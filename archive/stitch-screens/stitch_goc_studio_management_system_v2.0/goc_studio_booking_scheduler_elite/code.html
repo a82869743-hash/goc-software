@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Slots Booking Calendar | APEX DETAILING</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "secondary": "#ffb4a8",
+                      "tertiary": "#c8c6c7",
+                      "surface-dim": "#050505",
+                      "error": "#ffb4ab",
+                      "tertiary-fixed": "#e5e2e3",
+                      "secondary-fixed": "#ffdad4",
+                      "outline": "#b18780",
+                      "on-surface-variant": "#ebbbb4",
+                      "secondary-fixed-dim": "#ffb4a8",
+                      "on-primary-container": "#ffffff",
+                      "on-error": "#690005",
+                      "on-background": "#e2e2e2",
+                      "inverse-primary": "#C00000",
+                      "on-secondary-container": "#ff9f90",
+                      "background": "#050505",
+                      "on-secondary-fixed-variant": "#930000",
+                      "on-tertiary": "#313031",
+                      "on-secondary-fixed": "#410000",
+                      "surface-container": "#111111",
+                      "primary-container": "#FF2B2B",
+                      "on-tertiary-fixed": "#1c1b1d",
+                      "inverse-surface": "#e2e2e2",
+                      "error-container": "#93000a",
+                      "inverse-on-surface": "#2f3131",
+                      "surface-container-lowest": "#080808",
+                      "on-primary-fixed-variant": "#930100",
+                      "surface-container-low": "#0c0c0c",
+                      "tertiary-fixed-dim": "#c8c6c7",
+                      "tertiary-container": "#929091",
+                      "surface-container-highest": "#1a1a1a",
+                      "surface": "#050505",
+                      "on-tertiary-fixed-variant": "#474648",
+                      "on-tertiary-container": "#2a292b",
+                      "primary-fixed": "#ffdad4",
+                      "on-primary-fixed": "#410000",
+                      "primary": "#FF2B2B",
+                      "surface-tint": "#FF2B2B",
+                      "secondary-container": "#980000",
+                      "on-secondary": "#690000",
+                      "on-error-container": "#ffdad6",
+                      "surface-variant": "#111111",
+                      "outline-variant": "#603e39",
+                      "on-surface": "#e2e2e2",
+                      "surface-bright": "#222222",
+                      "surface-container-high": "#161616",
+                      "primary-fixed-dim": "#ffb4a8",
+                      "on-primary": "#ffffff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.6rem",
+                      "xl": "1rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "panel-gap": "1.5rem",
+                      "bento-unit": "160px",
+                      "gutter-md": "2rem",
+                      "grid-margin": "2.5rem"
+              },
+              "fontFamily": {
+                      "display-hero": ["Outfit", "sans-serif"],
+                      "headline-md": ["Outfit", "sans-serif"],
+                      "label-caps": ["JetBrains Mono", "monospace"],
+                      "data-lg": ["JetBrains Mono", "monospace"],
+                      "headline-lg": ["Outfit", "sans-serif"],
+                      "data-sm": ["JetBrains Mono", "monospace"],
+                      "body-lg": ["Outfit", "sans-serif"]
+              },
+              "fontSize": {
+                      "display-hero": ["64px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                      "label-caps": ["11px", {"lineHeight": "1.2", "letterSpacing": "0.15em", "fontWeight": "700"}],
+                      "data-lg": ["18px", {"lineHeight": "1.4", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                      "headline-lg": ["40px", {"lineHeight": "1.2", "fontWeight": "600"}],
+                      "data-sm": ["13px", {"lineHeight": "1.4", "fontWeight": "400"}],
+                      "body-lg": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}]
+              }
+            },
+          },
+        }
+    </script>
+<style>
+        body { background-color: #050505; color: theme('colors.on-background'); }
+        
+        .obsidian-panel { 
+            background: rgba(18, 18, 20, 0.4); 
+            backdrop-filter: blur(22px); 
+            -webkit-backdrop-filter: blur(22px);
+            border: 1px solid rgba(255, 255, 255, 0.08); 
+            position: relative; 
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+        }
+        
+        .obsidian-panel::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            background: radial-gradient(circle at top left, rgba(255, 43, 43, 0.03), transparent 40%);
+            pointer-events: none;
+        }
+
+        .glow-red { 
+            box-shadow: 0 0 25px rgba(255, 43, 43, 0.15); 
+        }
+
+        .btn-primary { 
+            background: linear-gradient(135deg, #FF2B2B 0%, #B80000 100%); 
+            color: white; 
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); 
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .btn-primary:hover { 
+            box-shadow: 0 0 25px rgba(255, 43, 43, 0.45); 
+            transform: translateY(-2px); 
+            filter: brightness(1.1);
+        }
+
+        .btn-secondary { 
+            border: 1px solid rgba(255, 43, 43, 0.4); 
+            color: #FF2B2B; 
+            background: rgba(255, 43, 43, 0.03); 
+            transition: all 0.3s ease; 
+        }
+        
+        .btn-secondary:hover { 
+            background: rgba(255, 43, 43, 0.12); 
+            border-color: #FF2B2B;
+        }
+
+        .input-glass { 
+            background: rgba(255, 255, 255, 0.02); 
+            border: 1px solid rgba(255, 255, 255, 0.1); 
+            color: theme('colors.on-background'); 
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+        }
+        
+        .input-glass:focus { 
+            border-color: #FF2B2B; 
+            background: rgba(255, 255, 255, 0.04);
+            box-shadow: 0 0 0 1px rgba(255, 43, 43, 0.3); 
+            outline: none; 
+        }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.02); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 43, 43, 0.2); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255, 43, 43, 0.5); }
+
+        .sidebar-active {
+            background: linear-gradient(90deg, rgba(255, 43, 43, 0.1) 0%, transparent 100%);
+            border-right: 2px solid #FF2B2B;
+        }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden antialiased selection:bg-primary-container selection:text-white">
+<!-- SideNavBar -->
+<nav class="bg-[#080808]/90 backdrop-blur-3xl font-label-caps text-label-caps h-screen w-72 fixed left-0 top-0 border-r border-white/5 shadow-[30px_0_60px_rgba(0,0,0,0.8)] duration-300 ease-in-out flex flex-col h-full py-10 z-50">
+<div class="px-10 mb-16">
+<h1 class="font-display-hero text-headline-md tracking-tighter text-white truncate" title="APEX DETAILING">
+            APEX <span class="text-primary">DETAILING</span>
+</h1>
+<p class="text-tertiary/40 text-[10px] mt-2 tracking-[0.2em] font-label-caps">ELITE STUDIO MANAGEMENT</p>
+</div>
+<div class="flex flex-col gap-1 flex-grow px-4">
+<a class="flex items-center gap-4 px-6 py-4 rounded-lg text-tertiary/60 hover:text-white hover:bg-white/5 transition-all group" href="#">
+<span class="material-symbols-outlined text-xl group-hover:text-primary transition-colors" data-icon="dashboard">dashboard</span>
+<span class="text-[12px]">Dashboard</span>
+</a>
+<a class="flex items-center gap-4 px-6 py-4 rounded-lg text-tertiary/60 hover:text-white hover:bg-white/5 transition-all group" href="#">
+<span class="material-symbols-outlined text-xl group-hover:text-primary transition-colors" data-icon="directions_car">directions_car</span>
+<span class="text-[12px]">Fleet</span>
+</a>
+<a class="flex items-center gap-4 px-6 py-4 rounded-lg sidebar-active text-white" href="#">
+<span class="material-symbols-outlined text-xl text-primary" data-icon="calendar_month">calendar_month</span>
+<span class="text-[12px]">Schedule</span>
+</a>
+<a class="flex items-center gap-4 px-6 py-4 rounded-lg text-tertiary/60 hover:text-white hover:bg-white/5 transition-all group" href="#">
+<span class="material-symbols-outlined text-xl group-hover:text-primary transition-colors" data-icon="analytics">analytics</span>
+<span class="text-[12px]">Analytics</span>
+</a>
+<a class="flex items-center gap-4 px-6 py-4 rounded-lg text-tertiary/60 hover:text-white hover:bg-white/5 transition-all group" href="#">
+<span class="material-symbols-outlined text-xl group-hover:text-primary transition-colors" data-icon="inventory_2">inventory_2</span>
+<span class="text-[12px]">Inventory</span>
+</a>
+<a class="flex items-center gap-4 px-6 py-4 rounded-lg text-tertiary/60 hover:text-white hover:bg-white/5 transition-all group" href="#">
+<span class="material-symbols-outlined text-xl group-hover:text-primary transition-colors" data-icon="settings">settings</span>
+<span class="text-[12px]">Settings</span>
+</a>
+</div>
+<div class="px-8 mt-auto pt-8 border-t border-white/5">
+<div class="flex items-center gap-4 p-2 rounded-xl bg-white/5">
+<div class="w-10 h-10 rounded-lg bg-surface-container-highest border border-white/10 flex items-center justify-center overflow-hidden">
+<span class="material-symbols-outlined text-lg text-primary" data-icon="account_circle">account_circle</span>
+</div>
+<div>
+<div class="text-on-surface text-[12px] font-bold">Studio Owner</div>
+<div class="text-tertiary/40 text-[10px] uppercase font-label-caps">Admin Access</div>
+</div>
+</div>
+</div>
+</nav>
+<!-- TopAppBar -->
+<header class="bg-[#050505]/60 backdrop-blur-xl fixed top-0 right-0 w-[calc(100%-18rem)] z-40 border-b border-white/5 flex justify-between items-center px-gutter-md h-24">
+<div class="flex items-center">
+<h2 class="font-headline-md text-2xl text-on-surface tracking-tight">Schedule Management</h2>
+</div>
+<div class="flex items-center gap-6">
+<div class="relative focus-within:ring-1 focus-within:ring-primary/30 rounded-full transition-all">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-tertiary/40 text-[20px]">search</span>
+<input class="input-glass rounded-full py-2.5 pl-12 pr-6 text-sm font-data-sm w-72" placeholder="Quick Search Bookings..." type="text"/>
+</div>
+<div class="flex items-center gap-2">
+<button class="text-tertiary/60 hover:text-primary transition-all flex items-center justify-center w-12 h-12 rounded-xl hover:bg-white/5">
+<span class="material-symbols-outlined text-[22px]" data-icon="notifications">notifications</span>
+</button>
+<button class="text-tertiary/60 hover:text-primary transition-all flex items-center justify-center w-12 h-12 rounded-xl hover:bg-white/5">
+<span class="material-symbols-outlined text-[22px]" data-icon="grid_view">grid_view</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-72 pt-24 p-grid-margin w-full overflow-y-auto h-full flex gap-8">
+<!-- Left Column: Calendar Widget -->
+<div class="w-[340px] flex flex-col gap-8">
+<div class="obsidian-panel rounded-xl p-8 flex flex-col">
+<div class="flex justify-between items-center mb-8">
+<h3 class="font-label-caps text-label-caps text-primary flex items-center gap-3">
+<span class="w-1.5 h-1.5 rounded-full bg-primary glow-red"></span>
+                    OCTOBER 2023
+                </h3>
+<div class="flex gap-2">
+<button class="w-9 h-9 flex items-center justify-center rounded-lg bg-white/5 text-tertiary/60 hover:text-white hover:bg-white/10 transition-all border border-white/5">
+<span class="material-symbols-outlined text-[18px]">chevron_left</span>
+</button>
+<button class="w-9 h-9 flex items-center justify-center rounded-lg bg-white/5 text-tertiary/60 hover:text-white hover:bg-white/10 transition-all border border-white/5">
+<span class="material-symbols-outlined text-[18px]">chevron_right</span>
+</button>
+</div>
+</div>
+<div class="grid grid-cols-7 gap-1 mb-4">
+<div class="font-label-caps text-[10px] text-tertiary/30 text-center">SUN</div>
+<div class="font-label-caps text-[10px] text-tertiary/30 text-center">MON</div>
+<div class="font-label-caps text-[10px] text-tertiary/30 text-center">TUE</div>
+<div class="font-label-caps text-[10px] text-tertiary/30 text-center">WED</div>
+<div class="font-label-caps text-[10px] text-tertiary/30 text-center">THU</div>
+<div class="font-label-caps text-[10px] text-tertiary/30 text-center">FRI</div>
+<div class="font-label-caps text-[10px] text-tertiary/30 text-center">SAT</div>
+</div>
+<div class="grid grid-cols-7 gap-1">
+<!-- Calendar Days -->
+<div class="aspect-square flex items-center justify-center font-data-sm text-tertiary/10">24</div>
+<div class="aspect-square flex items-center justify-center font-data-sm text-tertiary/10">25</div>
+<div class="aspect-square flex items-center justify-center font-data-sm text-tertiary/10">26</div>
+<div class="aspect-square flex items-center justify-center font-data-sm text-tertiary/10">27</div>
+<div class="aspect-square flex items-center justify-center font-data-sm text-tertiary/10">28</div>
+<div class="aspect-square flex items-center justify-center font-data-sm text-tertiary/10">29</div>
+<div class="aspect-square flex items-center justify-center font-data-sm text-tertiary/10">30</div>
+<div class="aspect-square flex items-center justify-center font-data-sm text-on-background cursor-pointer hover:bg-white/10 rounded-lg transition-colors">1</div>
+<div class="aspect-square flex items-center justify-center font-data-sm text-on-background cursor-pointer hover:bg-white/10 rounded-lg transition-colors">2</div>
+<div class="aspect-square flex items-center justify-center font-data-sm text-on-background cursor-pointer hover:bg-white/10 rounded-lg transition-colors relative"><span class="absolute bottom-1 w-1 h-1 rounded-full bg-primary/60"></span>3</div>
+<div class="aspect-square flex items-center justify-center font-data-sm text-on-background cursor-pointer hover:bg-white/10 rounded-lg transition-colors">4</div>
+<div class="aspect-square flex items-center justify-center font-data-sm text-on-background cursor-pointer hover:bg-white/10 rounded-lg transition-colors">5</div>
+<div class="aspect-square flex items-center justify-center font-data-sm text-on-background cursor-pointer hover:bg-white/10 rounded-lg transition-colors relative"><span class="absolute bottom-1 w-1 h-1 rounded-full bg-tertiary/40"></span>6</div>
+<div class="aspect-square flex items-center justify-center font-data-sm text-on-background cursor-pointer hover:bg-white/10 rounded-lg transition-colors">7</div>
+<div class="aspect-square flex items-center justify-center font-data-sm text-on-background cursor-pointer hover:bg-white/10 rounded-lg transition-colors">8</div>
+<div class="aspect-square flex items-center justify-center font-data-sm text-on-background cursor-pointer hover:bg-white/10 rounded-lg transition-colors">9</div>
+<div class="aspect-square flex items-center justify-center font-data-sm text-on-background cursor-pointer hover:bg-white/10 rounded-lg transition-colors relative"><span class="absolute bottom-1 w-1 h-1 rounded-full bg-primary/60"></span>10</div>
+<div class="aspect-square flex items-center justify-center font-data-sm text-on-background cursor-pointer hover:bg-white/10 rounded-lg transition-colors relative"><span class="absolute bottom-1 w-1 h-1 rounded-full bg-primary/60"></span>11</div>
+<div class="aspect-square flex items-center justify-center font-data-sm text-white font-bold bg-primary border border-white/20 rounded-lg cursor-pointer glow-red shadow-lg">12</div>
+<div class="aspect-square flex items-center justify-center font-data-sm text-on-background cursor-pointer hover:bg-white/10 rounded-lg transition-colors">13</div>
+<div class="aspect-square flex items-center justify-center font-data-sm text-on-background cursor-pointer hover:bg-white/10 rounded-lg transition-colors">14</div>
+<div class="aspect-square flex items-center justify-center font-data-sm text-on-background cursor-pointer hover:bg-white/10 rounded-lg transition-colors relative"><span class="absolute bottom-1 w-1 h-1 rounded-full bg-tertiary/40"></span>15</div>
+<div class="aspect-square flex items-center justify-center font-data-sm text-on-background cursor-pointer hover:bg-white/10 rounded-lg transition-colors">16</div>
+<div class="aspect-square flex items-center justify-center font-data-sm text-on-background cursor-pointer hover:bg-white/10 rounded-lg transition-colors">17</div>
+<div class="aspect-square flex items-center justify-center font-data-sm text-on-background cursor-pointer hover:bg-white/10 rounded-lg transition-colors">18</div>
+<div class="aspect-square flex items-center justify-center font-data-sm text-on-background cursor-pointer hover:bg-white/10 rounded-lg transition-colors">19</div>
+<div class="aspect-square flex items-center justify-center font-data-sm text-on-background cursor-pointer hover:bg-white/10 rounded-lg transition-colors">20</div>
+<div class="aspect-square flex items-center justify-center font-data-sm text-on-background cursor-pointer hover:bg-white/10 rounded-lg transition-colors relative"><span class="absolute bottom-1 w-1 h-1 rounded-full bg-primary/60"></span>21</div>
+</div>
+</div>
+<!-- Weekly Capacity -->
+<div class="obsidian-panel rounded-xl p-8">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-label-caps text-label-caps text-tertiary/60 tracking-widest">WEEKLY LOAD</h3>
+<span class="font-data-sm text-primary text-[11px]">82%</span>
+</div>
+<div class="flex items-end gap-3 h-28 px-2">
+<div class="flex-1 bg-white/5 rounded-t-md relative group"><div class="absolute bottom-0 w-full bg-tertiary/20 rounded-t-md h-[40%] transition-all group-hover:bg-primary/40"></div></div>
+<div class="flex-1 bg-white/5 rounded-t-md relative group"><div class="absolute bottom-0 w-full bg-tertiary/20 rounded-t-md h-[65%] transition-all group-hover:bg-primary/40"></div></div>
+<div class="flex-1 bg-white/5 rounded-t-md relative group"><div class="absolute bottom-0 w-full bg-primary rounded-t-md h-[90%] glow-red shadow-[0_0_20px_rgba(255,43,43,0.3)] transition-all"></div></div>
+<div class="flex-1 bg-white/5 rounded-t-md relative group"><div class="absolute bottom-0 w-full bg-tertiary/20 rounded-t-md h-[30%] transition-all group-hover:bg-primary/40"></div></div>
+<div class="flex-1 bg-white/5 rounded-t-md relative group"><div class="absolute bottom-0 w-full bg-tertiary/20 rounded-t-md h-[55%] transition-all group-hover:bg-primary/40"></div></div>
+<div class="flex-1 bg-white/5 rounded-t-md relative group"><div class="absolute bottom-0 w-full bg-tertiary/20 rounded-t-md h-[45%] transition-all group-hover:bg-primary/40"></div></div>
+<div class="flex-1 bg-white/5 rounded-t-md relative group"><div class="absolute bottom-0 w-full bg-tertiary/20 rounded-t-md h-[25%] transition-all group-hover:bg-primary/40"></div></div>
+</div>
+</div>
+</div>
+<!-- Right Column: Bay Slots Grid -->
+<div class="flex-grow flex flex-col h-full relative pr-8">
+<div class="flex justify-between items-end mb-8">
+<div>
+<h2 class="font-headline-md text-3xl text-on-surface mb-2">Thursday, Oct 12</h2>
+<p class="font-body-lg text-tertiary/50">3 of 8 slots available across 2 Operational Bays</p>
+</div>
+<button class="btn-primary px-8 py-3.5 rounded-full font-label-caps text-[11px] flex items-center gap-3 tracking-widest shadow-xl" id="openDrawerBtn">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                NEW BOOKING
+            </button>
+</div>
+<div class="flex-grow overflow-y-auto pr-4 custom-scrollbar space-y-8">
+<!-- Detailing Bay Alpha -->
+<div class="obsidian-panel rounded-2xl p-8">
+<div class="flex items-center justify-between mb-8">
+<h3 class="font-label-caps text-label-caps text-tertiary flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-[20px]">local_car_wash</span>
+                        DETAILING BAY ALPHA
+                    </h3>
+<span class="px-3 py-1 bg-green-500/10 text-green-400 font-label-caps text-[10px] rounded border border-green-500/20">OPERATIONAL</span>
+</div>
+<div class="grid grid-cols-2 gap-6">
+<!-- Booked Slot -->
+<div class="bg-surface-container-lowest border border-white/5 rounded-xl p-6 relative overflow-hidden group">
+<div class="absolute top-0 left-0 w-1.5 h-full bg-tertiary/40"></div>
+<div class="flex justify-between items-start mb-4">
+<span class="font-data-lg text-data-lg text-white">09:00 - 11:00</span>
+<span class="font-label-caps text-[9px] px-2 py-1 bg-white/5 rounded text-tertiary/40 tracking-widest">LOCKED</span>
+</div>
+<p class="font-headline-md text-lg text-on-surface mb-1">Ceramic Coating Stage 1</p>
+<p class="font-data-sm text-[12px] text-tertiary/50">Porsche 911 GT3 <span class="text-white/20 mx-2">|</span> J. Doe</p>
+<div class="absolute inset-0 bg-[#050505]/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-4">
+<button class="btn-secondary px-6 py-2 rounded-full font-label-caps text-[10px] tracking-widest">DETAILS</button>
+<button class="text-white/40 hover:text-white transition-colors"><span class="material-symbols-outlined">edit</span></button>
+</div>
+</div>
+<!-- Available Slot -->
+<div class="bg-primary/5 border border-primary/20 rounded-xl p-6 relative cursor-pointer hover:bg-primary/10 hover:border-primary/40 transition-all group">
+<div class="flex justify-between items-start mb-4">
+<span class="font-data-lg text-data-lg text-primary">11:00 - 13:00</span>
+<span class="font-label-caps text-[9px] px-2 py-1 bg-primary/20 text-primary rounded flex items-center gap-1.5 tracking-widest">
+<span class="material-symbols-outlined text-[12px]">bolt</span> AVAILABLE
+                            </span>
+</div>
+<div class="h-16 flex items-center justify-center border border-dashed border-primary/30 rounded-lg group-hover:border-primary/60 transition-all bg-primary/5">
+<span class="font-label-caps text-[10px] text-primary/70 tracking-[0.2em] group-hover:scale-105 transition-transform">CLICK TO RESERVE</span>
+</div>
+</div>
+<!-- In Progress Slot -->
+<div class="bg-surface-container-lowest border border-white/5 rounded-xl p-6 relative overflow-hidden group col-span-2">
+<div class="absolute top-0 left-0 w-1.5 h-full bg-primary glow-red"></div>
+<div class="flex justify-between items-start mb-4">
+<span class="font-data-lg text-data-lg text-white">14:00 - 18:00</span>
+<span class="font-label-caps text-[9px] px-3 py-1 bg-primary/20 text-primary rounded flex items-center gap-1.5 animate-pulse tracking-widest">IN PROGRESS</span>
+</div>
+<div class="flex justify-between items-end">
+<div>
+<p class="font-headline-md text-lg text-on-surface mb-1">Full Paint Correction &amp; PPF</p>
+<p class="font-data-sm text-[12px] text-tertiary/50">McLaren 720S <span class="text-white/20 mx-2">|</span> M. Smith</p>
+</div>
+<div class="text-right">
+<span class="font-data-sm text-[11px] text-primary">65% COMPLETED</span>
+</div>
+</div>
+<div class="w-full bg-white/5 h-1.5 rounded-full mt-6 overflow-hidden">
+<div class="bg-gradient-to-r from-primary to-primary/60 h-full w-[65%] glow-red"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Detailing Bay Omega -->
+<div class="obsidian-panel rounded-2xl p-8">
+<div class="flex items-center justify-between mb-8">
+<h3 class="font-label-caps text-label-caps text-tertiary flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-[20px]">local_car_wash</span>
+                        DETAILING BAY OMEGA
+                    </h3>
+<span class="px-3 py-1 bg-green-500/10 text-green-400 font-label-caps text-[10px] rounded border border-green-500/20">OPERATIONAL</span>
+</div>
+<div class="grid grid-cols-2 gap-6">
+<div class="bg-surface-container-lowest border border-white/5 rounded-xl p-6 relative overflow-hidden group">
+<div class="absolute top-0 left-0 w-1.5 h-full bg-tertiary/40"></div>
+<div class="flex justify-between items-start mb-4">
+<span class="font-data-lg text-data-lg text-white">09:00 - 13:00</span>
+<span class="font-label-caps text-[9px] px-2 py-1 bg-white/5 rounded text-tertiary/40 tracking-widest">LOCKED</span>
+</div>
+<p class="font-headline-md text-lg text-on-surface mb-1">Interior Deep Clean &amp; Ozone</p>
+<p class="font-data-sm text-[12px] text-tertiary/50">Range Rover SVR <span class="text-white/20 mx-2">|</span> A. Johnson</p>
+</div>
+<div class="bg-primary/5 border border-primary/20 rounded-xl p-6 relative cursor-pointer hover:bg-primary/10 hover:border-primary/40 transition-all group">
+<div class="flex justify-between items-start mb-4">
+<span class="font-data-lg text-data-lg text-primary">14:00 - 16:00</span>
+<span class="font-label-caps text-[9px] px-2 py-1 bg-primary/20 text-primary rounded flex items-center gap-1.5 tracking-widest">
+<span class="material-symbols-outlined text-[12px]">bolt</span> AVAILABLE
+                            </span>
+</div>
+<div class="h-16 flex items-center justify-center border border-dashed border-primary/30 rounded-lg group-hover:border-primary/60 transition-all bg-primary/5">
+<span class="font-label-caps text-[10px] text-primary/70 tracking-[0.2em]">CLICK TO RESERVE</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Schedule Booking Drawer -->
+<div class="fixed inset-0 bg-black/80 backdrop-blur-xl z-[60] hidden opacity-0 transition-all duration-500" id="bookingDrawerOverlay"></div>
+<div class="fixed top-0 right-0 h-full w-[480px] bg-[#0A0A0A]/95 backdrop-blur-3xl border-l border-white/10 z-[70] transform translate-x-full transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1) flex flex-col shadow-[-40px_0_100px_rgba(0,0,0,0.9)]" id="bookingDrawer">
+<div class="flex justify-between items-center p-10 border-b border-white/5">
+<div>
+<h2 class="font-headline-md text-3xl text-on-surface">New Reservation</h2>
+<p class="text-[11px] font-label-caps text-primary mt-1 tracking-widest">SCHEDULING WIZARD</p>
+</div>
+<button class="w-12 h-12 flex items-center justify-center rounded-full text-tertiary/40 hover:text-white hover:bg-white/5 transition-all" id="closeDrawerBtn">
+<span class="material-symbols-outlined text-[28px]">close</span>
+</button>
+</div>
+<div class="p-10 flex-grow overflow-y-auto space-y-8 custom-scrollbar">
+<!-- Customer Autocomplete -->
+<div>
+<label class="block font-label-caps text-[10px] text-tertiary/40 mb-3 tracking-[0.2em]">SELECT CUSTOMER</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-primary text-[20px]">person_search</span>
+<input class="input-glass w-full rounded-xl py-4 pl-14 pr-6 text-sm font-data-sm" placeholder="Search by name, VIN, or plate..." type="text"/>
+</div>
+</div>
+<!-- Service Selection -->
+<div>
+<label class="block font-label-caps text-[10px] text-tertiary/40 mb-3 tracking-[0.2em]">SERVICE PACKAGE</label>
+<select class="input-glass w-full rounded-xl py-4 px-6 text-sm font-data-sm appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23FF2B2B%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_1.5rem_center] bg-[length:1.2em]">
+<option class="bg-surface-dim text-on-surface">Browse All Services...</option>
+<option class="bg-surface-dim text-on-surface">Stage 1 Ceramic Coating (8-10hrs)</option>
+<option class="bg-surface-dim text-on-surface">Full Paint Correction (15-20hrs)</option>
+<option class="bg-surface-dim text-on-surface">Bespoke Interior Detailing (4-6hrs)</option>
+</select>
+</div>
+<!-- Date & Time Grid -->
+<div class="grid grid-cols-2 gap-6">
+<div>
+<label class="block font-label-caps text-[10px] text-tertiary/40 mb-3 tracking-[0.2em]">APPOINTMENT DATE</label>
+<div class="input-glass w-full rounded-xl py-4 px-6 text-sm font-data-sm flex items-center justify-between text-white/50 bg-white/5">
+<span>Oct 12, 2023</span>
+<span class="material-symbols-outlined text-[18px]">calendar_today</span>
+</div>
+</div>
+<div>
+<label class="block font-label-caps text-[10px] text-tertiary/40 mb-3 tracking-[0.2em]">ASSIGNED BAY</label>
+<div class="input-glass w-full rounded-xl py-4 px-6 text-sm font-data-sm flex items-center justify-between text-white/50 bg-white/5">
+<span>ALPHA</span>
+<span class="material-symbols-outlined text-[18px]">meeting_room</span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-6">
+<div>
+<label class="block font-label-caps text-[10px] text-tertiary/40 mb-3 tracking-[0.2em]">START WINDOW</label>
+<select class="input-glass w-full rounded-xl py-4 px-6 text-sm font-data-sm appearance-none">
+<option class="bg-surface-dim">11:00 AM</option>
+</select>
+</div>
+<div>
+<label class="block font-label-caps text-[10px] text-tertiary/40 mb-3 tracking-[0.2em]">EST. COMPLETION</label>
+<select class="input-glass w-full rounded-xl py-4 px-6 text-sm font-data-sm appearance-none">
+<option class="bg-surface-dim">01:00 PM</option>
+</select>
+</div>
+</div>
+<!-- Notes -->
+<div>
+<label class="block font-label-caps text-[10px] text-tertiary/40 mb-3 tracking-[0.2em]">TECHNICAL NOTES</label>
+<textarea class="input-glass w-full rounded-xl py-4 px-6 text-sm font-data-sm resize-none h-32" placeholder="Specific paint depth readings, known defects, or client preferences..."></textarea>
+</div>
+</div>
+<div class="p-10 border-t border-white/5 bg-white/2 backdrop-blur-md mt-auto flex gap-6">
+<button class="btn-secondary flex-1 py-4 rounded-xl font-label-caps text-[11px] tracking-[0.2em]" id="cancelDrawerBtn">DISCARD</button>
+<button class="btn-primary flex-1 py-4 rounded-xl font-label-caps text-[11px] tracking-[0.2em] glow-red">CONFIRM SLOT</button>
+</div>
+</div>
+<script>
+    const drawer = document.getElementById('bookingDrawer');
+    const overlay = document.getElementById('bookingDrawerOverlay');
+    const openBtn = document.getElementById('openDrawerBtn');
+    const closeBtn = document.getElementById('closeDrawerBtn');
+    const cancelBtn = document.getElementById('cancelDrawerBtn');
+
+    function openDrawer() {
+        overlay.classList.remove('hidden');
+        setTimeout(() => {
+            overlay.classList.remove('opacity-0');
+            drawer.classList.remove('translate-x-full');
+        }, 10);
+    }
+
+    function closeDrawer() {
+        overlay.classList.add('opacity-0');
+        drawer.classList.add('translate-x-full');
+        setTimeout(() => {
+            overlay.classList.add('hidden');
+        }, 500);
+    }
+
+    openBtn.addEventListener('click', openDrawer);
+    closeBtn.addEventListener('click', closeDrawer);
+    cancelBtn.addEventListener('click', closeDrawer);
+    overlay.addEventListener('click', closeDrawer);
+
+    const interactiveSlots = document.querySelectorAll('.cursor-pointer');
+    interactiveSlots.forEach(slot => {
+        slot.addEventListener('click', openDrawer);
+    });
+</script>
+</body></html>

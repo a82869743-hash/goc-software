@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Apex Detailing | Staff Attendance</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            background-color: #050505;
+            color: #e2e2e2;
+            overflow-x: hidden;
+        }
+        .obsidian-glass {
+            background: rgba(18, 20, 20, 0.4);
+            backdrop-filter: blur(22px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
+        }
+        .performance-red-gradient {
+            background: linear-gradient(135deg, #FF2B2B 0%, #930100 100%);
+        }
+        .apex-glow-red {
+            box-shadow: 0 0 25px rgba(255, 43, 43, 0.3);
+        }
+        .apex-glow-red:hover {
+            box-shadow: 0 0 40px rgba(255, 43, 43, 0.5);
+        }
+        .ambient-red-glow {
+            filter: blur(80px);
+            background: radial-gradient(circle, rgba(255, 43, 43, 0.15) 0%, transparent 70%);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 43, 43, 0.2);
+            border-radius: 10px;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "primary-container": "#FF2B2B",
+                      "primary": "#FF2B2B",
+                      "surface": "#121414",
+                      "background": "#050505",
+                      "on-surface": "#e2e2e2",
+                      "on-surface-variant": "#ebbbb4",
+                      "surface-container": "#1e2020",
+                      "surface-container-low": "#121414",
+                      "surface-container-lowest": "#080808",
+                      "surface-container-high": "#282a2b",
+                      "tertiary": "#c8c6c7"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "panel-gap": "1rem",
+                      "gutter-md": "1.5rem",
+                      "bento-unit": "160px",
+                      "grid-margin": "2rem"
+              },
+              "fontFamily": {
+                      "display-hero": ["Outfit"],
+                      "headline-md": ["Outfit"],
+                      "data-sm": ["JetBrains Mono"],
+                      "label-caps": ["JetBrains Mono"],
+                      "body-lg": ["Outfit"],
+                      "headline-lg": ["Outfit"],
+                      "data-lg": ["JetBrains Mono"]
+              },
+              "fontSize": {
+                      "display-hero": ["64px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                      "data-sm": ["13px", {"lineHeight": "1.4", "fontWeight": "400"}],
+                      "label-caps": ["11px", {"lineHeight": "1.2", "letterSpacing": "0.1em", "fontWeight": "700"}],
+                      "body-lg": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                      "headline-lg": ["40px", {"lineHeight": "1.2", "fontWeight": "600"}],
+                      "data-lg": ["18px", {"lineHeight": "1.4", "letterSpacing": "0.02em", "fontWeight": "500"}]
+              }
+            }
+          }
+        }
+      </script>
+</head>
+<body class="bg-background">
+<!-- SIDEBAR NAVIGATION -->
+<aside class="bg-black/60 backdrop-blur-3xl h-screen w-64 fixed left-0 top-0 border-r border-white/5 shadow-[20px_0_40px_rgba(0,0,0,0.8)] flex flex-col py-8 z-50">
+<div class="px-6 mb-12">
+<h1 class="font-display-hero text-headline-md tracking-tighter text-primary">APEX DETAILING</h1>
+<p class="font-label-caps text-[10px] text-on-surface-variant/40">Elite Studio Management</p>
+</div>
+<nav class="flex-1 px-4 space-y-2">
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-tertiary hover:text-white transition-all hover:bg-white/5 group" href="#">
+<span class="material-symbols-outlined text-primary/60 group-hover:text-primary transition-colors">dashboard</span>
+<span class="font-label-caps text-label-caps">Dashboard</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-tertiary hover:text-white transition-all hover:bg-white/5 group" href="#">
+<span class="material-symbols-outlined text-primary/60 group-hover:text-primary transition-colors">directions_car</span>
+<span class="font-label-caps text-label-caps">Fleet</span>
+</a>
+<!-- Active State -->
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg bg-primary/10 text-primary border-r-2 border-primary group relative overflow-hidden" href="#">
+<div class="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent"></div>
+<span class="material-symbols-outlined relative z-10">calendar_month</span>
+<span class="font-label-caps text-label-caps relative z-10">Schedule</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-tertiary hover:text-white transition-all hover:bg-white/5 group" href="#">
+<span class="material-symbols-outlined text-primary/60 group-hover:text-primary transition-colors">analytics</span>
+<span class="font-label-caps text-label-caps">Analytics</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-tertiary hover:text-white transition-all hover:bg-white/5 group" href="#">
+<span class="material-symbols-outlined text-primary/60 group-hover:text-primary transition-colors">inventory_2</span>
+<span class="font-label-caps text-label-caps">Inventory</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-tertiary hover:text-white transition-all hover:bg-white/5 group" href="#">
+<span class="material-symbols-outlined text-primary/60 group-hover:text-primary transition-colors">settings</span>
+<span class="font-label-caps text-label-caps">Settings</span>
+</a>
+</nav>
+<div class="mt-auto px-6 pt-6 border-t border-white/5 flex items-center gap-4">
+<div class="relative">
+<img alt="Studio Owner" class="w-10 h-10 rounded-full border border-primary/30" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDMRCi-PdtsficWC8VBxww1yDVhWcjkSBcbVrkpREcBiDMop3v1SfwAfouW3HlJRGIDXdxCWMqEqtZ7KDwCw5s7jvrlaS4l7Xf2CihGrV6X95Re4zPj5l5rAG1tLr7XNm-gnyQKmsUmp87J-yMdSlOxzYIqGTg25nQqyKdC-SZi-G5uuxJh-WKXDLqeEBCnGC3lPsdMIAlQ4uc0C1_MsXVy7Cs2RuThTGqLdrga3Y7UjuLmFBN60Hv0Rckpu6ZxFfzD8aZpO9hrRW4"/>
+<span class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-black rounded-full"></span>
+</div>
+<div>
+<p class="font-label-caps text-[9px] text-primary">CHIEF OFFICER</p>
+<p class="font-headline-md text-sm text-on-surface">M. Sterling</p>
+</div>
+</div>
+</aside>
+<!-- MAIN CONTENT AREA -->
+<main class="ml-64 min-h-screen relative">
+<!-- TOP APP BAR -->
+<header class="fixed top-0 right-0 w-[calc(100%-16rem)] z-40 bg-background/60 backdrop-blur-md border-b border-white/5 flex justify-between items-center px-gutter-md h-20">
+<div class="flex flex-col">
+<h2 class="font-headline-md text-headline-md text-on-surface flex items-center gap-3">
+                Staff Attendance
+                <span class="text-on-surface-variant/80 font-data-sm text-[12px] bg-white/5 px-3 py-1 rounded-full border border-white/5">OCT 24, 2023</span>
+</h2>
+</div>
+<div class="flex items-center gap-6">
+<div class="relative group">
+<input class="bg-black/40 border border-white/10 rounded-full px-6 py-2 w-64 focus:outline-none focus:border-primary/50 text-sm transition-all font-body-lg" placeholder="Search Telemetry..." type="text"/>
+<span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/40 group-focus-within:text-primary">search</span>
+</div>
+<div class="flex gap-4">
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/5 transition-colors relative">
+<span class="material-symbols-outlined text-on-surface-variant/60">notifications</span>
+<span class="absolute top-2.5 right-2.5 w-1.5 h-1.5 bg-primary rounded-full shadow-[0_0_8px_rgba(255,43,43,0.8)]"></span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/5 transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant/60">account_circle</span>
+</button>
+</div>
+</div>
+</header>
+<div class="pt-24 px-gutter-md pb-12 space-y-8 relative z-10">
+<!-- TOP BENTO SECTION -->
+<div class="grid grid-cols-12 gap-panel-gap">
+<!-- BIOMETRIC TERMINAL -->
+<div class="col-span-12 lg:col-span-7 obsidian-glass rounded-xl p-6 relative overflow-hidden group">
+<div class="absolute top-0 right-0 p-6 opacity-5 pointer-events-none group-hover:opacity-10 transition-opacity">
+<span class="material-symbols-outlined text-7xl">qr_code_scanner</span>
+</div>
+<div class="flex items-center gap-2 mb-6">
+<div class="w-2 h-2 bg-primary rounded-full animate-pulse shadow-[0_0_8px_rgba(255,43,43,0.8)]"></div>
+<h3 class="font-label-caps text-label-caps text-on-surface-variant/80 uppercase tracking-widest">Biometric Terminal Alpha</h3>
+</div>
+<div class="flex flex-col md:flex-row gap-6">
+<!-- CAMERA PREVIEW AREA -->
+<div class="w-full md:w-1/2 aspect-video bg-black/80 rounded-lg border border-white/5 overflow-hidden relative shadow-2xl">
+<img class="w-full h-full object-cover opacity-50 grayscale hover:grayscale-0 transition-all duration-1000" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB6C-VtKLofE2z6brkHeDRb22HzHm9xoAgFH6wiBg5YIiIArROMa2D5LXgHEhcPfb_VWBOcz-SOY4QY8tCFZ9qHNkdN2Zhbuc4NbNKPjMjLps9jev5_OaQe6rsDDHslE36loRl9qDSEaq2VHX2KCkBYlIbWEpTZ83kczBuQWZA5EYZ8riGZ4BSq-7P434YMp_-AgeWKL1GVzbw9lTUJTgCTJUucxHA6OxlPZYBl4nXYVlu9KMpVawNrqLEQBDCTNGvFF0CUehLHxII"/>
+<div class="absolute inset-0 flex flex-col justify-between p-4 bg-gradient-to-t from-black/90 via-transparent to-transparent">
+<div class="flex justify-between items-start">
+<span class="font-data-sm text-[10px] text-green-500 bg-green-500/10 px-2 py-0.5 rounded border border-green-500/20">LIVE FEED</span>
+<span class="font-data-sm text-[10px] text-white/40">CH: 01_BIOMETRIC</span>
+</div>
+<div class="space-y-1">
+<p class="font-data-sm text-[10px] text-primary/70">LAT: 34.0522° N</p>
+<p class="font-data-sm text-[10px] text-primary/70">LONG: 118.2437° W</p>
+</div>
+</div>
+<!-- SCANNER ANIMATION -->
+<div class="absolute top-0 left-0 w-full h-0.5 bg-primary/60 shadow-[0_0_15px_rgba(255,43,43,1)] animate-[scan_3s_infinite]"></div>
+</div>
+<!-- CLOCK ACTION -->
+<div class="w-full md:w-1/2 flex flex-col justify-between">
+<div class="space-y-4">
+<div class="bg-black/40 border border-white/5 rounded-lg p-4 border-l-2 border-l-primary">
+<p class="font-label-caps text-[10px] text-on-surface-variant/40 mb-1">CURRENT IDENTITY</p>
+<p class="font-headline-md text-lg text-on-surface">Scanning for Token...</p>
+</div>
+<div class="bg-black/40 border border-white/5 rounded-lg p-4 border-l-2 border-l-white/20">
+<p class="font-label-caps text-[10px] text-on-surface-variant/40 mb-1">SYSTEM TIME</p>
+<p class="font-data-lg text-xl text-on-surface" id="clock">09:41:00 AM</p>
+</div>
+</div>
+<button class="performance-red-gradient apex-glow-red w-full h-16 rounded-xl font-label-caps text-label-caps text-white transition-all transform active:scale-95 flex items-center justify-center gap-3 mt-4 border border-white/10">
+<span class="material-symbols-outlined">fingerprint</span>
+                            CLOCK IN / OUT
+                        </button>
+</div>
+</div>
+</div>
+<!-- TODAY'S STATS ROW -->
+<div class="col-span-12 lg:col-span-5 grid grid-cols-2 gap-panel-gap">
+<div class="obsidian-glass rounded-xl p-5 flex flex-col justify-between hover:bg-white/5 transition-all group">
+<div class="flex justify-between items-start">
+<span class="material-symbols-outlined text-primary group-hover:scale-110 transition-transform">groups</span>
+<span class="font-data-sm text-[10px] text-green-500">+12%</span>
+</div>
+<div>
+<p class="font-data-lg text-3xl text-on-surface">24</p>
+<p class="font-label-caps text-[10px] text-on-surface-variant/40 uppercase">Total Present</p>
+</div>
+</div>
+<div class="obsidian-glass rounded-xl p-5 flex flex-col justify-between hover:bg-white/5 transition-all group">
+<div class="flex justify-between items-start">
+<span class="material-symbols-outlined text-white/60 group-hover:text-primary transition-colors">timer</span>
+<span class="font-data-sm text-[10px] text-white/60">92%</span>
+</div>
+<div>
+<p class="font-data-lg text-3xl text-on-surface">22</p>
+<p class="font-label-caps text-[10px] text-on-surface-variant/40 uppercase">On Time</p>
+</div>
+</div>
+<div class="obsidian-glass rounded-xl p-5 flex flex-col justify-between hover:bg-white/5 transition-all group">
+<div class="flex justify-between items-start">
+<span class="material-symbols-outlined text-primary/40 group-hover:text-primary transition-colors">event_busy</span>
+<span class="font-data-sm text-[10px] text-primary">-2</span>
+</div>
+<div>
+<p class="font-data-lg text-3xl text-on-surface">02</p>
+<p class="font-label-caps text-[10px] text-on-surface-variant/40 uppercase">Late / Missed</p>
+</div>
+</div>
+<div class="obsidian-glass rounded-xl p-5 flex flex-col justify-between hover:bg-white/5 transition-all group relative overflow-hidden">
+<div class="absolute -right-6 -bottom-6 opacity-5 pointer-events-none group-hover:opacity-10 transition-opacity">
+<span class="material-symbols-outlined text-8xl">engineering</span>
+</div>
+<div class="flex justify-between items-start">
+<span class="material-symbols-outlined text-primary">precision_manufacturing</span>
+<span class="font-data-sm text-[10px] text-primary">ACTIVE</span>
+</div>
+<div>
+<p class="font-data-lg text-3xl text-on-surface">18</p>
+<p class="font-label-caps text-[10px] text-on-surface-variant/40 uppercase">Active Techs</p>
+</div>
+</div>
+</div>
+</div>
+<!-- DAILY ATTENDANCE ROSTER -->
+<section class="obsidian-glass rounded-xl overflow-hidden border border-white/5 shadow-2xl">
+<div class="px-8 py-6 border-b border-white/5 flex justify-between items-center bg-black/40">
+<div class="flex items-center gap-3">
+<span class="w-1 h-6 performance-red-gradient rounded-full shadow-[0_0_10px_rgba(255,43,43,0.5)]"></span>
+<h3 class="font-label-caps text-label-caps tracking-[0.2em] text-white/90 uppercase">Personnel Manifest</h3>
+</div>
+<div class="flex gap-3">
+<button class="px-4 py-2 bg-black/40 border border-white/10 rounded-lg text-[10px] font-label-caps text-on-surface hover:bg-white/10 transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">filter_list</span>
+                        FILTER
+                    </button>
+<button class="px-4 py-2 bg-black/40 border border-white/10 rounded-lg text-[10px] font-label-caps text-on-surface hover:bg-white/10 transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">download</span>
+                        EXPORT CSV
+                    </button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left">
+<thead>
+<tr class="bg-black/60 text-on-surface-variant/40 font-label-caps text-[10px] border-b border-white/5">
+<th class="px-8 py-5 font-normal tracking-[0.15em]">STAFF MEMBER</th>
+<th class="px-6 py-5 font-normal tracking-[0.15em]">ROLE</th>
+<th class="px-6 py-5 font-normal tracking-[0.15em]">CHECK-IN</th>
+<th class="px-6 py-5 font-normal tracking-[0.15em]">STATUS</th>
+<th class="px-6 py-5 font-normal tracking-[0.15em]">GPS VERIFICATION</th>
+<th class="px-8 py-5 text-right font-normal tracking-[0.15em]">ACTION</th>
+</tr>
+</thead>
+<tbody class="font-body-lg divide-y divide-white/5 bg-black/20">
+<!-- Row 1 -->
+<tr class="hover:bg-primary/5 transition-all group">
+<td class="px-8 py-5">
+<div class="flex items-center gap-4">
+<div class="relative">
+<img alt="Staff Member" class="w-11 h-11 rounded-lg grayscale group-hover:grayscale-0 transition-all border border-white/10" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAOzApWrZ70_uBhASHq74pyE2_WVzc8lD5m4UoVlEVoAj9Hbw4NPBwwedjb5pdejiX1m1ZyfQtwqmPalSnUIbVhR0FCGdFfEjXCASWJHbry9bTxz7hWJsbRoasW3NWODKlxphZ1dpiInJ60wi2UOqYINitol3JBwtyZSVIZDKYIXaPdAbxReHGp6DuJuPJrX9sgC6qIhYjLn94Ha375ir5FLWJsF9WdQCb1lc1UVwb5G3PzngVoYVQ4ceM6faVjrzFZi6UJxIw0BJE"/>
+<div class="absolute inset-0 rounded-lg border border-primary/20 group-hover:border-primary/50 transition-colors"></div>
+</div>
+<div>
+<p class="text-on-surface font-medium group-hover:text-primary transition-colors">Alexander Rossi</p>
+<p class="text-[10px] text-white/30 font-data-sm">ID: APX-901</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="font-label-caps text-[11px] text-tertiary/80 uppercase">Senior Detailer</span>
+</td>
+<td class="px-6 py-5">
+<p class="font-data-lg text-sm text-on-surface">08:52 AM</p>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 text-green-400 text-[9px] font-label-caps border border-green-500/20">
+<span class="w-1 h-1 bg-green-400 rounded-full animate-pulse"></span> PRESENT
+                                </span>
+</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-2 text-green-500/70 group-hover:text-green-500 transition-colors">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+<span class="text-[11px] font-data-sm">Within Range</span>
+</div>
+</td>
+<td class="px-8 py-5 text-right">
+<button class="p-2 hover:bg-white/5 rounded-lg transition-colors text-white/20 hover:text-primary">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-primary/5 transition-all group">
+<td class="px-8 py-5">
+<div class="flex items-center gap-4">
+<div class="relative">
+<img alt="Staff Member" class="w-11 h-11 rounded-lg grayscale group-hover:grayscale-0 transition-all border border-white/10" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBjECezE2MkjFM_FoepkcomOCK_IzXxjqOc4mS1bXrlp5jBu3TE9l-BGzHCquGE5IXMTkFVAVXlOuoKEpGVTnNmKXf7EGLdFZJziXlJpiSCyZ3dak_f2UQyoM4a0VYxPNnkKwnqMYW4Zu-qMIuHmwz6rBTDN68pJ0Gg_R5imnNNF528KkDLZEvTYJKDKYYeDBCRdIJ_-RgRMeLunEUl2_8MLCI3SmZ42PzJSx_5AyfVcit7y6zyilnBxbJcFSYqZKZw-bGvuJNpGnE"/>
+<div class="absolute inset-0 rounded-lg border border-primary/20 group-hover:border-primary/50 transition-colors"></div>
+</div>
+<div>
+<p class="text-on-surface font-medium group-hover:text-primary transition-colors">Jordan Vance</p>
+<p class="text-[10px] text-white/30 font-data-sm">ID: APX-442</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="font-label-caps text-[11px] text-tertiary/80 uppercase">Studio Manager</span>
+</td>
+<td class="px-6 py-5">
+<p class="font-data-lg text-sm text-on-surface">09:14 AM</p>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-[9px] font-label-caps border border-primary/20">
+<span class="w-1 h-1 bg-primary rounded-full"></span> LATE (14m)
+                                </span>
+</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-2 text-green-500/70 group-hover:text-green-500 transition-colors">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+<span class="text-[11px] font-data-sm">Within Range</span>
+</div>
+</td>
+<td class="px-8 py-5 text-right">
+<button class="p-2 hover:bg-white/5 rounded-lg transition-colors text-white/20 hover:text-primary">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-primary/5 transition-all group">
+<td class="px-8 py-5">
+<div class="flex items-center gap-4">
+<div class="relative">
+<img alt="Staff Member" class="w-11 h-11 rounded-lg grayscale group-hover:grayscale-0 transition-all border border-white/10" src="https://lh3.googleusercontent.com/aida-public/AB6AXuChV6XrWQqBmKuU11UYK4gCFFOUeKBcngcVOeBphIoBrk2PgT_ymj53sddTVCr7ZRtR-M0O_zxgYIQwIn9VFf11i5t3YnW9WMQVgwxj0e0hqrG1yXUOhT0hqV1xaWxTF2HIhPOkEDC_wbft4f6Zvp3HyNZR9lwDOIqPJH_4n2ccHhhr95fVp8GpkUES34sgZx-NCnRuk5LQXL0ESn6DMX7cp4yYfDHNBBO6SQtlyoHVTpK6eIYCsSj2CHZ4R7dN3rk-E68oK0vNRm0"/>
+<div class="absolute inset-0 rounded-lg border border-primary/20 group-hover:border-primary/50 transition-colors"></div>
+</div>
+<div>
+<p class="text-on-surface font-medium group-hover:text-primary transition-colors">Clara Mendez</p>
+<p class="text-[10px] text-white/30 font-data-sm">ID: APX-218</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="font-label-caps text-[11px] text-tertiary/80 uppercase">Lead Specialist</span>
+</td>
+<td class="px-6 py-5">
+<p class="font-data-lg text-sm text-white/10">--:--</p>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 text-white/40 text-[9px] font-label-caps border border-white/5">
+<span class="w-1 h-1 bg-white/20 rounded-full"></span> ON LEAVE
+                                </span>
+</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-2 text-white/10">
+<span class="material-symbols-outlined text-lg">public_off</span>
+<span class="text-[11px] font-data-sm">Not Verified</span>
+</div>
+</td>
+<td class="px-8 py-5 text-right">
+<button class="p-2 hover:bg-white/5 rounded-lg transition-colors text-white/20 hover:text-primary">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="px-8 py-5 bg-black/60 border-t border-white/5 flex justify-between items-center">
+<p class="font-data-sm text-[11px] text-white/30 tracking-tight">Active Personnel Telemetry Buffer: 24 active entries</p>
+<div class="flex gap-2">
+<button class="p-2 bg-white/5 border border-white/5 rounded-lg hover:bg-white/10 disabled:opacity-20 transition-colors" disabled="">
+<span class="material-symbols-outlined text-sm text-on-surface">chevron_left</span>
+</button>
+<button class="p-2 bg-white/5 border border-white/5 rounded-lg hover:bg-white/10 transition-colors group">
+<span class="material-symbols-outlined text-sm text-on-surface group-hover:text-primary">chevron_right</span>
+</button>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- ATMOSPHERIC EFFECTS -->
+<div class="fixed top-0 left-0 w-full h-full pointer-events-none z-0 overflow-hidden opacity-30">
+<div class="absolute -top-[10%] -left-[5%] w-[60%] h-[60%] ambient-red-glow"></div>
+<div class="absolute top-[50%] -right-[10%] w-[50%] h-[70%] bg-white/5 rounded-full blur-[140px]"></div>
+<div class="absolute -bottom-[20%] left-[20%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[100px]"></div>
+</div>
+<script>
+    // Micro-interaction: Clock Update
+    function updateClock() {
+        const now = new Date();
+        const timeString = now.toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            second: '2-digit',
+            hour12: true 
+        });
+        document.getElementById('clock').textContent = timeString;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Biometric button interaction
+    const clockBtn = document.querySelector('button.performance-red-gradient');
+    clockBtn.addEventListener('click', () => {
+        clockBtn.classList.add('scale-95');
+        setTimeout(() => clockBtn.classList.remove('scale-95'), 100);
+        
+        const scanOverlay = clockBtn.closest('.obsidian-glass').querySelector('.animate-\\[scan_3s_infinite\\]');
+        scanOverlay.style.animationDuration = '0.4s';
+        
+        const identityText = clockBtn.closest('.obsidian-glass').querySelector('.text-lg');
+        identityText.textContent = "VERIFYING IDENTITY...";
+        identityText.classList.add('text-primary', 'animate-pulse');
+
+        setTimeout(() => {
+            scanOverlay.style.animationDuration = '3s';
+            identityText.textContent = "GRANTED: M. STERLING";
+            identityText.classList.remove('animate-pulse');
+            identityText.classList.replace('text-primary', 'text-green-500');
+            
+            setTimeout(() => {
+                identityText.textContent = "Scanning for Token...";
+                identityText.classList.remove('text-green-500');
+            }, 3000);
+        }, 1200);
+    });
+</script>
+<style>
+    @keyframes scan {
+        0% { top: 0; }
+        50% { top: 100%; }
+        100% { top: 0; }
+    }
+    .animate-scan {
+        animation: scan 3s infinite linear;
+    }
+</style>
+</body></html>

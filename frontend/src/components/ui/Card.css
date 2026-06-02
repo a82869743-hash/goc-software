@@ -1,0 +1,62 @@
+/* ============================================================
+   GOC Studio — Card (from Stitch)
+   Matches: bg-[#111111] rounded-xl border border-white/5
+            shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]
+   ============================================================ */
+
+.goc-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.goc-card-header {
+  padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.goc-card-header-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.goc-card-title {
+  font-size: var(--text-label);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  color: var(--color-text-inverse);
+  margin: 0;
+  line-height: 1;
+}
+
+.goc-card-subtitle {
+  font-size: var(--text-body-sm);
+  color: var(--color-text-muted);
+  margin-top: var(--space-1);
+}
+
+.goc-card-header-action {
+  flex-shrink: 0;
+}
+
+.goc-card-body {
+  padding: var(--space-6);
+}
+
+.goc-card-body--flush {
+  padding: 0;
+}
+
+.goc-card-footer {
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+}

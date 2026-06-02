@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Dashboard Telemetry - GOC STUDIO</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+        darkMode: "class",
+        theme: {
+            extend: {
+                colors: {
+                    "surface-bright": "#38393a",
+                    "inverse-primary": "#c00100",
+                    "surface-container-high": "#282a2b",
+                    "secondary-fixed-dim": "#ffb4a8",
+                    error: "#ffb4ab",
+                    "on-primary-container": "#5c0000",
+                    "primary-container": "#FF2B2B",
+                    surface: "#050505",
+                    "performance-red": "#FF2B2B",
+                    "inverse-on-surface": "#2f3131",
+                    "on-secondary-container": "#ff9f90",
+                    "red-glow": "rgba(255, 43, 43, 0.12)",
+                    "on-error-container": "#ffdad6",
+                    "surface-dim": "#050505",
+                    "primary-fixed-dim": "#ffb4a8",
+                    "on-background": "#e2e2e2",
+                    "tertiary-container": "#929091",
+                    secondary: "#ffb4a8",
+                    "on-primary-fixed": "#410000",
+                    primary: "#FF2B2B",
+                    "surface-variant": "#1a1c1c",
+                    "on-surface": "#f5f5f5",
+                    "carbon-border": "rgba(255, 255, 255, 0.08)",
+                    "surface-container-highest": "#222424",
+                    tertiary: "#c8c6c7",
+                    "tertiary-fixed-dim": "#c8c6c7",
+                    "on-secondary-fixed": "#410000",
+                    "inverse-surface": "#e2e2e2",
+                    "on-primary": "#ffffff",
+                    background: "#050505",
+                    "outline-variant": "#594137",
+                    "on-secondary-fixed-variant": "#930000",
+                    "on-tertiary-fixed": "#1c1b1d",
+                    "prestige-red": "#FF2B2B",
+                    "on-surface-variant": "#a1a1a1",
+                    "primary-fixed": "#ffdad4",
+                    "surface-tint": "#FF2B2B",
+                    "void-black": "#050505",
+                    "surface-container-lowest": "#080808",
+                    "on-error": "#690005",
+                    "on-secondary": "#690000",
+                    "on-tertiary": "#313031",
+                    "on-tertiary-container": "#2a292b",
+                    "secondary-container": "#980000",
+                    "secondary-fixed": "#ffdad4",
+                    "tertiary-fixed": "#e5e2e3",
+                    "surface-container-low": "#0c0f0f",
+                    "on-primary-fixed-variant": "#930100",
+                    outline: "#a98a7e",
+                    "on-tertiary-fixed-variant": "#474648",
+                    "surface-container": "#0e0e0e",
+                    "obsidian-glass": "rgba(10, 10, 12, 0.7)",
+                    "error-container": "#93000a"
+                },
+                borderRadius: {
+                    DEFAULT: "0.25rem",
+                    lg: "0.5rem",
+                    xl: "0.75rem",
+                    full: "9999px"
+                },
+                spacing: {
+                    "panel-gap": "1.25rem",
+                    "grid-margin": "2.5rem",
+                    "gutter-md": "1.5rem",
+                    "bento-unit": "160px"
+                },
+                fontFamily: {
+                    "headline-lg": ["Outfit", "sans-serif"],
+                    "data-lg": ["JetBrains Mono", "monospace"],
+                    "body-lg": ["Outfit", "sans-serif"],
+                    "display-hero": ["Outfit", "sans-serif"],
+                    "headline-md": ["Outfit", "sans-serif"],
+                    "label-caps": ["JetBrains Mono", "monospace"],
+                    "data-sm": ["JetBrains Mono", "monospace"]
+                },
+                fontSize: {
+                    "headline-lg": ["40px", {lineHeight: "1.2", fontWeight: "600"}],
+                    "data-lg": ["18px", {lineHeight: "1.4", letterSpacing: "0.02em", fontWeight: "500"}],
+                    "body-lg": ["16px", {lineHeight: "1.6", fontWeight: "400"}],
+                    "display-hero": ["64px", {lineHeight: "1.1", letterSpacing: "-0.02em", fontWeight: "700"}],
+                    "headline-md": ["24px", {lineHeight: "1.3", fontWeight: "600"}],
+                    "label-caps": ["11px", {lineHeight: "1.2", letterSpacing: "0.1em", fontWeight: "700"}],
+                    "data-sm": ["13px", {lineHeight: "1.4", fontWeight: "400"}]
+                }
+            }
+        }
+    };
+    </script>
+<style>
+        body { background-color: #050505; color: #f5f5f5; }
+        .glass-panel {
+            background-color: rgba(15, 15, 18, 0.6);
+            backdrop-filter: blur(22px);
+            -webkit-backdrop-filter: blur(22px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255,255,255,0.05);
+        }
+        .text-glow-red { text-shadow: 0 0 12px rgba(255, 43, 43, 0.45); }
+        .box-glow-red { box-shadow: 0 0 25px rgba(255, 43, 43, 0.2); }
+        .bg-gradient-red { background: linear-gradient(135deg, #FF2B2B, #9b1c1c); }
+        .ambient-red-glow {
+            position: relative;
+        }
+        .ambient-red-glow::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at top right, rgba(255, 43, 43, 0.08), transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: #050505; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #FF2B2B; }
+
+        .active-nav {
+            background: linear-gradient(90deg, rgba(255, 43, 43, 0.15) 0%, transparent 100%);
+            border-left: 3px solid #FF2B2B;
+        }
+    </style>
+</head>
+<body class="bg-void-black text-on-surface font-body-lg text-body-lg min-h-screen flex selection:bg-performance-red selection:text-white">
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-0 h-full flex flex-col z-50 h-screen w-64 border-r border-carbon-border bg-obsidian-glass backdrop-blur-[32px] hidden md:flex">
+<!-- Header -->
+<div class="p-8 border-b border-carbon-border flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-surface-variant flex items-center justify-center overflow-hidden border border-carbon-border ring-1 ring-performance-red/20">
+<img alt="GOC Studio Elite Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDr4G3w-SgpSAbx1Mrytay63F37Kk1Z1rS9iUI-DL_FUQGytQlznU8PDo4WLxiTffK6SC7_AVEn0CaSy4oTPKlvkvBB4inuv-K72URiI6IaJtG3WIuLRGbbHCBf6pZDm5dsUWcSDeayGSpDo740sxjctE9vCdomJaR10v_DGOPi_Ve5p5wEwlndSMRN1rAgWu3SLCjJSdISIJY7kwORHijepQqevMq2ng4uVr6OXNmRM6a0xOpPf9kD3VYJ218hY1oU3WjS4EOxIa0"/>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold tracking-tight text-white">GOC STUDIO</h1>
+<p class="font-label-caps text-[9px] text-performance-red tracking-[0.2em] uppercase">Elite Management</p>
+</div>
+</div>
+<!-- Navigation -->
+<nav class="flex-1 overflow-y-auto py-6">
+<ul class="space-y-2 px-4">
+<li>
+<a class="active-nav flex items-center px-4 py-3.5 transition-all duration-300 rounded-lg group" href="#">
+<span class="material-symbols-outlined mr-3 text-performance-red text-glow-red" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-label-caps text-label-caps text-white group-hover:text-performance-red transition-colors">Dashboard</span>
+</a>
+</li>
+<li>
+<a class="text-on-surface-variant flex items-center px-4 py-3.5 hover:text-white transition-colors hover:bg-white/5 rounded-lg group" href="#">
+<span class="material-symbols-outlined mr-3 group-hover:text-performance-red transition-colors">directions_car</span>
+<span class="font-label-caps text-label-caps">Fleet</span>
+</a>
+</li>
+<li>
+<a class="text-on-surface-variant flex items-center px-4 py-3.5 hover:text-white transition-colors hover:bg-white/5 rounded-lg group" href="#">
+<span class="material-symbols-outlined mr-3 group-hover:text-performance-red transition-colors">calendar_today</span>
+<span class="font-label-caps text-label-caps">Schedule</span>
+</a>
+</li>
+<li>
+<a class="text-on-surface-variant flex items-center px-4 py-3.5 hover:text-white transition-colors hover:bg-white/5 rounded-lg group" href="#">
+<span class="material-symbols-outlined mr-3 group-hover:text-performance-red transition-colors">query_stats</span>
+<span class="font-label-caps text-label-caps">Analytics</span>
+</a>
+</li>
+<li>
+<a class="text-on-surface-variant flex items-center px-4 py-3.5 hover:text-white transition-colors hover:bg-white/5 rounded-lg group" href="#">
+<span class="material-symbols-outlined mr-3 group-hover:text-performance-red transition-colors">inventory_2</span>
+<span class="font-label-caps text-label-caps">Inventory</span>
+</a>
+</li>
+<li>
+<a class="text-on-surface-variant flex items-center px-4 py-3.5 hover:text-white transition-colors hover:bg-white/5 rounded-lg group" href="#">
+<span class="material-symbols-outlined mr-3 group-hover:text-performance-red transition-colors">settings</span>
+<span class="font-label-caps text-label-caps">Settings</span>
+</a>
+</li>
+</ul>
+</nav>
+<!-- Footer CTA & Links -->
+<div class="p-6 border-t border-carbon-border bg-void-black/40">
+<button class="w-full py-3.5 mb-6 rounded-lg bg-gradient-red text-white font-label-caps text-label-caps flex items-center justify-center hover:box-glow-red transition-all duration-300 shadow-lg shadow-performance-red/10 border border-performance-red/20">
+<span class="material-symbols-outlined mr-2 text-sm">add</span> New Booking
+        </button>
+<ul class="space-y-1">
+<li>
+<a class="text-on-surface-variant flex items-center px-2 py-2 hover:text-white transition-colors text-sm group" href="#">
+<span class="material-symbols-outlined mr-3 text-[18px] group-hover:text-performance-red">help</span>
+<span class="font-label-caps text-label-caps">Support</span>
+</a>
+</li>
+<li>
+<a class="text-on-surface-variant flex items-center px-2 py-2 hover:text-performance-red transition-colors text-sm group" href="#">
+<span class="material-symbols-outlined mr-3 text-[18px] group-hover:scale-110 transition-transform">logout</span>
+<span class="font-label-caps text-label-caps">Logout</span>
+</a>
+</li>
+</ul>
+</div>
+</aside>
+<!-- Main Canvas -->
+<main class="flex-1 flex flex-col md:ml-64 min-h-screen bg-surface ambient-red-glow">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center w-full px-10 h-20 sticky top-0 z-40 bg-void-black/80 backdrop-blur-md border-b border-carbon-border hidden md:flex">
+<div class="flex items-center">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-performance-red animate-pulse box-glow-red"></div>
+<span class="font-label-caps text-[10px] tracking-widest text-on-surface-variant uppercase">System Live</span>
+</div>
+</div>
+<div class="flex items-center gap-8">
+<button class="text-on-surface-variant hover:text-performance-red transition-all relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-performance-red box-glow-red"></span>
+</button>
+<button class="text-on-surface-variant hover:text-performance-red transition-all">
+<span class="material-symbols-outlined">diamond</span>
+</button>
+<div class="h-6 w-[1px] bg-carbon-border"></div>
+<button class="flex items-center gap-3 text-on-surface-variant hover:text-white transition-all group">
+<span class="font-label-caps text-label-caps text-[12px]">Admin</span>
+<span class="material-symbols-outlined group-hover:text-performance-red">account_circle</span>
+</button>
+</div>
+</header>
+<!-- Dashboard Content -->
+<div class="p-grid-margin flex-1 overflow-y-auto">
+<div class="mb-10">
+<h2 class="font-headline-lg text-headline-lg text-white mb-2 tracking-tight">Operations Telemetry</h2>
+<p class="font-data-lg text-data-lg text-on-surface-variant">Live Bay Status &amp; Revenue Tracking</p>
+</div>
+<!-- Bento Grid - KPIs -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-panel-gap mb-10">
+<!-- KPI 1: Revenue -->
+<div class="glass-panel rounded-xl p-6 relative overflow-hidden group">
+<div class="flex justify-between items-start mb-6">
+<span class="font-label-caps text-[10px] text-on-surface-variant tracking-widest uppercase flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-full bg-performance-red box-glow-red"></span>
+                        Today's Inflow
+                    </span>
+<span class="material-symbols-outlined text-performance-red/40 group-hover:text-performance-red transition-colors">payments</span>
+</div>
+<div class="font-data-lg text-[36px] font-bold text-white text-glow-red tracking-tight">₹1,24,500</div>
+<div class="mt-3 font-data-sm text-[12px] flex items-center gap-1.5 text-emerald-400">
+<span class="material-symbols-outlined text-[16px]">trending_up</span> +12.5% vs yesterday
+                </div>
+<div class="absolute -right-6 -bottom-6 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity pointer-events-none">
+<span class="material-symbols-outlined text-[140px]">currency_rupee</span>
+</div>
+</div>
+<!-- KPI 2: Active Bays -->
+<div class="glass-panel rounded-xl p-6 group">
+<div class="flex justify-between items-start mb-6">
+<span class="font-label-caps text-[10px] text-on-surface-variant tracking-widest uppercase flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-full bg-performance-red"></span>
+                        Active Bays
+                    </span>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-performance-red transition-colors">handyman</span>
+</div>
+<div class="flex items-baseline gap-2 mb-4">
+<span class="font-data-lg text-[36px] font-bold text-white">6</span>
+<span class="font-data-sm text-data-sm text-on-surface-variant">/ 8 Occupied</span>
+</div>
+<div class="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+<div class="h-full bg-gradient-red w-3/4 box-glow-red shadow-[0_0_15px_rgba(255,43,43,0.3)]"></div>
+</div>
+</div>
+<!-- KPI 3: Roster -->
+<div class="glass-panel rounded-xl p-6 group">
+<div class="flex justify-between items-start mb-6">
+<span class="font-label-caps text-[10px] text-on-surface-variant tracking-widest uppercase flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-full bg-performance-red"></span>
+                        Attendance
+                    </span>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-performance-red transition-colors">group</span>
+</div>
+<div class="flex items-baseline gap-2 mb-4">
+<span class="font-data-lg text-[36px] font-bold text-white">5</span>
+<span class="font-data-sm text-data-sm text-on-surface-variant">/ 8 On-Site</span>
+</div>
+<div class="flex gap-1.5">
+<div class="flex-1 h-2 rounded-sm bg-performance-red/80 box-glow-red"></div>
+<div class="flex-1 h-2 rounded-sm bg-performance-red/80 box-glow-red"></div>
+<div class="flex-1 h-2 rounded-sm bg-performance-red/80 box-glow-red"></div>
+<div class="flex-1 h-2 rounded-sm bg-performance-red/80 box-glow-red"></div>
+<div class="flex-1 h-2 rounded-sm bg-performance-red/80 box-glow-red"></div>
+<div class="flex-1 h-2 rounded-sm bg-white/5"></div>
+<div class="flex-1 h-2 rounded-sm bg-white/5"></div>
+<div class="flex-1 h-2 rounded-sm bg-white/5"></div>
+</div>
+</div>
+<!-- KPI 4: Critical Warnings -->
+<div class="glass-panel rounded-xl p-6 border-l-[3px] border-l-performance-red bg-performance-red/[0.03]">
+<div class="flex justify-between items-start mb-6">
+<span class="font-label-caps text-[10px] text-performance-red tracking-widest uppercase flex items-center gap-2 font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-performance-red animate-ping"></span>
+                        Supply Alert
+                    </span>
+<span class="material-symbols-outlined text-performance-red">warning</span>
+</div>
+<div class="font-data-lg text-[36px] font-bold text-white">3</div>
+<div class="font-label-caps text-[10px] text-on-surface-variant mt-2 tracking-widest uppercase">Items below threshold</div>
+</div>
+</div>
+<!-- Main Layout Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
+<!-- Active Bays Grid (Takes up 2 cols on lg) -->
+<div class="lg:col-span-2 space-y-6">
+<div class="flex items-center justify-between mb-4">
+<h3 class="font-headline-md text-headline-md text-white">Active Operations</h3>
+<button class="text-performance-red font-label-caps text-[12px] hover:text-white transition-colors flex items-center gap-2 group tracking-widest">
+                        MONITOR ALL <span class="material-symbols-outlined text-[16px] group-hover:translate-x-1 transition-transform">arrow_right_alt</span>
+</button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-panel-gap">
+<!-- Bay 1 -->
+<div class="glass-panel rounded-xl overflow-hidden group hover:border-performance-red/30 transition-all duration-500">
+<div class="h-40 bg-surface-variant relative overflow-hidden">
+<img alt="Porsche 911" class="w-full h-full object-cover opacity-40 mix-blend-luminosity group-hover:scale-105 group-hover:opacity-80 group-hover:mix-blend-normal transition-all duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBi_FgpTNl4axq_f1YeHz4Ibz9WsvXN-mWl6gxFapHI4Av69Du_2DJU_xOqJwzalTQzIlm_jDN2aSdSZ3R_9-41dcuOjPegrtOo9L9pEhzZN6JXB3PdWjaX-lwRx9MmR8aJkh_a7HrvrPOpwzoCRatHa8XAdyF96C4qWyzpWiDB2Bo98Mcp4rXuGa8FQgAQ42vXyJlT1dL7_T6OHuil6Oz6JWn1JVoZELvDvGjmnkMwoNeT4aHNTMO4KXzzZbTBkd_I7yRjIw-ZwLI"/>
+<div class="absolute top-4 left-4 bg-void-black/90 backdrop-blur-md px-3 py-1 rounded text-performance-red font-data-sm text-[11px] border border-performance-red/30 tracking-widest">BAY 01</div>
+<div class="absolute bottom-4 left-4 right-4 bg-gradient-to-t from-black/80 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="text-[10px] font-label-caps text-performance-red">CERAMIC COATING SYSTEM</span>
+</div>
+</div>
+<div class="p-6">
+<div class="flex justify-between items-center mb-2">
+<h4 class="font-headline-md text-[18px] text-white">Porsche 911 GT3</h4>
+<span class="font-data-sm text-performance-red text-[13px] font-bold">75%</span>
+</div>
+<p class="font-data-sm text-[12px] text-on-surface-variant mb-5 uppercase tracking-wider">Stage 2 Polishing Phase</p>
+<div class="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+<div class="h-full bg-performance-red w-[75%] box-glow-red relative shadow-[0_0_10px_rgba(255,43,43,0.5)]"></div>
+</div>
+</div>
+</div>
+<!-- Bay 2 -->
+<div class="glass-panel rounded-xl overflow-hidden group hover:border-performance-red/30 transition-all duration-500">
+<div class="h-40 bg-surface-variant relative overflow-hidden">
+<img alt="BMW M4" class="w-full h-full object-cover opacity-40 mix-blend-luminosity group-hover:scale-105 group-hover:opacity-80 group-hover:mix-blend-normal transition-all duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC2gzVQojcyLLeKHSItymnf50miNc8BPJe-SzbJsuG5sMbON6TWyeG_LAE9IVAuDSH4dNwln2HSP7L1apnBJ1R682E78frT2ldt0dLBGCeeaKH2TkFJagi4Kjlyj1btbtsfd0lSzWSk80Jj2F8P5MivAej4b1tT5ACZa33v-c_ucV8BZH44oR_EvO_TuVeFhZJNOx9wXduVngvqgIrUHZubg1VVStkR5jn4lnLrizJ2_TY7-t_ra_swWQc7y2ClnTKEiCtJEkK-naQ"/>
+<div class="absolute top-4 left-4 bg-void-black/90 backdrop-blur-md px-3 py-1 rounded text-performance-red font-data-sm text-[11px] border border-performance-red/30 tracking-widest">BAY 02</div>
+</div>
+<div class="p-6">
+<div class="flex justify-between items-center mb-2">
+<h4 class="font-headline-md text-[18px] text-white">BMW M4 Competition</h4>
+<span class="font-data-sm text-performance-red text-[13px] font-bold">40%</span>
+</div>
+<p class="font-data-sm text-[12px] text-on-surface-variant mb-5 uppercase tracking-wider">Interior &amp; Leather Treatment</p>
+<div class="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+<div class="h-full bg-performance-red w-[40%] shadow-[0_0_10px_rgba(255,43,43,0.3)]"></div>
+</div>
+</div>
+</div>
+<!-- Bay 4 (Active as 3 in text but using 4 for structure) -->
+<div class="glass-panel rounded-xl overflow-hidden group hover:border-performance-red/30 transition-all duration-500">
+<div class="h-40 bg-surface-variant relative overflow-hidden">
+<img alt="Audi RS6" class="w-full h-full object-cover opacity-40 mix-blend-luminosity group-hover:scale-105 group-hover:opacity-80 group-hover:mix-blend-normal transition-all duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCoWiljAfFIO4IocnaMeb_5ydr6LuTvhtU-GJPnJlwwuQUU4uu5u7sXXKlNbUuv6byIKzMjuD8Zhg5E9b1eYj_4Pv4IQf8iZbhR6dJrUynyiFih67UqsTpU6zpoI1sP7jUTaHg9Dw96DamFBSjGTBj4RyPcfindjuXWGJ2zmmPqa2QaiikqlA3_pDon6fi8jA04i_DgA5uQetjFH8RTkUYSDDaH-rOhBL-tDyg-gbi-Xnt6j33dSar18AxgkAzYNRIZFlnccHHsjps"/>
+<div class="absolute top-4 left-4 bg-void-black/90 backdrop-blur-md px-3 py-1 rounded text-performance-red font-data-sm text-[11px] border border-performance-red/30 tracking-widest">BAY 04</div>
+</div>
+<div class="p-6">
+<div class="flex justify-between items-center mb-2">
+<h4 class="font-headline-md text-[18px] text-white">Audi RS6 Avant</h4>
+<span class="font-data-sm text-performance-red text-[13px] font-bold">90%</span>
+</div>
+<p class="font-data-sm text-[12px] text-on-surface-variant mb-5 uppercase tracking-wider">Final Quality Inspection</p>
+<div class="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+<div class="h-full bg-performance-red w-[90%] box-glow-red shadow-[0_0_15px_rgba(255,43,43,0.5)]"></div>
+</div>
+</div>
+</div>
+<!-- Empty Bay -->
+<div class="glass-panel rounded-xl flex items-center justify-center border-dashed border-2 border-white/10 bg-white/[0.02] hover:bg-performance-red/[0.04] hover:border-performance-red/40 transition-all duration-300 cursor-pointer min-h-[260px] group">
+<div class="text-center">
+<div class="w-16 h-16 rounded-full bg-void-black flex items-center justify-center mb-4 border border-white/5 group-hover:scale-110 group-hover:border-performance-red/50 transition-all shadow-xl">
+<span class="material-symbols-outlined text-[32px] text-performance-red">add</span>
+</div>
+<p class="font-label-caps text-[12px] tracking-[0.2em] text-on-surface-variant group-hover:text-white transition-colors">ASSIGN BAY 03</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Sidebar / Right Column (Alerts) -->
+<div class="space-y-6">
+<div class="flex items-center justify-between mb-4">
+<h3 class="font-headline-md text-headline-md text-white">Supply Chain</h3>
+<span class="material-symbols-outlined text-on-surface-variant">inventory_2</span>
+</div>
+<div class="glass-panel rounded-xl p-5 border-l-[3px] border-l-performance-red bg-performance-red/[0.02] relative group overflow-hidden">
+<div class="flex items-start gap-4 relative z-10">
+<div class="w-12 h-12 rounded-lg bg-performance-red/10 flex items-center justify-center border border-performance-red/20 shrink-0 group-hover:bg-performance-red/20 transition-colors">
+<span class="material-symbols-outlined text-performance-red">science</span>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-center">
+<h4 class="font-data-sm text-[14px] font-bold text-white">Ceramic Coat Pro</h4>
+<span class="font-data-sm text-performance-red font-bold">2 Btls</span>
+</div>
+<p class="font-label-caps text-[10px] text-on-surface-variant mt-1 tracking-wider uppercase">Threshold: 5 Units</p>
+<button class="mt-4 w-full text-[10px] font-label-caps tracking-widest text-white bg-performance-red rounded py-2.5 hover:brightness-125 transition-all shadow-lg shadow-performance-red/20 uppercase font-bold">
+                                Restock Immediately
+                            </button>
+</div>
+</div>
+</div>
+<div class="glass-panel rounded-xl p-5 border border-white/5 hover:border-performance-red/20 transition-colors group">
+<div class="flex items-start gap-4">
+<div class="w-12 h-12 rounded-lg bg-white/5 flex items-center justify-center border border-white/5 shrink-0 group-hover:bg-white/10 transition-colors">
+<span class="material-symbols-outlined text-white/60 group-hover:text-performance-red">cleaning_services</span>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-center">
+<h4 class="font-data-sm text-[14px] font-bold text-white">Microfiber Elite</h4>
+<span class="font-data-sm text-white/60">15 Pcs</span>
+</div>
+<p class="font-label-caps text-[10px] text-on-surface-variant mt-1 tracking-wider uppercase">Threshold: 20 Pcs</p>
+<button class="mt-4 w-full text-[10px] font-label-caps tracking-widest text-performance-red border border-performance-red/40 rounded py-2.5 hover:bg-performance-red/10 transition-all uppercase">
+                                Add to Order
+                            </button>
+</div>
+</div>
+</div>
+<div class="glass-panel rounded-xl p-5 border border-white/5 hover:border-performance-red/20 transition-colors group">
+<div class="flex items-start gap-4">
+<div class="w-12 h-12 rounded-lg bg-white/5 flex items-center justify-center border border-white/5 shrink-0 group-hover:bg-white/10 transition-colors">
+<span class="material-symbols-outlined text-white/60 group-hover:text-performance-red">opacity</span>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-center">
+<h4 class="font-data-sm text-[14px] font-bold text-white">Iron Decon Spray</h4>
+<span class="font-data-sm text-white/60">1 Gal</span>
+</div>
+<p class="font-label-caps text-[10px] text-on-surface-variant mt-1 tracking-wider uppercase">Threshold: 2 Gal</p>
+<button class="mt-4 w-full text-[10px] font-label-caps tracking-widest text-performance-red border border-performance-red/40 rounded py-2.5 hover:bg-performance-red/10 transition-all uppercase">
+                                Add to Order
+                            </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

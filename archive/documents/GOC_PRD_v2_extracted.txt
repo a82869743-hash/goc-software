@@ -1,0 +1,618 @@
+﻿
+GOD OF CERAMIC
+Premium Auto Detailing Studio
+
+PRODUCT REQUIREMENTS DOCUMENT
+Studio Management System v2.0
+Vadodara, Gujarat, India  ·  May 2026
+
+Field | Detail
+Document Type | Product Requirements Document (PRD)
+Product Name | GOC Studio Management System v2.0
+Client / Studio | God of Ceramic — godofceramic.in
+Location | Vadodara, Gujarat, India
+Version | 2.0 — Full System Build
+Prepared By | PATIL BHAU — Freelance Software Developer
+Frontend Stack | React 19 + TypeScript + Vite (Stitch AI)
+Backend Stack | Node.js + Express.js + MySQL 8.x
+Date | May 2026
+Status | APPROVED FOR DEVELOPMENT
+
+
+1. Executive Summary
+
+God of Ceramic (GOC) is a premium auto detailing studio based in Vadodara, Gujarat, specializing in PPF (Paint Protection Film) installation, ceramic coating, and high-end surface protection services. This document defines the complete product requirements for the GOC Studio Management System v2.0 — a comprehensive, single-tenant SaaS-grade web application that manages the entire business lifecycle from lead capture to customer delivery and repeat follow-up.
+The system replaces all manual, WhatsApp-based, and spreadsheet-driven workflows with a unified, real-time platform. It covers 11 primary functional modules including Lead CRM, Booking, Job Cards, Quotation with Drawing Tool, Inventory, Staff Management, Billing, Marketing Automation, Reporting, and Owner Dashboard.
+
+IMPORTANT: This PRD is the single source of truth for all development, design, and QA activities. All team members, freelancers, and AI coding agents must reference this document before starting any feature development.
+
+1.1 Business Goals
+Digitize 100% of customer and lead management operations
+Reduce lead response time from hours to under 5 minutes via WhatsApp automation
+Eliminate manual inventory tracking errors — especially PPF roll sq.ft tracking
+Enable owner to monitor studio performance in real-time from mobile or desktop
+Increase repeat customer rate via automated follow-up and service reminder system
+Generate professional PDF quotations with car diagram drawing tool
+
+1.2 Target Users
+User Role | Description
+Studio Owner | Full access. Views dashboard, approves reports, manages staff and commissions.
+Manager / Front Desk | Handles leads, bookings, job cards, billing, customer communication.
+Detailer / Technician | Views assigned jobs, updates job status, marks work stages.
+Sales / Follow-up Staff | Manages lead funnel, sends WhatsApp follow-ups, logs contact attempts.
+
+
+
+2. System Overview & Architecture
+
+The GOC Studio Management System is a full-stack single-tenant web application hosted on a cloud server. The frontend is built with React 19 + TypeScript + Vite using Stitch AI-generated components. The backend is Node.js + Express.js REST API with MySQL 8.x as the primary database.
+
+2.1 Master Flow
+The complete end-to-end business flow follows this pipeline:
+
+Step | Stage | Module Responsible
+1 | Lead Generated | Module 1 — Lead Management (FB / Insta / WhatsApp / Walk-in)
+2 | Lead Stored in CRM | Module 1 + Module 2 — CRM auto-profile creation
+3 | Staff Contacts Customer | Module 10 — WhatsApp auto-reply + follow-up
+4 | Quotation Created | Module 5 — Drawing-based Quotation Tool
+5 | Booking Confirmed | Module 3 — Booking System + Advance Payment
+6 | Job Card Created | Module 4 — Job Card System
+7 | Service Started + QC | Module 4 — Job Status Flow
+8 | Inventory Deducted | Module 6 — PPF sq.ft auto-deduction
+9 | Invoice Generated | Module 8 — Billing & Payments
+10 | Payment Completed | Module 8 — Split / Full / Advance reconciliation
+11 | Car Delivered | Module 4 — Delivery status + gate pass
+12 | Feedback + Follow-up | Module 10 — Marketing & Follow-up Automation
+
+
+2.2 Technology Stack
+Layer | Technology
+Frontend | React 19, TypeScript, Vite, React Router 7, Tailwind CSS, Stitch AI components
+Backend | Node.js 20 LTS, Express.js 4.x, REST API (JSON)
+Database | MySQL 8.x — relational schema with foreign keys and soft deletes
+Auth | JWT tokens, role-based access control (RBAC) — 4 roles
+File Storage | Local storage / S3-compatible for PDF, photos, videos
+WhatsApp | MSG91 WhatsApp Business API — auto-reply, campaigns, dispatch
+PDF Generation | Puppeteer / PDFKit — quotations, invoices, job cards
+Maps / GPS | Google Maps JavaScript API — staff attendance geofencing
+Email | Nodemailer via SMTP / MSG91 email
+Hosting | VPS Linux — Ubuntu 22.04 (NGINX reverse proxy)
+
+
+2.3 UI/UX Design System
+The entire frontend adheres to the GOC brand identity — a premium automotive aesthetic combining deep blacks, pure whites, and the signature GOC red. Every screen must feel like a luxury product interface, not a generic SaaS dashboard.
+Token | Hex Code | Usage
+Primary Red | #CC0000 / #FF0000 | CTAs, active states, highlights, brand accents
+Dark Red Gradient | #990000 → #CC0000 | Header backgrounds, sidebar, hero sections
+Pure Black | #000000 / #111111 | Background, nav, dark cards, body text on light
+Pure White | #FFFFFF | Card backgrounds, text on dark, input fields
+Light Gray | #F5F5F5 | Subtle dividers, inactive states, alt table rows
+Red Glow | rgba(204,0,0,0.15) | Hover states, focus rings, card shadows
+
+DESIGN RULE: All UI components must support both Light Mode (white cards on dark nav) and Dark Mode (black backgrounds throughout). The red accent never changes between modes.
+
+
+3. Module 1 — Lead Management
+
+Lead Management is the most critical module in the system. Every customer interaction begins here. The module captures leads from multiple sources, assigns them to staff, tracks funnel progress, and integrates WhatsApp automation for instant response.
+
+3.1 Lead Sources
+Facebook Leads API — automatic sync via Meta Lead Ads webhook
+Instagram DM — manual entry from DM conversations
+WhatsApp — auto-create lead when new customer messages studio number
+Walk-in — front desk manual entry form
+Reference / Connector — lead referred by a commission-based connector person
+
+3.2 Lead Capture Form — Fields
+Field | Type | Required | Notes
+Full Name | Text | Yes | Customer full name
+Phone Number | Phone (IN) | Yes | 10-digit India mobile, used for WhatsApp
+Vehicle Make | Autocomplete | Yes | Indian vehicle database — Make/Model/Year
+Vehicle Model | Autocomplete | Yes | Linked to Make selection
+Service Requirement | Multi-select | Yes | PPF / Ceramic / Polish / Detailing / Other
+Lead Source | Dropdown | Yes | FB / Insta / Walk-in / WhatsApp / Reference
+Assigned Staff | Dropdown | Yes | Sales / follow-up staff assignment
+Notes / Remarks | Textarea | No | Additional context from lead capture
+Connector Name | Autocomplete | No | Only if Source = Reference
+Lead Date & Time | Auto | Auto | System timestamp on creation
+
+
+3.3 Lead Funnel Status
+Every lead progresses through a defined funnel. Status changes are logged with timestamp and staff who changed it.
+Stage | Color | Description
+New Lead | Blue | Just captured — not yet contacted by staff
+Contacted | Yellow | Staff has called / messaged the customer
+Interested | Orange | Customer expressed interest in proceeding
+Quotation Sent | Purple | PDF quotation generated and sent via WhatsApp
+Booked | Green | Booking confirmed with advance payment
+Lost | Red/Gray | Customer declined — reason must be logged
+
+
+3.4 WhatsApp Integration
+Auto-reply triggered when new WhatsApp message received on studio number
+Welcome message with service menu sent automatically within 5 seconds
+Lead auto-created in system with customer's WhatsApp number + name
+Follow-up reminder scheduled: +1 day, +3 days, +7 days if no booking
+Staff notified via in-app alert + their own WhatsApp when new lead arrives
+
+3.5 Connector / Referral System
+A Connector is a person (business owner, car dealer, friend) who regularly sends customers to GOC in exchange for commission per completed job.
+Feature | Description
+Connector Profile | Name, phone, commission rate (fixed ₹ or % of job value)
+Lead Tagging | Every lead from this connector tagged with connector ID
+Commission Tracking | Auto-calculated on job completion — pending / paid status
+Repeat Tracking | Count of customers referred + total revenue generated per connector
+Commission Report | Monthly PDF report of commissions due per connector
+
+
+
+4. Module 2 — Customer & Vehicle CRM
+
+The CRM stores every customer and their associated vehicles. It provides a complete history of all interactions, services, payments, and lead sources. This is the single source of truth for all customer data.
+
+4.1 Customer Profile
+Field | Description
+Customer ID | Auto-generated unique ID (GOC-CUST-XXXX)
+Full Name | Customer name
+Phone | Primary mobile (WhatsApp capable)
+Alternate Phone | Optional secondary number
+Email | Optional — for invoice email delivery
+Address | City / Area in Vadodara
+Lead Source | Original source that brought this customer (FB / Walk-in / etc.)
+Connector | Linked connector if referred
+Customer Since | First service date
+Total Revenue | Lifetime billing total (auto-calculated)
+Total Visits | Count of completed job cards
+Last Visit | Date of most recent service
+Status | Active / Inactive / VIP
+
+
+4.2 Vehicle Profile
+Each customer can have multiple vehicles registered. Each vehicle has its own service history.
+Field | Description
+Vehicle ID | Auto-generated (GOC-VEH-XXXX)
+Make | Brand (Maruti, Hyundai, Tata, Toyota, etc.)
+Model | Model name (Swift, Creta, Nexon, etc.)
+Year | Manufacturing year
+Fuel Type | Petrol / Diesel / Electric / CNG
+Color | Body color
+Registration No. | Vehicle plate number (optional — for records)
+VIN / Chassis | Optional for premium tracking
+PPF Coverage | Areas covered by PPF — stored from quotation history
+Service History | List of all job cards with date, service, amount
+
+
+KEY UX NOTE: The Vehicle Service History tab is the most-viewed screen by studio staff and is used to check previous services, applied films, and warranty status before any new job.
+
+
+5. Module 3 — Booking System
+
+The Booking System converts a confirmed lead into a scheduled appointment. It generates a Booking Slip, captures advance payment, and schedules the job on the studio calendar.
+
+5.1 Booking Slip Fields
+Field | Type | Description
+Booking ID | Auto | GOC-BKG-XXXXXX — unique
+Customer | Linked | Auto-fetched from CRM or new entry
+Vehicle | Linked | Auto-fetched from customer's vehicle list
+Service Type | Dropdown | PPF / Ceramic / Polish / Full Detailing / Other
+Package | Dropdown | Basic / Premium / Elite (per service)
+Booking Date | Date picker | Date customer will drop car
+Time Slot | Time picker | 9AM / 11AM / 2PM / 4PM slots
+Estimated Duration | Calculated | Auto-suggested per service type
+Advance Amount (₹) | Number | Advance payment collected at booking
+Payment Mode | Dropdown | Cash / UPI / Card / Bank Transfer
+Assigned Staff | Multi-select | Primary detailer(s) for this booking
+Notes | Textarea | Special instructions from customer
+
+
+5.2 Booking Flow
+Step 1: Staff selects lead from funnel (status = Interested / Quotation Sent)
+Step 2: Booking form auto-populates customer + vehicle from CRM
+Step 3: Staff selects date, time slot, service, package
+Step 4: Advance payment amount entered + payment mode selected
+Step 5: System generates Booking Confirmation message → send via WhatsApp
+Step 6: Calendar slot blocked — no double bookings allowed on same slot
+Step 7: Lead funnel status auto-updated to 'Booked'
+Step 8: Job Card auto-created in 'Scheduled' status from booking data
+
+5.3 Booking Calendar View
+Studio calendar displays all bookings by date and time slot. Owner and manager can see daily capacity at a glance. Color coding: Green = confirmed, Yellow = pending advance, Red = full day.
+
+
+6. Module 4 — Job Card System (Core Engine)
+
+The Job Card is the operational core of the entire studio. Every car entering the studio has a Job Card. It tracks the vehicle from arrival to delivery, links to inventory deductions, billing, and QC.
+
+6.1 Job Card Header Fields
+Field | Description
+Job Card ID | GOC-JC-XXXXXX — auto generated
+Booking Reference | Linked booking ID (if pre-booked) or walk-in
+Customer | Auto-fetched from CRM
+Vehicle | Auto-fetched — displays make, model, year, color, reg no.
+Date In | Timestamp when car physically arrives
+Expected Date Out | Auto-calculated or manually set
+Date Out (Actual) | Timestamp when car delivered to customer
+Service(s) | Selected services for this job (can be multiple)
+Package | Package tier for each service
+Assigned Staff | Primary detailer + support staff
+Job Status | Current stage in the flow (see 6.2)
+Total Amount | Calculated from services + packages
+Amount Paid | Running total of payments received
+Balance Due | Pending = Total − Paid
+
+
+6.2 Job Status Flow
+Stage | Status Code | Description
+Booked / Scheduled | SCHEDULED | Booking confirmed, car not yet arrived
+Car Received | CAR_IN | Car physically at studio, checked in
+Washing | WASHING | Pre-wash and prep stage
+PPF / Ceramic Work | IN_PROGRESS | Main service being performed
+Quality Check | QC | QC inspection by senior detailer
+QC Failed — Rework | REWORK | QC failed — sent back to technician
+Ready for Delivery | READY | Work complete, pending customer pickup
+Delivered | DELIVERED | Car handed over, invoice settled
+Cancelled | CANCELLED | Job cancelled before delivery
+
+
+6.3 Job Card Actions
+Photos: Upload before / during / after photos for each stage — stored per job card
+Service Notes: Detailer can add notes at each stage transition
+Customer WhatsApp Update: Auto-message sent on status = READY
+Print Work Order: PDF generation of job card for bay technician
+Print Gate Pass: Vehicle out-pass with basic details
+Inventory Link: PPF sq.ft or ceramic ml consumed — logged per job card
+
+6.4 Quick Service Mode
+For walk-in quick services (wash, wax, minor polish) that do not require a full job card:
+Fast entry form — customer name, phone, vehicle (optional), service, amount
+Direct billing — invoice generated immediately
+No booking, no full job card created
+Still recorded in daily revenue and CRM history
+
+
+7. Module 5 — Quotation System (Drawing Tool)
+
+The Quotation System is one of the most unique and differentiating features of the GOC platform. It allows staff to create precise, visual quotations by selecting areas on an interactive car diagram and drawing the coverage zones for PPF or ceramic coating.
+
+7.1 Drawing Tool — Functionality
+Interactive SVG car diagram (Top view + Side view) rendered in browser
+Car body parts labeled: Bonnet, Roof, Boot, Front Bumper, Rear Bumper, Doors (FL/FR/RL/RR), Pillars, Mirrors, Pillars
+Click-to-select individual panels OR draw custom polygon over any area
+Each selected area displays estimated sq.ft (pre-mapped per panel, per car size)
+Manual sq.ft override available for custom or complex shapes
+Price auto-calculated: selected sq.ft × PPF rate per sq.ft (configurable)
+Multiple materials selectable per zone (3M / XPEL / SunTek — configurable)
+
+7.2 Quotation Document Fields
+Field | Description
+Quotation ID | GOC-QT-XXXXXX — auto
+Customer Name | Linked from CRM
+Vehicle | Make, Model, Year
+Date | Quotation generation date — valid for 15 days
+Coverage Diagram | Annotated car image showing selected zones
+Zone Breakdown | Table: Zone | Material | Sq.ft | Rate | Amount
+Subtotal | Sum of all zones
+Discount | Optional discount (% or fixed ₹)
+GST | 18% GST toggle (optional — some customers non-GST)
+Grand Total | Final amount
+Terms & Conditions | Studio T&C pre-filled, editable per quotation
+Validity | Valid till date (auto: quotation date + 15 days)
+
+
+7.3 Quotation Output
+Generate branded PDF with car diagram, zone table, and pricing
+PDF includes GOC logo, red/black/white design, studio address, contact
+One-tap: Send quotation PDF via WhatsApp to customer phone number
+Save as template — reuse quotation configuration for same vehicle type
+Link to job card if quotation is accepted and booking is created
+
+
+8. Module 6 — Inventory Management
+
+Inventory Management tracks all consumable materials used in services. Special emphasis is placed on PPF roll tracking — since PPF is sold by the sq.ft and applied from large rolls, accurate usage deduction is critical for profitability analysis.
+
+8.1 Inventory Categories
+Category | Unit | Tracking Method
+PPF Rolls | sq.ft | Roll-level tracking: brand, width, total sq.ft, used sq.ft, balance sq.ft
+Ceramic Coating | ml / bottle | Bottle-level: brand, size ml, quantity, used ml per job
+Primer / Prep Chemicals | ml / litre | Quantity tracking — min stock alert
+Car Care Products | Units / litre | Basic stock count with min alert
+Microfiber / Consumables | Units | Simple count — bulk order tracking
+
+
+8.2 PPF Roll — Detailed Tracking
+Each PPF roll entered with: Brand, Grade, Roll Width (cm), Total Length (m) → auto-calc total sq.ft
+Purchase price per sq.ft recorded for margin tracking
+When PPF zone logged in job card: used sq.ft deducted from assigned roll
+Multi-roll support: staff selects which roll material was cut from
+Balance sq.ft displayed per roll — visual progress bar
+Alert when roll balance < 10 sq.ft (configurable threshold)
+Wastage field: account for cut waste per job (default: 5% — configurable)
+
+8.3 Inventory Dashboard
+Real-time stock levels for all categories
+Low stock alerts — configurable threshold per item
+Monthly usage report — sq.ft consumed per brand per month
+Inventory valuation — current stock × purchase price
+Purchase history — vendor, date, qty, price per entry
+
+
+9. Module 7 — Staff Management
+
+The Staff Management module handles staff profiles, GPS-based attendance, performance tracking, and salary records. It is designed specifically for a small team studio environment where accountability and transparency are essential.
+
+9.1 Staff Profile
+Field | Description
+Staff ID | GOC-STF-XXX — auto
+Full Name | Employee name
+Role | Detailer / Senior Detailer / Manager / Sales / Front Desk
+Phone | Mobile — used for WhatsApp alerts
+Salary Type | Fixed monthly / Daily wage
+Salary Amount | Monthly CTC or daily rate (₹)
+Join Date | Onboarding date
+Status | Active / On Leave / Resigned
+Login Credentials | Email + password for system access
+Access Role | RBAC role mapping — limits system access per role
+
+
+9.2 Attendance System — GPS + Photo
+The attendance system uses mobile GPS verification combined with a mandatory selfie photo to prevent proxy attendance. All check-ins must happen within a 50-meter radius of the studio location.
+Feature | Specification
+GPS Geofencing | 50-meter radius around studio GPS coordinates (configurable)
+Check-In Photo | Mandatory front-facing selfie on check-in — stored per attendance record
+Check-Out Photo | Mandatory selfie on check-out
+Time Restriction | Check-in allowed only between 8:00 AM – 10:30 AM (configurable)
+Late Marking | Auto-marked late if check-in after configured cutoff time
+Attendance Status | Present / Late / Absent / Half Day / Leave
+Leave Requests | Staff submits leave — manager approves / rejects in-app
+Monthly Summary | Auto-generated attendance report per staff — days worked / absent / late
+
+
+TECHNICAL NOTE: GPS check-in is performed via the mobile web browser — no separate app required. Staff opens the studio web URL on their phone, system requests location permission, verifies radius, then prompts for selfie using the camera API.
+
+9.3 Performance Tracking
+Jobs Handled: Count of job cards where staff was assigned detailer
+Revenue Generated: Total billing from jobs handled by this staff member
+QC Pass Rate: % of jobs that passed QC on first attempt (no rework)
+Attendance Score: % attendance in current month
+Performance Badge: Auto-awarded (Star Detailer / Most Punctual) per month
+
+
+10. Module 8 — Payment & Billing
+
+The Billing module handles all financial transactions — advances, partial payments, full payments, and refunds. It generates GST-compliant invoices and estimates in PDF format.
+
+10.1 Payment Types
+Type | Description
+Advance Payment | Collected at booking — auto-deducted from final balance
+Milestone Payment | Mid-service payment (for large jobs > ₹15,000)
+Full Payment | Complete settlement on delivery
+Split Payment | Multiple payment modes in one settlement (e.g. ₹5000 Cash + ₹3000 UPI)
+Refund | Partial or full refund logged against job card
+
+
+10.2 Payment Modes
+Cash
+UPI (Google Pay / PhonePe / Paytm)
+Card (Credit / Debit)
+Bank Transfer / NEFT / RTGS
+Cheque (rare — logged separately)
+
+10.3 Invoice & Estimate
+Document | Contents
+Estimate | Pre-service cost estimate — not tax invoice. Sent before job starts or after quotation.
+Tax Invoice | GST-compliant invoice with GSTIN, HSN/SAC codes, IGST/CGST/SGST breakdown
+Proforma Invoice | Pre-payment formal document — used for advance collection
+Work Order | Internal document for technician — services to be performed, notes, assigned staff
+Gate Pass | Vehicle exit slip — reg no, date-time, staff signature confirmation
+
+
+10.4 Invoice Fields
+Invoice No.: GOC-INV-XXXXXX (sequential, financial year reset)
+Customer name, address, GSTIN (if applicable)
+Vehicle details — make, model, reg no.
+Service line items: description, HSN code, qty, rate, amount
+Subtotal, Discount, CGST 9%, SGST 9% (or IGST 18% for interstate)
+GST toggle — some retail customers prefer non-GST bill (cash sale)
+Payment received history — advance + current payment
+Balance due
+Studio details: GOC name, address, phone, GSTIN, bank details
+
+
+11. Module 9 — Owner Dashboard
+
+The Owner Dashboard is the command center for the studio owner. It provides real-time visibility into every dimension of the business — revenue, leads, staff performance, inventory, and operational KPIs — all in one screen.
+
+11.1 Dashboard KPI Cards (Top Row)
+KPI | Description
+Today's Revenue (₹) | Sum of all payments received today
+Active Jobs | Job cards in progress (not DELIVERED or CANCELLED)
+New Leads Today | Count of leads captured today from all sources
+Pending Deliveries | Job cards in READY status — waiting for customer pickup
+Low Stock Alerts | Count of inventory items below threshold
+Staff Present | Count of staff checked in today
+
+
+11.2 Charts & Visualizations
+Revenue Chart: Daily revenue — current month bar chart vs previous month overlay
+Lead Funnel: Horizontal funnel chart — New → Contacted → Booked → Lost
+Lead Source Breakdown: Pie chart — FB / Insta / Walk-in / WhatsApp / Reference
+Service Mix: Pie/donut — PPF vs Ceramic vs Polish vs Detailing % split
+PPF Usage: Running sq.ft consumed this month per brand
+Staff Performance Table: Revenue generated + jobs handled per staff, current month
+Monthly vs Annual Comparison: Line chart — monthly revenue for last 12 months
+
+11.3 Quick Actions from Dashboard
++ New Lead — opens lead capture form
++ Quick Booking — fast booking without full lead flow
+View Today's Jobs — filtered job card list for today
+Send Campaign — trigger WhatsApp broadcast to selected segment
+
+
+12. Module 10 — Marketing & Follow-Up System
+
+The Marketing module automates customer communication throughout the lifecycle — from lead nurturing to post-service follow-up and seasonal campaigns. All outbound communication is via WhatsApp (MSG91) and optional email.
+
+12.1 Automated Triggers
+Trigger Event | Action
+New lead from Facebook/WhatsApp | Auto-reply: Welcome message + services menu
+Lead status = Contacted (no response 24h) | Follow-up reminder message to staff + auto customer nudge
+Quotation sent (no booking in 48h) | Auto follow-up WhatsApp: 'Is there anything we can help clarify?'
+Job status = READY | Auto WhatsApp to customer: 'Your car is ready for pickup!'
+Job DELIVERED | Thank you message + request for Google review / feedback
+Service anniversary (X months) | Service reminder: 'Time for your ceramic top-up!'
+Birthday (if DOB stored) | Birthday greeting with special discount offer
+
+
+12.2 WhatsApp Campaign Broadcasts
+Segment by: Last service date, service type, location, lead source
+Custom message templates with variable substitution ({name}, {vehicle}, {discount})
+Schedule broadcast: immediate or set future date/time
+Delivery & read receipt tracking per message
+Opt-out management: customers who reply STOP are excluded from future campaigns
+
+12.3 Service Reminders — Configurable Intervals
+Service | Default Reminder Interval
+Ceramic Coating | 6 months — top coat check reminder
+PPF | 12 months — PPF inspection reminder
+Full Detailing | 3 months — next detail reminder
+Polish / Wax | 2 months — maintenance reminder
+
+
+
+13. Module 11 — Reports & Analytics
+
+The Reports module provides exportable, printable reports for every dimension of the business. All reports support date range filtering and can be exported as PDF or Excel.
+
+13.1 Available Reports
+Report Name | Key Data Points
+Revenue Report | Daily / Monthly / Annual revenue; by service type; by payment mode; GST summary
+Lead Source Report | Leads count per source; conversion rate per source; lost lead reasons
+Job Card Report | Jobs completed / in-progress / cancelled; avg job duration; rework count
+Staff Performance Report | Revenue per staff; jobs handled; attendance; QC pass rate
+Inventory Usage Report | PPF sq.ft used per brand per month; ceramic ml used; reorder suggestions
+Connector Commission Report | Commission due per connector; jobs referred; payment status
+Customer LTV Report | Top 20 customers by lifetime value; visit frequency; last service date
+Outstanding Payments Report | Unpaid invoices; partial payments; amount due with ageing
+
+
+13.2 Report Export Formats
+PDF: Branded GOC template with red/black design — suitable for printing or sharing
+Excel / CSV: Raw data export for owner's own analysis
+WhatsApp: Summary report auto-sent to owner's WhatsApp every Monday 9 AM
+
+
+14. Database Design — MySQL 8.x (Key Tables)
+
+The database follows a normalized relational schema with soft-delete support (deleted_at), audit timestamps (created_at, updated_at), and foreign key constraints. All monetary values stored in DECIMAL(10,2). All timestamps in UTC, displayed in IST.
+
+Table Name | Primary Purpose
+leads | All leads from all sources — funnel status, assignment, source
+customers | Customer CRM profiles — lifetime value, source, connector
+vehicles | Vehicles linked to customers — make, model, registration
+bookings | Booking slips — date, time slot, advance, assigned staff
+job_cards | Core job records — status flow, dates, assigned staff
+job_services | Services per job card — type, package, price, sq.ft
+job_photos | Photos linked to job cards — stage, URL, timestamp
+quotations | Quotation records — diagram data (JSON), zones, pricing
+quotation_zones | Individual drawing zones — part name, sq.ft, material, price
+invoices | Tax invoices — linked to job card, GST details
+invoice_items | Line items per invoice — description, HSN, qty, rate, tax
+payments | All payment records — amount, mode, date, linked invoice
+inventory_items | All inventory — name, category, unit, current stock, threshold
+ppf_rolls | PPF roll-level tracking — brand, width, total sq.ft, used sq.ft
+inventory_usage | Usage log — qty deducted, job card link, staff, date
+staff | Staff profiles — role, salary, login credentials
+attendance | GPS check-in/out records — lat/lng, photo URL, timestamp
+connectors | Referral connector profiles — commission rate, bank details
+connector_commissions | Commission entries per job — amount, status, paid date
+whatsapp_logs | All WhatsApp messages sent — customer, template, status
+notifications | In-app notification queue per user
+
+
+
+15. API Structure — Node.js + Express REST API
+
+The backend exposes a RESTful JSON API on port 4000. All endpoints are prefixed with /api/v1/. Authentication uses JWT Bearer tokens. Role-based middleware protects sensitive routes.
+
+Module | Base Route | Key Endpoints
+Auth | /api/v1/auth | POST /login, POST /logout, POST /refresh-token
+Leads | /api/v1/leads | GET / POST / PATCH /:id/status / DELETE (soft)
+Customers | /api/v1/customers | GET / POST / PATCH /:id / GET /:id/vehicles / GET /:id/history
+Vehicles | /api/v1/vehicles | GET / POST / PATCH /:id
+Bookings | /api/v1/bookings | GET / POST / PATCH /:id / GET /calendar?date=
+Job Cards | /api/v1/jobs | GET / POST / PATCH /:id/status / GET /:id/photos / POST /:id/photos
+Quotations | /api/v1/quotations | GET / POST / PATCH /:id / POST /:id/pdf / POST /:id/whatsapp
+Invoices | /api/v1/invoices | GET / POST / PATCH /:id / GET /:id/pdf
+Payments | /api/v1/payments | GET / POST / GET /outstanding
+Inventory | /api/v1/inventory | GET / POST / PATCH /:id / POST /usage
+Staff | /api/v1/staff | GET / POST / PATCH /:id / GET /:id/attendance / GET /:id/performance
+Attendance | /api/v1/attendance | POST /checkin / POST /checkout / GET ?date=&staff=
+Dashboard | /api/v1/dashboard | GET /kpis / GET /charts/revenue / GET /charts/leads
+Reports | /api/v1/reports | GET /revenue / GET /leads / GET /inventory / GET /staff / GET /connectors
+WhatsApp | /api/v1/whatsapp | POST /send / POST /campaign / GET /logs
+
+
+
+16. Development Milestones & Timeline
+
+
+Milestone | Scope | Est. Duration
+M1 — Foundation | Auth system, RBAC, DB schema, base API setup, React boilerplate + routing | 1.5 weeks
+M2 — CRM Core | Lead Management, Customer CRM, Vehicle profiles, WhatsApp webhook | 2 weeks
+M3 — Booking + Job Card | Booking system, Job card full flow, status transitions, photo upload | 2 weeks
+M4 — Quotation Tool | SVG drawing tool, zone selection, sq.ft calc, PDF generation, WhatsApp send | 2 weeks
+M5 — Billing | Invoice, Estimate, GST calc, Payment recording, PDF output, MSG91 | 1.5 weeks
+M6 — Inventory | PPF roll tracking, Usage deduction, Low stock alerts, Inventory dashboard | 1 week
+M7 — Staff + Attendance | Staff profiles, GPS attendance, selfie capture, performance metrics | 1.5 weeks
+M8 — Dashboard + Reports | Owner dashboard, KPI cards, charts, all 8 report types, export PDF/CSV | 1.5 weeks
+M9 — Marketing | Auto follow-up triggers, WhatsApp campaigns, service reminders, broadcast | 1 week
+M10 — QA + Launch | End-to-end testing, UAT with GOC team, bug fixes, production deployment | 1 week
+
+
+PROJECT NOTE: Total estimated development timeline: 16 weeks (4 months) for full system build. Priority modules M1–M5 can be delivered as MVP in 8 weeks for early studio use.
+
+
+17. Non-Functional Requirements
+
+
+Requirement | Specification
+Performance | Dashboard loads in < 2 seconds. API response < 300ms for standard queries.
+Mobile Responsiveness | Full mobile support — all staff-facing screens optimized for 375px+ screens.
+Uptime | 99.5% monthly uptime SLA on production server.
+Data Security | JWT auth, HTTPS only, bcrypt password hashing, input sanitization, SQL injection prevention.
+Backup | Daily automated MySQL dumps to secondary storage. 30-day retention.
+Photo Storage | Job card photos max 5MB each. Thumbnails auto-generated. Stored on S3-compatible storage.
+PDF Generation | Quotation and invoice PDFs generated in < 3 seconds. Stored per transaction.
+WhatsApp Rate Limits | MSG91 API rate limits respected. Queued sending for bulk campaigns.
+Multi-language | English primary. Gujarati labels in select UI areas (future roadmap).
+Audit Trail | All status changes logged with: user, timestamp, previous value, new value.
+
+
+
+18. Appendix — GOC Service Pricing Reference
+
+The following is a reference pricing structure for GOC services. These values are configurable in the admin settings panel and are used in quotation auto-calculation.
+
+Service | Tier | Approx. Price Range
+PPF — Partial (Bonnet + Bumpers) | Premium | ₹15,000 – ₹25,000
+PPF — Full Car | Elite | ₹45,000 – ₹90,000+
+Ceramic Coating | Basic | ₹8,000 – ₹15,000
+Ceramic Coating | Premium (9H) | ₹18,000 – ₹35,000
+Paint Correction | Level 1 / 2 / 3 | ₹5,000 – ₹20,000
+Full Detailing | Interior + Exterior | ₹3,000 – ₹8,000
+Quick Polish + Wax | Express | ₹1,500 – ₹3,000
+
+
+DISCLAIMER: Pricing is indicative and subject to change per market rates, vehicle size, and current material costs. Always generate live quotation using the Drawing Tool for accurate customer-facing pricing.
+
+19. Sign-Off
+
+This Product Requirements Document has been reviewed and approved for development. Any scope changes after sign-off must follow a formal Change Request process with updated timeline and cost estimation.
+
+Role | Name | Signature / Date
+Studio Owner / Client | God of Ceramic | ________________
+Product Owner / Developer | PATIL BHAU | ________________
+Document Version | v2.0 — May 2026 | ________________
+
+

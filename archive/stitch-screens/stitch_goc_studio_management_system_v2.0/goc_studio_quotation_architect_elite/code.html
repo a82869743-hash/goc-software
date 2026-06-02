@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>APEX Detailing - Quotation Designer</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&amp;family=Outfit:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary": "#ffb4a8",
+                        "tertiary": "#929091",
+                        "surface-dim": "#050505",
+                        "error": "#FF2B2B",
+                        "tertiary-fixed": "#e5e2e3",
+                        "secondary-fixed": "#ffdad4",
+                        "outline": "rgba(255,255,255,0.08)",
+                        "on-surface-variant": "#ebbbb4",
+                        "secondary-fixed-dim": "#ffb4a8",
+                        "on-primary-container": "#ffffff",
+                        "on-error": "#ffffff",
+                        "on-background": "#e2e2e2",
+                        "inverse-primary": "#FF2B2B",
+                        "on-secondary-container": "#ff9f90",
+                        "background": "#050505",
+                        "on-secondary-fixed-variant": "#930000",
+                        "on-tertiary": "#313031",
+                        "on-secondary-fixed": "#410000",
+                        "surface-container": "#0c0c0c",
+                        "primary-container": "#FF2B2B",
+                        "on-tertiary-fixed": "#1c1b1d",
+                        "inverse-surface": "#e2e2e2",
+                        "error-container": "#93000a",
+                        "inverse-on-surface": "#2f3131",
+                        "surface-container-lowest": "#050505",
+                        "on-primary-fixed-variant": "#930100",
+                        "surface-container-low": "#0a0a0a",
+                        "tertiary-fixed-dim": "#c8c6c7",
+                        "tertiary-container": "#333535",
+                        "surface-container-highest": "#1a1a1a",
+                        "surface": "#050505",
+                        "on-tertiary-fixed-variant": "#474648",
+                        "on-tertiary-container": "#e2e2e2",
+                        "primary-fixed": "#ffdad4",
+                        "on-primary-fixed": "#410000",
+                        "primary": "#FF2B2B",
+                        "surface-tint": "#FF2B2B",
+                        "secondary-container": "#980000",
+                        "on-secondary": "#ffffff",
+                        "on-error-container": "#ffdad6",
+                        "surface-variant": "#121212",
+                        "outline-variant": "rgba(255,255,255,0.05)",
+                        "on-surface": "#f5f5f5",
+                        "surface-bright": "#1a1a1a",
+                        "surface-container-high": "#121212",
+                        "primary-fixed-dim": "#FF2B2B",
+                        "on-primary": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "1rem",
+                        "2xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "panel-gap": "1.5rem",
+                        "bento-unit": "160px",
+                        "gutter-md": "2rem",
+                        "grid-margin": "3rem"
+                    },
+                    "fontFamily": {
+                        "display-hero": ["Outfit"],
+                        "headline-md": ["Outfit"],
+                        "label-caps": ["JetBrains Mono"],
+                        "data-lg": ["JetBrains Mono"],
+                        "headline-lg": ["Outfit"],
+                        "data-sm": ["JetBrains Mono"],
+                        "body-lg": ["Outfit"]
+                    },
+                    "fontSize": {
+                        "display-hero": ["64px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                        "label-caps": ["11px", { "lineHeight": "1.2", "letterSpacing": "0.1em", "fontWeight": "700" }],
+                        "data-lg": ["18px", { "lineHeight": "1.4", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "headline-lg": ["40px", { "lineHeight": "1.2", "fontWeight": "600" }],
+                        "data-sm": ["13px", { "lineHeight": "1.4", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-feature-settings: 'liga';
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        .bento-panel {
+            background: rgba(12, 12, 12, 0.4);
+            backdrop-filter: blur(22px);
+            -webkit-backdrop-filter: blur(22px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .car-panel-svg {
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            stroke: rgba(255,255,255,0.15);
+            stroke-width: 1.5;
+            fill: rgba(255,255,255,0.03);
+        }
+
+        .car-panel-svg:hover {
+            fill: rgba(255, 43, 43, 0.08);
+            stroke: rgba(255, 43, 43, 0.4);
+        }
+
+        .car-panel-svg.active {
+            fill: rgba(255, 43, 43, 0.25);
+            stroke: #FF2B2B;
+            filter: drop-shadow(0 0 12px rgba(255, 43, 43, 0.5));
+        }
+
+        .btn-apex {
+            background: linear-gradient(135deg, #FF2B2B 0%, #93000a 100%);
+            box-shadow: 0 4px 15px rgba(255, 43, 43, 0.3);
+            transition: all 0.3s ease;
+        }
+        .btn-apex:hover {
+            box-shadow: 0 0 30px rgba(255, 43, 43, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .ambient-glow {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(255, 43, 43, 0.1) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+            filter: blur(40px);
+        }
+
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 43, 43, 0.3);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface antialiased min-h-screen selection:bg-primary selection:text-white overflow-x-hidden">
+<!-- Ambient backgrounds -->
+<div class="ambient-glow -top-20 -left-20"></div>
+<div class="ambient-glow bottom-0 right-0 opacity-50"></div>
+<!-- Shared Component: SideNavBar -->
+<nav class="bg-surface-container-lowest/60 backdrop-blur-3xl h-screen w-64 fixed left-0 top-0 border-r border-white/10 shadow-2xl z-50 flex flex-col py-8 hidden md:flex">
+<div class="px-8 mb-12">
+<h1 class="font-display-hero text-headline-md tracking-tighter text-primary truncate" title="APEX DETAILING">APEX DETAILING</h1>
+<p class="font-label-caps text-[10px] text-tertiary mt-1.5 tracking-[0.2em] uppercase">Elite Studio Management</p>
+</div>
+<ul class="flex flex-col gap-1.5 px-4 flex-1">
+<li>
+<a class="flex items-center gap-4 px-4 py-3.5 rounded-xl text-tertiary hover:text-on-surface hover:bg-white/5 transition-all duration-300" href="#">
+<span class="material-symbols-outlined text-[20px]">dashboard</span>
+<span class="font-label-caps text-label-caps">DASHBOARD</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-4 px-4 py-3.5 rounded-xl bg-primary/10 text-primary border border-primary/20 transition-all duration-300" href="#">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">directions_car</span>
+<span class="font-label-caps text-label-caps">FLEET</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-4 px-4 py-3.5 rounded-xl text-tertiary hover:text-on-surface hover:bg-white/5 transition-all duration-300" href="#">
+<span class="material-symbols-outlined text-[20px]">calendar_month</span>
+<span class="font-label-caps text-label-caps">SCHEDULE</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-4 px-4 py-3.5 rounded-xl text-tertiary hover:text-on-surface hover:bg-white/5 transition-all duration-300" href="#">
+<span class="material-symbols-outlined text-[20px]">analytics</span>
+<span class="font-label-caps text-label-caps">ANALYTICS</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-4 px-4 py-3.5 rounded-xl text-tertiary hover:text-on-surface hover:bg-white/5 transition-all duration-300" href="#">
+<span class="material-symbols-outlined text-[20px]">inventory_2</span>
+<span class="font-label-caps text-label-caps">INVENTORY</span>
+</a>
+</li>
+</ul>
+<div class="px-4 mt-auto">
+<a class="flex items-center gap-4 px-4 py-3.5 rounded-xl text-tertiary hover:text-on-surface hover:bg-white/5 transition-all duration-300" href="#">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+<span class="font-label-caps text-label-caps">SETTINGS</span>
+</a>
+</div>
+</nav>
+<!-- Shared Component: TopAppBar -->
+<header class="fixed top-0 right-0 w-full md:w-[calc(100%-16rem)] z-40 bg-background/40 backdrop-blur-xl border-b border-white/5 flex justify-between items-center px-gutter-md h-20">
+<div class="flex items-center gap-4">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-tertiary text-[18px] group-focus-within:text-primary transition-colors">search</span>
+<input class="bg-white/5 border border-white/10 rounded-full py-2.5 pl-11 pr-6 text-sm font-body-lg text-on-surface placeholder:text-tertiary/50 focus:ring-1 focus:ring-primary/50 focus:border-primary/50 focus:outline-none w-80 transition-all" placeholder="Search parameters..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="p-2.5 text-tertiary hover:text-primary transition-all rounded-full hover:bg-white/5">
+<span class="material-symbols-outlined text-[22px]">notifications</span>
+</button>
+<div class="w-px h-6 bg-white/10 mx-2"></div>
+<button class="flex items-center gap-3 p-1.5 pl-4 rounded-full hover:bg-white/5 transition-all group">
+<span class="font-label-caps text-[11px] text-tertiary group-hover:text-on-surface">OPERATOR_01</span>
+<span class="material-symbols-outlined text-[28px] text-tertiary group-hover:text-primary">account_circle</span>
+</button>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="pt-28 pb-12 px-6 md:ml-64 md:px-grid-margin min-h-screen relative">
+<!-- Header -->
+<div class="mb-10 relative z-10">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-8 h-[2px] bg-primary"></div>
+<span class="font-label-caps text-label-caps text-primary tracking-[0.3em]">QUOTATION ENGINE V2.0</span>
+</div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface">Quotation Designer</h2>
+<p class="font-body-lg text-body-lg text-tertiary mt-2 max-w-2xl">Configure protection packages and calculate pricing based on precise surface telemetry and material matrices.</p>
+</div>
+<div class="grid grid-cols-12 gap-panel-gap relative z-10">
+<!-- Left Side: Interactive Wireframe (Col span 7) -->
+<div class="col-span-12 lg:col-span-7 bento-panel rounded-2xl p-8 flex flex-col relative h-[650px] overflow-hidden">
+<!-- Inner glow -->
+<div class="absolute -top-20 -right-20 w-64 h-64 bg-primary/5 blur-[80px] pointer-events-none"></div>
+<div class="flex justify-between items-center mb-8 relative z-10">
+<h3 class="font-label-caps text-label-caps text-on-surface uppercase flex items-center gap-3">
+<span class="flex h-2 w-2 relative">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+</span>
+                        Telemetry Array: Surface Mapping
+                    </h3>
+<div class="flex gap-3">
+<button class="px-4 py-1.5 rounded-lg text-[10px] font-label-caps border border-white/10 hover:border-primary/50 text-tertiary hover:text-primary transition-all active:scale-95" onclick="selectAllPanels()">SELECT ALL</button>
+<button class="px-4 py-1.5 rounded-lg text-[10px] font-label-caps border border-white/10 hover:border-white/30 text-tertiary transition-all active:scale-95" onclick="clearAllPanels()">CLEAR</button>
+</div>
+</div>
+<!-- Wireframe Canvas -->
+<div class="flex-1 relative flex items-center justify-center bg-black/40 rounded-xl border border-white/5 overflow-hidden group shadow-inner">
+<!-- Subtle grid background -->
+<div class="absolute inset-0 opacity-[0.05]" style="background-image: radial-gradient(circle at 1px 1px, white 1px, transparent 0); background-size: 24px 24px;"></div>
+<!-- SVG Car Wireframe -->
+<svg class="w-full max-w-[280px] h-auto drop-shadow-[0_0_30px_rgba(0,0,0,0.5)] z-10 relative" id="car-wireframe" viewbox="0 0 300 600">
+<!-- Front Bumper -->
+<path class="car-panel-svg" d="M 60,80 Q 150,50 240,80 L 250,110 L 50,110 Z" data-panel="Front Bumper" data-price="450" data-sqft="25"></path>
+<!-- Hood -->
+<path class="car-panel-svg" d="M 60,120 L 240,120 L 220,220 L 80,220 Z" data-panel="Hood" data-price="600" data-sqft="35"></path>
+<!-- Front Fenders -->
+<path class="car-panel-svg" d="M 40,120 L 55,120 L 75,220 L 35,220 Z" data-panel="Front Left Fender" data-price="250" data-sqft="15"></path>
+<path class="car-panel-svg" d="M 260,120 L 245,120 L 225,220 L 265,220 Z" data-panel="Front Right Fender" data-price="250" data-sqft="15"></path>
+<!-- Roof -->
+<path class="car-panel-svg" d="M 85,250 L 215,250 L 215,380 L 85,380 Z" data-panel="Roof" data-price="700" data-sqft="40"></path>
+<!-- Glass -->
+<path d="M 80,225 L 220,225 L 210,245 L 90,245 Z" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)"></path>
+<path d="M 90,385 L 210,385 L 220,405 L 80,405 Z" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)"></path>
+<!-- Doors -->
+<path class="car-panel-svg" d="M 30,230 L 75,230 L 75,300 L 25,300 Z" data-panel="Front Left Door" data-price="350" data-sqft="20"></path>
+<path class="car-panel-svg" d="M 25,305 L 75,305 L 75,375 L 30,375 Z" data-panel="Rear Left Door" data-price="350" data-sqft="20"></path>
+<path class="car-panel-svg" d="M 270,230 L 225,230 L 225,300 L 275,300 Z" data-panel="Front Right Door" data-price="350" data-sqft="20"></path>
+<path class="car-panel-svg" d="M 275,305 L 225,305 L 225,375 L 270,375 Z" data-panel="Rear Right Door" data-price="350" data-sqft="20"></path>
+<!-- Rear Fenders -->
+<path class="car-panel-svg" d="M 35,400 L 75,400 L 60,490 L 40,490 Z" data-panel="Rear Left Quarter" data-price="300" data-sqft="18"></path>
+<path class="car-panel-svg" d="M 265,400 L 225,400 L 240,490 L 260,490 Z" data-panel="Rear Right Quarter" data-price="300" data-sqft="18"></path>
+<!-- Trunk -->
+<path class="car-panel-svg" d="M 80,410 L 220,410 L 235,490 L 65,490 Z" data-panel="Trunk" data-price="450" data-sqft="25"></path>
+<!-- Rear Bumper -->
+<path class="car-panel-svg" d="M 50,500 L 250,500 L 240,530 Q 150,550 60,530 Z" data-panel="Rear Bumper" data-price="450" data-sqft="25"></path>
+</svg>
+<!-- Overlay UI hint -->
+<div class="absolute bottom-6 left-6 right-6 flex justify-between items-center opacity-40 pointer-events-none group-hover:opacity-100 transition-all duration-500">
+<span class="font-data-sm text-data-sm text-tertiary">MAPPED SURFACE DETECTION ACTIVE</span>
+<span class="material-symbols-outlined text-primary text-sm animate-pulse">sensors</span>
+</div>
+</div>
+</div>
+<!-- Right Side: Configuration & Pricing (Col span 5) -->
+<div class="col-span-12 lg:col-span-5 flex flex-col gap-panel-gap">
+<!-- Material Selection -->
+<div class="bento-panel rounded-2xl p-8">
+<h3 class="font-label-caps text-label-caps text-on-surface uppercase flex items-center gap-3 mb-6">
+<span class="w-1.5 h-1.5 rounded-full bg-white/20"></span>
+                        Material Matrix
+                    </h3>
+<div class="grid grid-cols-1 gap-4">
+<label class="cursor-pointer group">
+<input checked="" class="peer sr-only" name="material" onchange="calculateTotals()" type="radio" value="1.0"/>
+<div class="p-5 rounded-xl border border-white/5 bg-white/[0.02] peer-checked:border-primary/50 peer-checked:bg-primary/[0.05] transition-all relative overflow-hidden group-hover:bg-white/[0.05]">
+<div class="flex justify-between items-start mb-1 relative z-10">
+<div class="font-headline-md text-lg text-on-surface">XPEL Ultimate Plus</div>
+<div class="h-4 w-4 rounded-full border border-white/20 flex items-center justify-center peer-checked:border-primary peer-checked:bg-primary">
+<div class="h-2 w-2 rounded-full bg-white opacity-0 peer-checked:opacity-100"></div>
+</div>
+</div>
+<div class="font-data-sm text-[11px] text-tertiary uppercase tracking-wider relative z-10">10yr Warranty • Ceramic Infused • High-Gloss</div>
+</div>
+</label>
+<label class="cursor-pointer group">
+<input class="peer sr-only" name="material" onchange="calculateTotals()" type="radio" value="0.85"/>
+<div class="p-5 rounded-xl border border-white/5 bg-white/[0.02] peer-checked:border-primary/50 peer-checked:bg-primary/[0.05] transition-all relative overflow-hidden group-hover:bg-white/[0.05]">
+<div class="flex justify-between items-start mb-1 relative z-10">
+<div class="font-headline-md text-lg text-on-surface">3M Pro Series V4</div>
+<div class="h-4 w-4 rounded-full border border-white/20 flex items-center justify-center peer-checked:border-primary peer-checked:bg-primary">
+<div class="h-2 w-2 rounded-full bg-white opacity-0 peer-checked:opacity-100"></div>
+</div>
+</div>
+<div class="font-data-sm text-[11px] text-tertiary uppercase tracking-wider relative z-10">7yr Warranty • Stealth Finish • Self-Healing</div>
+</div>
+</label>
+</div>
+</div>
+<!-- Breakdown Table -->
+<div class="bento-panel rounded-2xl flex-1 flex flex-col overflow-hidden relative min-h-[250px]">
+<div class="p-8 pb-4 border-b border-white/5 flex justify-between items-end">
+<h3 class="font-label-caps text-label-caps text-on-surface uppercase flex items-center gap-3">
+<span class="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(255,43,43,0.8)]"></span>
+                            Itemized Logic
+                        </h3>
+<span class="font-data-sm text-xs text-tertiary bg-white/5 px-2 py-0.5 rounded" id="selected-count">0 PANELS SELECTED</span>
+</div>
+<div class="flex-1 overflow-y-auto px-2">
+<table class="w-full text-left border-separate border-spacing-y-2">
+<thead class="sticky top-0 bg-surface-container/80 backdrop-blur z-10">
+<tr>
+<th class="py-3 px-6 font-label-caps text-[10px] text-tertiary uppercase w-1/2">Component</th>
+<th class="py-3 px-6 font-label-caps text-[10px] text-tertiary uppercase text-right">Coverage</th>
+<th class="py-3 px-6 font-label-caps text-[10px] text-tertiary uppercase text-right">Est. Cost</th>
+</tr>
+</thead>
+<tbody class="font-data-sm text-data-sm text-on-surface" id="line-items">
+<tr>
+<td class="py-12 text-center text-tertiary/40 italic font-body-lg" colspan="3">No panels active. Select telemetry points.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Totals & Action -->
+<div class="bento-panel rounded-2xl p-8 bg-black/60 relative overflow-hidden">
+<!-- Glow effect for total -->
+<div class="absolute -bottom-10 -right-10 w-48 h-48 bg-primary/10 blur-[50px] pointer-events-none"></div>
+<div class="flex justify-between items-center mb-3">
+<span class="font-data-sm text-xs text-tertiary uppercase tracking-widest">SUBTOTAL</span>
+<span class="font-data-lg text-on-surface" id="subtotal">$0.00</span>
+</div>
+<div class="flex justify-between items-center mb-6">
+<span class="font-data-sm text-xs text-tertiary uppercase tracking-widest">EST. TAX (18%)</span>
+<span class="font-data-sm text-tertiary" id="tax">$0.00</span>
+</div>
+<div class="w-full h-px bg-white/5 mb-8"></div>
+<div class="flex justify-between items-end mb-8">
+<div>
+<span class="font-label-caps text-[10px] text-primary tracking-[0.2em] block mb-1">TOTAL ESTIMATE</span>
+<span class="font-display-hero text-[52px] text-white leading-none tracking-tight transition-all duration-300" id="total">$0.00</span>
+</div>
+</div>
+<button class="w-full py-5 rounded-2xl btn-apex text-white font-headline-md text-[18px] tracking-[0.1em] flex justify-center items-center gap-3 group uppercase">
+                        INITIALIZE QUOTATION
+                        <span class="material-symbols-outlined text-xl group-hover:translate-x-1.5 transition-transform">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+<script>
+        // State
+        let selectedPanels = new Map(); // DOM Element -> Data Object
+        
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            const panels = document.querySelectorAll('.car-panel-svg');
+            
+            panels.forEach(panel => {
+                panel.addEventListener('click', function() {
+                    this.classList.toggle('active');
+                    
+                    if (this.classList.contains('active')) {
+                        selectedPanels.set(this, {
+                            name: this.getAttribute('data-panel').toUpperCase(),
+                            sqft: parseFloat(this.getAttribute('data-sqft')),
+                            basePrice: parseFloat(this.getAttribute('data-price'))
+                        });
+                    } else {
+                        selectedPanels.delete(this);
+                    }
+                    
+                    updateUI();
+                });
+            });
+        });
+
+        function selectAllPanels() {
+            document.querySelectorAll('.car-panel-svg').forEach(panel => {
+                if(!panel.classList.contains('active')) panel.click();
+            });
+        }
+
+        function clearAllPanels() {
+            document.querySelectorAll('.car-panel-svg').forEach(panel => {
+                if(panel.classList.contains('active')) panel.click();
+            });
+        }
+
+        function updateUI() {
+            renderTable();
+            calculateTotals();
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('line-items');
+            const countEl = document.getElementById('selected-count');
+            
+            tbody.innerHTML = '';
+            countEl.textContent = `${selectedPanels.size} PANELS SELECTED`;
+
+            if (selectedPanels.size === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="py-12 text-center text-tertiary/40 italic font-body-lg">No panels active. Select telemetry points.</td></tr>`;
+                return;
+            }
+
+            const materialMultiplier = parseFloat(document.querySelector('input[name="material"]:checked').value);
+
+            selectedPanels.forEach((data, el) => {
+                const finalPrice = data.basePrice * materialMultiplier;
+                const tr = document.createElement('tr');
+                tr.className = 'group cursor-default bg-white/[0.02] hover:bg-primary/[0.05] transition-all border border-transparent hover:border-primary/20 rounded-lg overflow-hidden';
+                tr.innerHTML = `
+                    <td class="py-4 px-6 font-data-sm text-on-surface group-hover:text-primary transition-colors">${data.name}</td>
+                    <td class="py-4 px-6 text-right text-tertiary/60 font-data-sm">${data.sqft} FT²</td>
+                    <td class="py-4 px-6 text-right font-data-lg text-on-surface">$${finalPrice.toFixed(2)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function calculateTotals() {
+            const materialMultiplier = parseFloat(document.querySelector('input[name="material"]:checked').value);
+            let subtotal = 0;
+            
+            selectedPanels.forEach((data) => {
+                subtotal += (data.basePrice * materialMultiplier);
+            });
+
+            const tax = subtotal * 0.18;
+            const total = subtotal + tax;
+
+            document.getElementById('subtotal').textContent = `$${subtotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('tax').textContent = `$${tax.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            
+            if(selectedPanels.size > 0) {
+                 renderTable(); 
+            }
+
+            const totalEl = document.getElementById('total');
+            totalEl.textContent = `$${total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            
+            // Animation bump
+            totalEl.classList.remove('scale-105', 'text-primary');
+            void totalEl.offsetWidth; // trigger reflow
+            totalEl.classList.add('scale-105', 'text-primary');
+            setTimeout(() => {
+                totalEl.classList.remove('scale-105', 'text-primary');
+            }, 300);
+        }
+    </script>
+</body></html>

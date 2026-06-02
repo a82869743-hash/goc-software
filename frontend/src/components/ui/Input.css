@@ -1,0 +1,118 @@
+/* ============================================================
+   GOC Studio — Input (from Stitch)
+   Matches: bg-[#111111] border border-gray-800 text-white
+            focus:border-[#CC0000] focus:ring-1 focus:ring-[#CC0000]
+   ============================================================ */
+
+.goc-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.goc-input-group--full {
+  width: 100%;
+}
+
+.goc-input-label {
+  font-size: var(--text-label);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.goc-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.goc-input-icon {
+  position: absolute;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-dim);
+  pointer-events: none;
+  z-index: 1;
+  transition: color var(--transition-fast);
+}
+
+.goc-input-icon svg,
+.goc-input-icon .material-symbols-outlined {
+  width: 18px;
+  height: 18px;
+  font-size: 18px;
+}
+
+.goc-input-wrap:focus-within .goc-input-icon {
+  color: var(--color-primary);
+}
+
+.goc-input {
+  width: 100%;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-medium);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: var(--text-body-md);
+  outline: none;
+  transition: all var(--transition-fast);
+}
+
+.goc-input::placeholder {
+  color: var(--color-text-dim);
+}
+
+.goc-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+.goc-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Sizes ───────────────────────────────────────────── */
+.goc-input-wrap--sm .goc-input {
+  padding: 6px 12px;
+  font-size: var(--text-body-sm);
+  border-radius: var(--radius-md);
+  height: 32px;
+}
+
+.goc-input-wrap--md .goc-input {
+  padding: 8px 14px;
+  font-size: var(--text-body-md);
+  border-radius: var(--radius-md);
+  height: 40px;
+}
+
+.goc-input-wrap--lg .goc-input {
+  padding: 10px 16px;
+  font-size: var(--text-body-lg);
+  border-radius: var(--radius-md);
+  height: 48px;
+}
+
+/* ── With Icon ───────────────────────────────────────── */
+.goc-input--has-icon {
+  padding-left: 38px !important;
+}
+
+/* ── Error State ─────────────────────────────────────── */
+.goc-input-group--error .goc-input {
+  border-color: var(--color-error);
+}
+
+.goc-input-group--error .goc-input:focus {
+  box-shadow: 0 0 0 1px var(--color-error);
+}
+
+.goc-input-error {
+  font-size: var(--text-label);
+  color: var(--color-error);
+}

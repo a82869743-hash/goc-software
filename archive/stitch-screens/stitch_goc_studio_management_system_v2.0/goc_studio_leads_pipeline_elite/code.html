@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>GOC STUDIO - Leads Pipeline</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "performance-red": "#FF2B2B",
+                        "obsidian-black": "#050505",
+                        "surface": "#121414",
+                        "surface-container": "#1e2020",
+                        "surface-variant": "#333535",
+                        "on-surface": "#e2e2e2",
+                        "on-surface-variant": "#ebbbb4",
+                        "carbon-border": "rgba(255, 255, 255, 0.08)",
+                        "obsidian-glass": "rgba(16, 17, 20, 0.75)"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        "grid-margin": "2rem",
+                        "bento-unit": "160px",
+                        "panel-gap": "1rem",
+                        "gutter-md": "1.5rem"
+                    },
+                    fontFamily: {
+                        "label-caps": ["JetBrains Mono"],
+                        "headline-md": ["Outfit"],
+                        "display-hero": ["Outfit"],
+                        "headline-lg": ["Outfit"],
+                        "data-sm": ["JetBrains Mono"],
+                        "data-lg": ["JetBrains Mono"],
+                        "body-lg": ["Outfit"]
+                    },
+                    fontSize: {
+                        "label-caps": ["11px", { lineHeight: "1.2", letterSpacing: "0.1em", fontWeight: "700" }],
+                        "headline-md": ["24px", { lineHeight: "1.3", fontWeight: "600" }],
+                        "display-hero": ["64px", { lineHeight: "1.1", letterSpacing: "-0.02em", fontWeight: "700" }],
+                        "headline-lg": ["40px", { lineHeight: "1.2", fontWeight: "600" }],
+                        "data-sm": ["13px", { lineHeight: "1.4", fontWeight: "400" }],
+                        "data-lg": ["18px", { lineHeight: "1.4", letterSpacing: "0.02em", fontWeight: "500" }],
+                        "body-lg": ["16px", { lineHeight: "1.6", fontWeight: "400" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .deep-glass {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(22px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        
+        .performance-gradient {
+            background: linear-gradient(135deg, #FF2B2B 0%, #B30000 100%);
+        }
+        
+        .red-glow {
+            box-shadow: 0 0 20px rgba(255, 43, 43, 0.15);
+        }
+        
+        .red-glow-strong {
+            box-shadow: 0 0 30px rgba(255, 43, 43, 0.3);
+        }
+
+        .kanban-col {
+            background: rgba(10, 10, 10, 0.6);
+            backdrop-filter: blur(22px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+    </style>
+</head>
+<body class="bg-obsidian-black text-on-surface font-body-lg flex overflow-hidden selection:bg-performance-red/30 selection:text-performance-red">
+<!-- SideNavBar -->
+<nav class="hidden md:flex fixed left-0 top-0 h-full flex-col z-50 bg-black/40 backdrop-blur-3xl w-64 border-r border-carbon-border">
+<div class="p-6 border-b border-carbon-border">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-surface-variant flex items-center justify-center overflow-hidden border border-carbon-border ring-1 ring-performance-red/20">
+<img alt="GOC Studio Elite Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYnlbbKG6W6X28zPUJEvl_HB-NLhAWT-em4ewhWeJ7OJAlQxs7zXU-GZ02CDLPlAqH1Yci-Z5g37riJFtP4ta1IK-H3Vq0_nH9ogq62shcFftIL1IX_OMq4qThUdRuraI_pccLUPYQSWTKA71JffMw4xOJ1bm1AXiNGOshJ4XXvmU4C-FH8JXeH7tmSKTxQy65cpw9sqbohYcx9Z0amhLKny04XgBaj_XaNXEArscbT3duFm6UIV37aWfr6OXkMv2GV92rXpauWEI"/>
+</div>
+<div>
+<h2 class="font-headline-md text-sm font-bold tracking-tighter text-on-surface">GOC STUDIO</h2>
+<p class="font-label-caps text-[10px] text-on-surface-variant/70">Elite Management</p>
+</div>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto py-6 flex flex-col gap-1">
+<a class="text-performance-red border-r-2 border-performance-red bg-performance-red/10 flex items-center px-6 py-4 transition-all duration-300" href="#">
+<span class="material-symbols-outlined mr-4" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-label-caps tracking-widest uppercase">Dashboard</span>
+</a>
+<a class="text-on-surface-variant/80 flex items-center px-6 py-4 hover:bg-white/5 hover:text-on-surface transition-all duration-200" href="#">
+<span class="material-symbols-outlined mr-4">directions_car</span>
+<span class="font-label-caps tracking-widest uppercase">Fleet</span>
+</a>
+<a class="text-on-surface-variant/80 flex items-center px-6 py-4 hover:bg-white/5 hover:text-on-surface transition-all duration-200" href="#">
+<span class="material-symbols-outlined mr-4">calendar_today</span>
+<span class="font-label-caps tracking-widest uppercase">Schedule</span>
+</a>
+<a class="text-on-surface-variant/80 flex items-center px-6 py-4 hover:bg-white/5 hover:text-on-surface transition-all duration-200" href="#">
+<span class="material-symbols-outlined mr-4">query_stats</span>
+<span class="font-label-caps tracking-widest uppercase">Analytics</span>
+</a>
+<a class="text-on-surface-variant/80 flex items-center px-6 py-4 hover:bg-white/5 hover:text-on-surface transition-all duration-200" href="#">
+<span class="material-symbols-outlined mr-4">inventory_2</span>
+<span class="font-label-caps tracking-widest uppercase">Inventory</span>
+</a>
+<a class="text-on-surface-variant/80 flex items-center px-6 py-4 hover:bg-white/5 hover:text-on-surface transition-all duration-200" href="#">
+<span class="material-symbols-outlined mr-4">settings</span>
+<span class="font-label-caps tracking-widest uppercase">Settings</span>
+</a>
+</div>
+<div class="p-6 border-t border-carbon-border">
+<button class="w-full performance-gradient text-white font-label-caps py-3 rounded-lg red-glow hover:red-glow-strong transition-all tracking-widest mb-4 uppercase">
+            New Booking
+        </button>
+<div class="flex flex-col gap-1">
+<a class="text-on-surface-variant/60 flex items-center px-2 py-2 hover:text-on-surface transition-colors" href="#">
+<span class="material-symbols-outlined mr-4 text-[18px]">help</span>
+<span class="font-label-caps tracking-widest uppercase">Support</span>
+</a>
+<a class="text-on-surface-variant/60 flex items-center px-2 py-2 hover:text-on-surface transition-colors" href="#">
+<span class="material-symbols-outlined mr-4 text-[18px]">logout</span>
+<span class="font-label-caps tracking-widest uppercase">Logout</span>
+</a>
+</div>
+</div>
+</nav>
+<!-- Main Content Area -->
+<div class="ml-0 md:ml-64 flex-1 flex flex-col h-screen overflow-hidden">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center w-full px-8 h-20 sticky top-0 z-40 bg-obsidian-black/60 backdrop-blur-md border-b border-carbon-border shrink-0">
+<div class="flex items-center">
+<h1 class="text-headline-md font-bold text-on-surface tracking-wide uppercase">GOC STUDIO</h1>
+</div>
+<div class="flex items-center gap-6">
+<div class="hidden lg:flex items-center bg-white/5 border border-carbon-border rounded-full px-4 py-2 focus-within:border-performance-red/50 transition-all">
+<span class="material-symbols-outlined text-on-surface-variant/60 text-[20px] mr-2">search</span>
+<input class="bg-transparent border-none outline-none text-on-surface font-data-sm placeholder:text-on-surface-variant/30 w-64" placeholder="Search chassis, client, fleet..." type="text"/>
+</div>
+<div class="flex items-center gap-4 border-l border-carbon-border pl-6">
+<button class="text-on-surface-variant hover:text-performance-red transition-colors relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-0 right-0 w-2 h-2 performance-gradient rounded-full shadow-[0_0_8px_#FF2B2B]"></span>
+</button>
+<button class="text-on-surface-variant hover:text-performance-red transition-colors">
+<span class="material-symbols-outlined">diamond</span>
+</button>
+<button class="text-on-surface-variant hover:text-performance-red transition-colors">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Pipeline Header -->
+<div class="px-8 py-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-carbon-border bg-obsidian-black/40 shrink-0">
+<div>
+<h2 class="font-headline-md text-on-surface">Leads Pipeline</h2>
+<p class="font-data-sm text-on-surface-variant/60 mt-1">Real-time acquisition telemetry</p>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex bg-white/5 border border-carbon-border rounded-lg p-1">
+<button class="px-4 py-1.5 rounded-md performance-gradient text-white font-label-caps shadow-lg">All</button>
+<button class="px-4 py-1.5 rounded-md text-on-surface-variant/60 hover:text-on-surface font-label-caps transition-colors">VIP</button>
+<button class="px-4 py-1.5 rounded-md text-on-surface-variant/60 hover:text-on-surface font-label-caps transition-colors">Fleet</button>
+</div>
+<button class="flex items-center justify-center w-10 h-10 rounded-lg border border-carbon-border bg-white/5 hover:bg-white/10 transition-colors text-on-surface-variant">
+<span class="material-symbols-outlined">filter_list</span>
+</button>
+<button class="performance-gradient text-white font-label-caps px-6 py-2.5 rounded-lg red-glow hover:red-glow-strong transition-all flex items-center gap-2 uppercase tracking-widest" onclick="document.getElementById('lead-drawer').classList.remove('translate-x-full'); document.getElementById('drawer-overlay').classList.remove('hidden');">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                New Lead
+            </button>
+</div>
+</div>
+<!-- Kanban Board -->
+<main class="flex-1 overflow-x-auto overflow-y-hidden p-8 flex gap-6 items-start scrollbar-hide bg-[radial-gradient(circle_at_top_right,rgba(255,43,43,0.03),transparent_40%)]">
+<!-- Column 1: New -->
+<div class="w-[320px] shrink-0 kanban-col rounded-xl flex flex-col h-full max-h-full shadow-2xl">
+<div class="p-4 border-b border-carbon-border flex justify-between items-center bg-white/5 rounded-t-xl">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full performance-gradient shadow-[0_0_8px_#FF2B2B]"></div>
+<span class="font-label-caps text-on-surface tracking-widest uppercase">New</span>
+</div>
+<span class="font-data-sm bg-performance-red/10 text-performance-red px-2 py-0.5 rounded border border-performance-red/20">3</span>
+</div>
+<div class="p-4 flex-1 overflow-y-auto flex flex-col gap-4 scrollbar-hide">
+<!-- Card 1 -->
+<div class="deep-glass rounded-lg p-5 cursor-grab hover:border-performance-red/40 group transition-all relative overflow-hidden red-glow" onclick="document.getElementById('lead-drawer').classList.remove('translate-x-full'); document.getElementById('drawer-overlay').classList.remove('hidden');">
+<div class="absolute left-0 top-0 bottom-0 w-1 performance-gradient opacity-40 group-hover:opacity-100 transition-opacity"></div>
+<div class="flex justify-between items-start mb-3">
+<h3 class="font-data-lg text-on-surface group-hover:text-performance-red transition-colors">Julian Vance</h3>
+<span class="material-symbols-outlined text-on-surface-variant/40 opacity-0 group-hover:opacity-100 transition-opacity text-sm">drag_indicator</span>
+</div>
+<div class="flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-[14px] text-performance-red/70">directions_car</span>
+<p class="font-data-sm text-on-surface-variant">Porsche 911 GT3 RS</p>
+</div>
+<div class="flex justify-between items-center mt-2 pt-3 border-t border-white/5">
+<span class="bg-white/5 border border-carbon-border text-on-surface-variant/70 px-2 py-1 rounded text-[10px] font-label-caps uppercase">Instagram</span>
+<span class="font-data-sm text-[11px] text-on-surface-variant/50">2h ago</span>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="deep-glass rounded-lg p-5 cursor-grab hover:border-performance-red/40 group transition-all relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-white/10 group-hover:performance-gradient transition-all"></div>
+<div class="flex justify-between items-start mb-3">
+<h3 class="font-data-lg text-on-surface group-hover:text-performance-red transition-colors">Elena Rostova</h3>
+<span class="material-symbols-outlined text-on-surface-variant/40 opacity-0 group-hover:opacity-100 transition-opacity text-sm">drag_indicator</span>
+</div>
+<div class="flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-[14px] text-performance-red/70">directions_car</span>
+<p class="font-data-sm text-on-surface-variant">Aston Martin DBS</p>
+</div>
+<div class="flex justify-between items-center mt-2 pt-3 border-t border-white/5">
+<span class="bg-white/5 border border-carbon-border text-on-surface-variant/70 px-2 py-1 rounded text-[10px] font-label-caps uppercase">Referral</span>
+<span class="font-data-sm text-[11px] text-on-surface-variant/50">5h ago</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Column 2: Contacted -->
+<div class="w-[320px] shrink-0 kanban-col rounded-xl flex flex-col h-full max-h-full">
+<div class="p-4 border-b border-carbon-border flex justify-between items-center bg-white/5 rounded-t-xl">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-on-surface-variant/40"></div>
+<span class="font-label-caps text-on-surface tracking-widest uppercase">Contacted</span>
+</div>
+<span class="font-data-sm bg-white/5 text-on-surface-variant/60 px-2 py-0.5 rounded border border-carbon-border">1</span>
+</div>
+<div class="p-4 flex-1 overflow-y-auto flex flex-col gap-4 scrollbar-hide">
+<!-- Card 3 -->
+<div class="deep-glass rounded-lg p-5 cursor-grab hover:border-performance-red/40 group transition-all relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-white/10 group-hover:performance-gradient transition-all"></div>
+<div class="flex justify-between items-start mb-3">
+<h3 class="font-data-lg text-on-surface group-hover:text-performance-red transition-colors">Marcus Chen</h3>
+<span class="material-symbols-outlined text-on-surface-variant/40 opacity-0 group-hover:opacity-100 transition-opacity text-sm">drag_indicator</span>
+</div>
+<div class="flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-[14px] text-performance-red/70">directions_car</span>
+<p class="font-data-sm text-on-surface-variant">McLaren 720S</p>
+</div>
+<div class="flex justify-between items-center mt-2 pt-3 border-t border-white/5">
+<span class="bg-white/5 border border-carbon-border text-on-surface-variant/70 px-2 py-1 rounded text-[10px] font-label-caps uppercase">Website</span>
+<span class="font-data-sm text-[11px] text-on-surface-variant/50">1d ago</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Column 3: Interested -->
+<div class="w-[320px] shrink-0 kanban-col rounded-xl flex flex-col h-full max-h-full opacity-60">
+<div class="p-4 border-b border-carbon-border flex justify-between items-center bg-white/5 rounded-t-xl">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-white/20"></div>
+<span class="font-label-caps text-on-surface/60 tracking-widest uppercase">Interested</span>
+</div>
+<span class="font-data-sm bg-white/5 text-on-surface-variant/40 px-2 py-0.5 rounded border border-carbon-border">0</span>
+</div>
+<div class="p-4 flex-1 flex flex-col items-center justify-center text-on-surface-variant/30">
+<span class="material-symbols-outlined text-4xl mb-2">inventory_2</span>
+<p class="font-data-sm">Empty Sector</p>
+</div>
+</div>
+<!-- Column 4: Quoted -->
+<div class="w-[320px] shrink-0 kanban-col rounded-xl flex flex-col h-full max-h-full">
+<div class="p-4 border-b border-carbon-border flex justify-between items-center bg-white/5 rounded-t-xl">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full performance-gradient"></div>
+<span class="font-label-caps text-on-surface tracking-widest uppercase">Quoted</span>
+</div>
+<span class="font-data-sm bg-white/5 text-on-surface-variant/60 px-2 py-0.5 rounded border border-carbon-border">1</span>
+</div>
+<div class="p-4 flex-1 overflow-y-auto flex flex-col gap-4 scrollbar-hide">
+<div class="deep-glass rounded-lg p-5 cursor-grab hover:border-performance-red/40 group transition-all relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-white/10 group-hover:performance-gradient transition-all"></div>
+<div class="flex justify-between items-start mb-3">
+<h3 class="font-data-lg text-on-surface group-hover:text-performance-red transition-colors">Sofia Rossi</h3>
+<span class="material-symbols-outlined text-on-surface-variant/40 opacity-0 group-hover:opacity-100 transition-opacity text-sm">drag_indicator</span>
+</div>
+<div class="flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-[14px] text-performance-red/70">directions_car</span>
+<p class="font-data-sm text-on-surface-variant">Ferrari F8 Tributo</p>
+</div>
+<div class="flex justify-between items-center mt-2 pt-3 border-t border-white/5">
+<span class="bg-white/5 border border-carbon-border text-on-surface-variant/70 px-2 py-1 rounded text-[10px] font-label-caps uppercase">Direct</span>
+<span class="font-data-sm text-[11px] text-performance-red">$12,500</span>
+</div>
+</div>
+</div>
+</div>
+<div class="w-8 shrink-0"></div>
+</main>
+</div>
+<!-- Drawer Panel -->
+<div class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] hidden transition-opacity" id="drawer-overlay" onclick="document.getElementById('lead-drawer').classList.add('translate-x-full'); this.classList.add('hidden');"></div>
+<div class="fixed right-0 top-0 h-full w-full max-w-md bg-obsidian-black border-l border-carbon-border z-[70] transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col shadow-[-20px_0_40px_rgba(0,0,0,0.8)]" id="lead-drawer">
+<div class="p-6 border-b border-carbon-border bg-white/5 flex justify-between items-center shrink-0">
+<div>
+<div class="flex items-center gap-2 mb-1">
+<span class="w-2 h-2 rounded-full performance-gradient animate-pulse shadow-[0_0_8px_#FF2B2B]"></span>
+<span class="font-label-caps text-[10px] text-performance-red tracking-widest uppercase">Active Telemetry</span>
+</div>
+<h2 class="font-headline-md text-on-surface font-bold">Julian Vance</h2>
+</div>
+<button class="text-on-surface-variant hover:text-performance-red transition-colors w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/5" onclick="document.getElementById('lead-drawer').classList.add('translate-x-full'); document.getElementById('drawer-overlay').classList.add('hidden');">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<div class="flex-1 overflow-y-auto p-6 flex flex-col gap-8 scrollbar-hide">
+<!-- Vehicle Stats -->
+<div class="deep-glass rounded-xl p-5 red-glow">
+<h4 class="font-label-caps text-on-surface-variant/50 mb-4 uppercase tracking-widest border-b border-white/5 pb-2">Vehicle Configuration</h4>
+<div class="flex flex-col gap-3">
+<div class="flex justify-between items-center">
+<span class="font-data-sm text-on-surface-variant/60">Chassis</span>
+<span class="font-data-sm text-on-surface font-medium">911 GT3 RS</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-data-sm text-on-surface-variant/60">Operation</span>
+<span class="font-data-sm text-on-surface font-medium">Full Ceramic Package</span>
+</div>
+<div class="flex justify-between items-center pt-2 border-t border-white/5">
+<span class="font-data-sm text-on-surface-variant/60">Estimated Yield</span>
+<span class="font-data-sm text-performance-red font-bold text-lg">$4,500</span>
+</div>
+</div>
+</div>
+<!-- Timeline -->
+<div>
+<h4 class="font-label-caps text-on-surface-variant/50 mb-6 uppercase tracking-widest px-1">Log Feed</h4>
+<div class="relative pl-4 border-l border-white/10 ml-2 flex flex-col gap-8">
+<div class="relative">
+<div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full performance-gradient shadow-[0_0_10px_#FF2B2B] ring-4 ring-obsidian-black"></div>
+<p class="font-data-sm text-[11px] text-performance-red mb-2 uppercase tracking-tighter">Current Status</p>
+<div class="deep-glass rounded-lg p-3">
+<p class="font-data-sm text-on-surface">Transmission to <strong class="text-performance-red">NEW</strong> confirmed.</p>
+</div>
+</div>
+<div class="relative">
+<div class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-white/10 ring-4 ring-obsidian-black border border-white/20"></div>
+<p class="font-data-sm text-[11px] text-on-surface-variant/40 mb-2 uppercase tracking-tighter">120 Minutes Prior</p>
+<div class="deep-glass rounded-lg p-4 bg-white/[0.01]">
+<p class="font-data-sm text-on-surface-variant">Inbound signal via <strong class="text-on-surface">Instagram DM</strong>.</p>
+<div class="mt-3 bg-obsidian-black/50 p-3 rounded border-l border-performance-red/50 italic font-data-sm text-on-surface-variant/80">
+                            "Hey, looking to get a quote for a GT3 RS ceramic coating. Based in LA."
+                        </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer Actions -->
+<div class="p-6 border-t border-carbon-border bg-white/5 shrink-0 flex gap-4">
+<button class="flex-1 border border-performance-red/30 text-performance-red font-label-caps py-3 rounded-lg hover:bg-performance-red/10 transition-all uppercase tracking-widest">
+            Log Note
+        </button>
+<button class="flex-1 performance-gradient text-white font-bold font-label-caps py-3 rounded-lg red-glow hover:red-glow-strong transition-all uppercase tracking-widest">
+            Create Quote
+        </button>
+</div>
+</div>
+</body></html>

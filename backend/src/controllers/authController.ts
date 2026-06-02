@@ -1,0 +1,179 @@
+import { Request, Response } from 'express';
+import bcrypt from 'bcryptjs';
+import pool from '../utils/db';
+import { signToken } from '../utils/jwt';
+import { ERROR_CODES } from '../utils/constants';
+import { RowDataPacket } from 'mysql2';
+
+interface StaffRow extends RowDataPacket {
+  id: number;
+  staff_code: string;
+  full_name: string;
+  phone: string;
+  email: string | null;
+  role: 'admin' | 'technician' | 'receptionist' | 'manager' | 'staff';
+  status: string;
+  password_hash: string;
+}
+
+/**
+ * POST /auth/login
+ * Authenticates staff by phone + password, returns JWT token
+ */
+export const login = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { phone, password } = req.body;
+
+    // Find staff by phone
+    const [rows] = await pool.query<StaffRow[]>(
+      `SELECT id, staff_code, full_name, phone, email, role, status, password_hash 
+       FROM staff 
+       WHERE phone = ? AND deleted_at IS NULL`,
+      [phone]
+    );
+
+    if (rows.length === 0) {
+      res.status(401).json({
+        success: false,
+        error: {
+          code: ERROR_CODES.AUTH_INVALID,
+          message: 'Invalid phone number or password.',
+        },
+      });
+      return;
+    }
+
+    const staff = rows[0];
+
+    // Check if staff is active
+    if (staff.status !== 'active') {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: ERROR_CODES.FORBIDDEN,
+          message: 'Your account is currently inactive. Please contact the owner.',
+        },
+      });
+      return;
+    }
+
+    // Verify password
+    const isValidPassword = await bcrypt.compare(password, staff.password_hash);
+    if (!isValidPassword) {
+      res.status(401).json({
+        success: false,
+        error: {
+          code: ERROR_CODES.AUTH_INVALID,
+          message: 'Invalid phone number or password.',
+        },
+      });
+      return;
+    }
+
+    // Generate JWT token
+    const token = signToken({
+      id: staff.id,
+      staff_code: staff.staff_code,
+      role: staff.role,
+      full_name: staff.full_name,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        token,
+        staff: {
+          id: staff.id,
+          staff_code: staff.staff_code,
+          full_name: staff.full_name,
+          role: staff.role,
+          phone: staff.phone,
+          email: staff.email,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: ERROR_CODES.SERVER_ERROR,
+        message: 'An error occurred during login.',
+      },
+    });
+  }
+};
+
+/**
+ * POST /auth/logout
+ * Logs out the current user (client-side token removal)
+ */
+export const logout = async (_req: Request, res: Response): Promise<void> => {
+  // DECISION: Server-side token blacklisting not implemented in v2.0
+  // Client is responsible for removing the token from storage
+  res.json({
+    success: true,
+    data: { message: 'Logged out successfully.' },
+  });
+};
+
+/**
+ * GET /auth/me
+ * Returns the current staff profile from the JWT token
+ */
+export const getMe = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.staff) {
+      res.status(401).json({
+        success: false,
+        error: {
+          code: ERROR_CODES.AUTH_REQUIRED,
+          message: 'Authentication required.',
+        },
+      });
+      return;
+    }
+
+    // Fetch fresh data from DB
+    const [rows] = await pool.query<StaffRow[]>(
+      `SELECT id, staff_code, full_name, phone, email, role, status, salary_type, join_date
+       FROM staff 
+       WHERE id = ? AND deleted_at IS NULL`,
+      [req.staff.id]
+    );
+
+    if (rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        error: {
+          code: ERROR_CODES.NOT_FOUND,
+          message: 'Staff account not found.',
+        },
+      });
+      return;
+    }
+
+    const staff = rows[0];
+    res.json({
+      success: true,
+      data: {
+        id: staff.id,
+        staff_code: staff.staff_code,
+        full_name: staff.full_name,
+        phone: staff.phone,
+        email: staff.email,
+        role: staff.role,
+        status: staff.status,
+      },
+    });
+  } catch (error) {
+    console.error('Get me error:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: ERROR_CODES.SERVER_ERROR,
+        message: 'An error occurred while fetching profile.',
+      },
+    });
+  }
+};

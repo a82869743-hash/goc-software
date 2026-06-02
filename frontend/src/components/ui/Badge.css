@@ -1,0 +1,43 @@
+/* ============================================================
+   GOC Studio — Badge / StatusBadge (from Stitch)
+   Matches: inline-flex items-center gap-1.5 px-2 py-1 
+            rounded-full font-label-caps text-label-caps
+   ============================================================ */
+
+.goc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-family: var(--font-body);
+  font-size: var(--text-label);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  border: 1px solid;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.goc-badge--sm {
+  font-size: var(--text-caption);
+  padding: 2px 8px;
+  gap: 4px;
+}
+
+.goc-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.goc-badge-dot--pulse {
+  animation: badge-pulse 2s ease-in-out infinite;
+}
+
+@keyframes badge-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}

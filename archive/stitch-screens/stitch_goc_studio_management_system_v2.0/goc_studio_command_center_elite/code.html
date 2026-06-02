@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>GOC STUDIO | Owner Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        :root {
+            --obsidian-base: #050505;
+            --performance-red: #FF2B2B;
+            --deep-crimson: #690100;
+            --glass-border: rgba(255, 255, 255, 0.08);
+        }
+
+        body {
+            background-color: var(--obsidian-base);
+            color: #e2e2e2;
+            overflow-x: hidden;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .bg-obsidian-glass {
+            background: rgba(12, 12, 12, 0.6);
+            backdrop-filter: blur(22px);
+            border: 1px solid var(--glass-border);
+        }
+
+        .performance-gradient {
+            background: linear-gradient(135deg, #FF2B2B 0%, #930100 100%);
+        }
+
+        .performance-text-gradient {
+            background: linear-gradient(135deg, #FF2B2B 0%, #ff8a7a 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .carbon-border {
+            border-color: var(--glass-border);
+        }
+
+        .red-ambient-glow {
+            box-shadow: 0 0 40px -10px rgba(255, 43, 43, 0.15);
+        }
+
+        .active-glow {
+            box-shadow: 0 0 20px rgba(255, 43, 43, 0.3);
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(255, 43, 43, 0.2);
+            border-radius: 10px;
+        }
+
+        .hero-gradient {
+            background: radial-gradient(circle at 50% -20%, rgba(255, 43, 43, 0.05) 0%, transparent 70%);
+        }
+
+        @keyframes pulse-red {
+            0% { opacity: 1; box-shadow: 0 0 0 0 rgba(255, 43, 43, 0.4); }
+            70% { opacity: 0.5; box-shadow: 0 0 0 10px rgba(255, 43, 43, 0); }
+            100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255, 43, 43, 0); }
+        }
+        .animate-pulse-red {
+            animation: pulse-red 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        .funnel-tier {
+            clip-path: polygon(0% 0%, 100% 0%, 92% 100%, 8% 100%);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .funnel-tier:hover {
+            filter: brightness(1.2) drop-shadow(0 0 15px rgba(255, 43, 43, 0.3));
+            transform: scale(1.01);
+        }
+
+        .metallic-progress {
+            background: linear-gradient(90deg, #930100 0%, #FF2B2B 100%);
+            box-shadow: 0 0 15px rgba(255, 43, 43, 0.4);
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .tooltip-container {
+            position: fixed;
+            pointer-events: none;
+            z-index: 100;
+            background: rgba(5, 5, 5, 0.95);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 43, 43, 0.3);
+            padding: 10px 14px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 20px rgba(255, 43, 43, 0.1);
+            opacity: 0;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            transform: translateY(10px);
+        }
+
+        .tooltip-container.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .donut-segment {
+            transition: stroke-width 0.4s cubic-bezier(0.4, 0, 0.2, 1), filter 0.4s ease;
+            cursor: pointer;
+        }
+
+        .font-data {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .font-headline {
+            font-family: 'Outfit', sans-serif;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#FF2B2B",
+                        "on-primary": "#FFFFFF",
+                        "surface": "#050505",
+                        "surface-container": "#121212",
+                        "on-surface": "#E2E2E2",
+                        "on-surface-variant": "#A0A0A0",
+                        "outline": "rgba(255,255,255,0.08)"
+                    },
+                    fontFamily: {
+                        "data-sm": ["JetBrains Mono"],
+                        "data-lg": ["JetBrains Mono"],
+                        "body-lg": ["Outfit"],
+                        "headline-lg": ["Outfit"],
+                        "display-hero": ["Outfit"],
+                        "label-caps": ["JetBrains Mono"],
+                        "headline-md": ["Outfit"]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="font-body-lg text-on-surface bg-surface">
+<!-- Tooltip -->
+<div class="tooltip-container" id="chart-tooltip">
+<p class="font-label-caps text-[10px] text-on-surface-variant uppercase mb-1" id="tooltip-label"></p>
+<p class="font-data text-base text-primary font-bold" id="tooltip-value"></p>
+<p class="font-data text-[10px] text-on-surface/60" id="tooltip-extra"></p>
+</div>
+<!-- Sidebar -->
+<aside class="fixed left-0 top-0 h-screen w-64 flex flex-col z-50 bg-[#080808] border-r border-outline shadow-2xl">
+<div class="px-8 py-10">
+<h1 class="font-headline text-2xl font-bold tracking-tight text-white">GOC STUDIO</h1>
+<p class="font-label-caps text-[10px] text-primary tracking-[0.3em] mt-1">ELITE MANAGEMENT</p>
+</div>
+<nav class="flex-1 px-4 space-y-1">
+<a class="text-primary bg-primary/5 border-l-4 border-primary flex items-center px-6 py-4 transition-all duration-300 active-glow" href="#">
+<span class="material-symbols-outlined mr-4" style="font-variation-settings: 'FILL' 1">dashboard</span>
+<span class="font-label-caps text-xs tracking-widest">DASHBOARD</span>
+</a>
+<a class="text-on-surface-variant flex items-center px-6 py-4 hover:text-white transition-colors hover:bg-white/5 rounded-lg" href="#">
+<span class="material-symbols-outlined mr-4">directions_car</span>
+<span class="font-label-caps text-xs tracking-widest">FLEET</span>
+</a>
+<a class="text-on-surface-variant flex items-center px-6 py-4 hover:text-white transition-colors hover:bg-white/5 rounded-lg" href="#">
+<span class="material-symbols-outlined mr-4">calendar_today</span>
+<span class="font-label-caps text-xs tracking-widest">SCHEDULE</span>
+</a>
+<a class="text-on-surface-variant flex items-center px-6 py-4 hover:text-white transition-colors hover:bg-white/5 rounded-lg" href="#">
+<span class="material-symbols-outlined mr-4">query_stats</span>
+<span class="font-label-caps text-xs tracking-widest">ANALYTICS</span>
+</a>
+<a class="text-on-surface-variant flex items-center px-6 py-4 hover:text-white transition-colors hover:bg-white/5 rounded-lg" href="#">
+<span class="material-symbols-outlined mr-4">inventory_2</span>
+<span class="font-label-caps text-xs tracking-widest">INVENTORY</span>
+</a>
+<a class="text-on-surface-variant flex items-center px-6 py-4 hover:text-white transition-colors hover:bg-white/5 rounded-lg" href="#">
+<span class="material-symbols-outlined mr-4">settings</span>
+<span class="font-label-caps text-xs tracking-widest">SETTINGS</span>
+</a>
+</nav>
+<div class="p-6 border-t border-outline">
+<button class="w-full performance-gradient text-white font-label-caps text-xs py-4 rounded-xl flex items-center justify-center gap-2 hover:scale-[1.02] transition-all active-glow uppercase tracking-widest">
+<span class="material-symbols-outlined text-lg">add</span>
+            New Booking
+        </button>
+<div class="mt-8 flex flex-col gap-4">
+<a class="text-on-surface-variant flex items-center gap-3 text-[10px] font-label-caps hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined text-sm">help</span> SUPPORT
+            </a>
+<a class="text-on-surface-variant flex items-center gap-3 text-[10px] font-label-caps hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined text-sm">logout</span> LOGOUT
+            </a>
+</div>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="ml-64 min-h-screen flex flex-col hero-gradient">
+<!-- Top Bar -->
+<header class="flex justify-between items-center w-full px-10 h-24 sticky top-0 z-40 bg-surface/80 backdrop-blur-xl border-b border-outline">
+<div class="flex items-center gap-5">
+<div class="w-3 h-3 rounded-full bg-primary animate-pulse-red"></div>
+<h2 class="font-headline text-2xl font-bold text-white tracking-tight">COMMAND CENTER</h2>
+</div>
+<div class="flex items-center gap-10">
+<div class="flex items-center gap-6">
+<span class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors cursor-pointer text-2xl">notifications</span>
+<span class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors cursor-pointer text-2xl">diamond</span>
+</div>
+<div class="flex items-center gap-4 pl-8 border-l border-outline">
+<div class="text-right">
+<p class="font-label-caps text-[10px] text-white tracking-widest">ELITE MEMBER</p>
+<p class="font-data text-[9px] text-primary/80">STUDIO OWNER</p>
+</div>
+<div class="relative group cursor-pointer">
+<img alt="Owner" class="w-12 h-12 rounded-xl border border-outline object-cover transition-all group-hover:border-primary/50" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC7IYUpsy9Wxm1pk3SqYochBwKduMJC48ip5MbEcLtGUTIeAkBWApSDtdkovlRd-hNsAjA9txa22p2m25Vtq_Xmg3XgwBiok9w8PVd-o6udTMlm0EhbCJn-R2GNuG7S_WxbhjHOndtVtWz-NowRpzbVK9gWen-dKl7-tGSkNxvAdu-qgrg0qj8DLrjNKeaRYwR7gfvD2DMiC6yYp83ViXXKgQ9KxoVkJmToxqisdOS8TWXAGjoy2kXZe6wY1NdB0vGegD3Ko3d2xTk"/>
+<div class="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-surface"></div>
+</div>
+</div>
+</div>
+</header>
+<!-- Content -->
+<div class="p-10 flex-1 space-y-8">
+<!-- KPI Row -->
+<div class="grid grid-cols-12 gap-8">
+<div class="col-span-12 md:col-span-3 bg-obsidian-glass p-8 rounded-2xl relative overflow-hidden group hover:scale-[1.02] transition-all duration-500 red-ambient-glow">
+<div class="absolute -top-4 -right-4 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+<span class="material-symbols-outlined text-8xl" data-icon="payments">payments</span>
+</div>
+<p class="font-label-caps text-[10px] text-on-surface-variant tracking-[0.2em] mb-4 flex items-center gap-3">
+<span class="w-1.5 h-1.5 bg-primary rounded-full"></span> TODAY'S REVENUE
+                </p>
+<h3 class="font-data text-4xl text-white font-bold">₹1,42,500</h3>
+<p class="font-data text-sm text-primary mt-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-base">trending_up</span> +12.4% <span class="text-on-surface-variant text-[10px] font-normal opacity-50 ml-1">VS LW</span>
+</p>
+</div>
+<div class="col-span-12 md:col-span-3 bg-obsidian-glass p-8 rounded-2xl relative overflow-hidden group hover:scale-[1.02] transition-all duration-500">
+<div class="absolute -top-4 -right-4 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+<span class="material-symbols-outlined text-8xl">garage</span>
+</div>
+<p class="font-label-caps text-[10px] text-on-surface-variant tracking-[0.2em] mb-4 flex items-center gap-3">
+<span class="w-1.5 h-1.5 bg-primary rounded-full"></span> ACTIVE JOB CARDS
+                </p>
+<h3 class="font-data text-4xl text-white font-bold">14 <span class="text-xl font-normal text-on-surface-variant">/ 4 BAYS</span></h3>
+<p class="font-data text-sm text-on-surface-variant mt-4">Utilization: <span class="text-white">87.5%</span></p>
+</div>
+<div class="col-span-12 md:col-span-3 bg-obsidian-glass p-8 rounded-2xl relative overflow-hidden group hover:scale-[1.02] transition-all duration-500">
+<div class="absolute -top-4 -right-4 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+<span class="material-symbols-outlined text-8xl">ads_click</span>
+</div>
+<p class="font-label-caps text-[10px] text-on-surface-variant tracking-[0.2em] mb-4 flex items-center gap-3">
+<span class="w-1.5 h-1.5 bg-primary rounded-full"></span> NEW LEADS
+                </p>
+<h3 class="font-data text-4xl text-white font-bold">08</h3>
+<p class="font-data text-sm text-on-surface-variant mt-4">Growth: <span class="text-primary">+4</span> from Meta</p>
+</div>
+<div class="col-span-12 md:col-span-3 bg-obsidian-glass p-8 rounded-2xl relative overflow-hidden group border-primary/20 hover:scale-[1.02] transition-all duration-500">
+<div class="absolute -top-4 -right-4 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+<span class="material-symbols-outlined text-8xl text-primary">warning</span>
+</div>
+<p class="font-label-caps text-[10px] text-primary tracking-[0.2em] mb-4 flex items-center gap-3">
+<span class="w-1.5 h-1.5 bg-primary rounded-full animate-pulse"></span> STOCK ALERTS
+                </p>
+<h3 class="font-data text-4xl text-white font-bold">03</h3>
+<p class="font-data text-[10px] text-on-surface-variant mt-4 uppercase tracking-tighter truncate">Critical: XPEL Stealth Roll #4</p>
+</div>
+</div>
+<!-- Charts Section -->
+<div class="grid grid-cols-12 gap-8">
+<!-- Revenue Area -->
+<div class="col-span-12 lg:col-span-8 bg-obsidian-glass p-8 rounded-2xl h-[480px] flex flex-col relative red-ambient-glow">
+<div class="flex justify-between items-start mb-10">
+<div>
+<p class="font-label-caps text-[10px] text-on-surface-variant tracking-[0.2em] flex items-center gap-3">
+<span class="w-1.5 h-1.5 bg-primary rounded-full"></span> REVENUE TELEMETRY
+                        </p>
+<h4 class="font-headline text-lg text-white mt-2">Performance Analytics</h4>
+</div>
+<div class="flex gap-4">
+<div class="flex items-center gap-3 bg-white/5 border border-outline px-4 py-2 rounded-xl">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span class="font-data text-[10px] text-white">PEAK: ₹2.84L</span>
+</div>
+<select class="bg-white/5 border border-outline rounded-xl text-[10px] font-label-caps text-white focus:ring-1 focus:ring-primary py-2 px-5 appearance-none cursor-pointer">
+<option>WEEKLY VIEW</option>
+<option>MONTHLY VIEW</option>
+</select>
+</div>
+</div>
+<div class="flex-1 relative">
+<svg class="w-full h-full overflow-visible" viewbox="0 0 1000 300">
+<defs>
+<lineargradient id="chartGradient" x1="0%" x2="0%" y1="0%" y2="100%">
+<stop offset="0%" style="stop-color:rgba(255, 43, 43, 0.4);stop-opacity:1"></stop>
+<stop offset="100%" style="stop-color:rgba(255, 43, 43, 0);stop-opacity:1"></stop>
+</lineargradient>
+<filter id="lineGlow">
+<fegaussianblur result="blur" stddeviation="5"></fegaussianblur>
+<fecomposite in="SourceGraphic" in2="blur" operator="over"></fecomposite>
+</filter>
+</defs>
+<!-- Grid Lines -->
+<g class="opacity-10">
+<line stroke="white" stroke-width="0.5" x1="0" x2="1000" y1="75" y2="75"></line>
+<line stroke="white" stroke-width="0.5" x1="0" x2="1000" y1="150" y2="150"></line>
+<line stroke="white" stroke-width="0.5" x1="0" x2="1000" y1="225" y2="225"></line>
+</g>
+<!-- Area -->
+<path d="M0,250 C100,240 150,220 200,210 C300,190 350,110 450,120 C550,130 600,220 700,210 C800,200 850,60 1000,80 L1000,300 L0,300 Z" fill="url(#chartGradient)"></path>
+<!-- Line -->
+<path d="M0,250 C100,240 150,220 200,210 C300,190 350,110 450,120 C550,130 600,220 700,210 C800,200 850,60 1000,80" fill="none" filter="url(#lineGlow)" stroke="#FF2B2B" stroke-linecap="round" stroke-width="4"></path>
+<!-- Interaction Points -->
+<g class="chart-points">
+<circle class="chart-hitbox" cx="0" cy="250" data-day="MONDAY" data-trend="Stable" data-val="₹42,500" fill="transparent" r="15"></circle>
+<circle class="chart-hitbox" cx="200" cy="210" data-day="TUESDAY" data-trend="+12% LW" data-val="₹68,200" fill="transparent" r="15"></circle>
+<circle class="chart-hitbox" cx="450" cy="120" data-day="WEDNESDAY" data-trend="High Traffic" data-val="₹1,24,000" fill="transparent" r="15"></circle>
+<circle class="chart-hitbox" cx="700" cy="210" data-day="THURSDAY" data-trend="Standard" data-val="₹85,000" fill="transparent" r="15"></circle>
+<circle class="chart-hitbox" cx="865" cy="65" data-day="FRIDAY" data-trend="Premium Focus" data-val="₹2,12,000" fill="transparent" r="15"></circle>
+<circle class="chart-hitbox" cx="1000" cy="80" data-day="SATURDAY" data-trend="Record High" data-val="₹2,84,000" fill="transparent" r="15"></circle>
+</g>
+<!-- Peak Indicator -->
+<circle class="animate-pulse-red" cx="865" cy="65" fill="#FF2B2B" r="6"></circle>
+</svg>
+<!-- Floating Highlight -->
+<div class="absolute top-[30px] left-[86.5%] -translate-x-1/2 bg-surface/90 border border-primary/40 px-3 py-2 rounded-xl backdrop-blur-xl shadow-2xl">
+<p class="font-label-caps text-[8px] text-on-surface-variant uppercase tracking-widest">Peak Sat</p>
+<p class="font-data text-xs text-white">₹2,84,000</p>
+</div>
+</div>
+<div class="flex justify-between mt-10 font-data text-[10px] text-on-surface-variant px-2 border-t border-outline pt-6">
+<span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span class="text-primary font-bold">SAT</span><span>SUN</span>
+</div>
+</div>
+<!-- Composition -->
+<div class="col-span-12 lg:col-span-4 bg-obsidian-glass p-8 rounded-2xl flex flex-col items-center justify-between">
+<p class="font-label-caps text-[10px] text-on-surface-variant self-start tracking-[0.2em] mb-8">
+<span class="w-1.5 h-1.5 bg-primary rounded-full"></span> COMPOSITION MATRIX
+                </p>
+<div class="relative w-64 h-64 flex items-center justify-center">
+<svg class="w-full h-full -rotate-90" viewbox="0 0 36 36">
+<circle cx="18" cy="18" fill="none" r="16" stroke="rgba(255,255,255,0.03)" stroke-width="4"></circle>
+<circle class="donut-segment" cx="18" cy="18" data-extra="65% share" data-type="PPF INSTALLS" data-val="₹2.73M" fill="none" r="16" stroke="#FF2B2B" stroke-dasharray="65, 100" stroke-linecap="round" stroke-width="4"></circle>
+<circle class="donut-segment" cx="18" cy="18" data-extra="25% share" data-type="CERAMIC PRO" data-val="₹1.05M" fill="none" r="16" stroke="#930100" stroke-dasharray="25, 100" stroke-dashoffset="-65" stroke-width="4"></circle>
+<circle class="donut-segment" cx="18" cy="18" data-extra="10% share" data-type="DETAILING" data-val="₹0.42M" fill="none" r="16" stroke="#444" stroke-dasharray="10, 100" stroke-dashoffset="-90" stroke-linecap="round" stroke-width="4"></circle>
+</svg>
+<div class="absolute text-center">
+<p class="font-data text-4xl font-bold text-white tracking-tighter">₹4.2M</p>
+<p class="font-label-caps text-[8px] text-on-surface-variant tracking-[0.3em] mt-1">GROSS YTD</p>
+</div>
+</div>
+<div class="w-full mt-10 space-y-3">
+<div class="flex justify-between items-center p-4 rounded-xl bg-white/5 border border-outline group hover:border-primary/40 transition-colors">
+<div class="flex items-center gap-4">
+<span class="w-3 h-3 rounded-full bg-primary shadow-[0_0_10px_rgba(255,43,43,0.5)]"></span>
+<span class="font-label-caps text-[10px] tracking-widest text-white">PPF INSTALLS</span>
+</div>
+<span class="font-data text-base font-bold text-primary">65%</span>
+</div>
+<div class="flex justify-between items-center p-4 rounded-xl bg-white/5 border border-outline group hover:border-primary/40 transition-colors">
+<div class="flex items-center gap-4">
+<span class="w-3 h-3 rounded-full bg-[#930100]"></span>
+<span class="font-label-caps text-[10px] tracking-widest text-white">CERAMIC PRO</span>
+</div>
+<span class="font-data text-base font-bold text-on-surface">25%</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Funnel and Operators -->
+<div class="grid grid-cols-12 gap-8">
+<div class="col-span-12 lg:col-span-8 bg-obsidian-glass p-8 rounded-2xl flex flex-col red-ambient-glow">
+<div class="flex justify-between items-center mb-12">
+<p class="font-label-caps text-[10px] text-on-surface-variant tracking-[0.2em] flex items-center gap-3">
+<span class="w-1.5 h-1.5 bg-primary rounded-full"></span> PIPELINE VELOCITY
+                    </p>
+<div class="flex items-center gap-3 text-primary/80">
+<span class="material-symbols-outlined text-base">speed</span>
+<span class="font-data text-[10px]">AVG: 4.2 DAYS TO CLOSE</span>
+</div>
+</div>
+<div class="flex-1 flex flex-col gap-3 relative">
+<!-- Funnel -->
+<div class="flex flex-col items-center group relative h-16 funnel-stage" data-extra="60% Conv. Rate" data-label="ACQUISITION" data-value="142 Leads">
+<div class="funnel-tier w-full h-full bg-white/5 border border-outline flex items-center justify-between px-16">
+<span class="font-label-caps text-[11px] text-on-surface-variant">NEW ACQUISITION</span>
+<span class="font-data text-2xl font-bold text-white">142</span>
+</div>
+</div>
+<div class="flex flex-col items-center group relative h-16 funnel-stage" data-extra="48% Conv. Rate" data-label="CONTACTED" data-value="86 Leads">
+<div class="funnel-tier w-[85%] h-full bg-primary/20 border border-primary/30 flex items-center justify-between px-16">
+<span class="font-label-caps text-[11px] text-on-surface">CONTACTED</span>
+<span class="font-data text-2xl font-bold text-white">86</span>
+</div>
+</div>
+<div class="flex flex-col items-center group relative h-16 funnel-stage" data-extra="42% Conv. Rate" data-label="QUALIFIED" data-value="42 Leads">
+<div class="funnel-tier w-[70%] h-full bg-primary/50 border border-primary/60 flex items-center justify-between px-16">
+<span class="font-label-caps text-[11px] text-white">QUALIFIED</span>
+<span class="font-data text-2xl font-bold text-white">42</span>
+</div>
+</div>
+<div class="flex flex-col items-center h-16 funnel-stage" data-extra="Win Rate: 12.6%" data-label="CONVERTED" data-value="18 Wins">
+<div class="funnel-tier w-[55%] h-full performance-gradient flex items-center justify-between px-16 shadow-[0_15px_40px_rgba(255,43,43,0.2)]">
+<span class="font-label-caps text-[11px] text-white font-bold">CONVERTED</span>
+<span class="font-data text-2xl font-bold text-white">18</span>
+</div>
+</div>
+</div>
+<div class="mt-12 flex justify-between items-center text-[11px] font-label-caps border-t border-outline pt-6">
+<div class="flex gap-8">
+<span class="text-on-surface-variant">LEAKAGE: <span class="text-primary font-bold">32%</span></span>
+<span class="text-on-surface-variant">WIN RATE: <span class="text-primary font-bold">12.6%</span></span>
+</div>
+<button class="text-primary hover:scale-105 transition-all flex items-center gap-2 uppercase tracking-[0.2em] text-[10px] font-bold">
+                        Full Report <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Operators -->
+<div class="col-span-12 lg:col-span-4 bg-obsidian-glass p-8 rounded-2xl">
+<p class="font-label-caps text-[10px] text-on-surface-variant tracking-[0.2em] mb-10">
+<span class="w-1.5 h-1.5 bg-primary rounded-full"></span> ELITE OPERATORS
+                </p>
+<div class="space-y-6">
+<div class="flex items-center gap-5 p-5 rounded-2xl bg-white/5 border border-outline group hover:border-primary/40 transition-all cursor-pointer">
+<div class="relative">
+<img alt="Arjun" class="w-14 h-14 rounded-xl object-cover grayscale group-hover:grayscale-0 transition-all border border-outline" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDTnjliSfb19tgkugTp4KmJdhAGrkXNXyhMaMbHG9fRix5PvjnTnDU78Zq-TBX_fZQUZXqGcN8yiBlZH8kSKu6ojPGEhj6mx6D-NR1kdkt55w9fTwH7w0KTnePItI32GfQcgL-kkxdc8vtX1gywxne0SCx4uHJczUiO16qTOnsD6ldGzOteRUt4SOSsa5YMLytmdH6HtQ634skum0VnpGMZ78P4Ts-eE3dBFZHazubZkB-DK68-X5-FxoEfruOb7Tx2D7wR9Tq0z_k"/>
+<div class="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full flex items-center justify-center border-2 border-surface">
+<span class="material-symbols-outlined text-[8px] text-white">star</span>
+</div>
+</div>
+<div class="flex-1">
+<p class="text-sm font-bold text-white">Arjun Sharma</p>
+<p class="text-[9px] text-on-surface-variant font-label-caps tracking-widest mt-0.5">XPEL MASTER</p>
+</div>
+<div class="text-right">
+<p class="font-data text-sm text-primary font-bold">28 JOBS</p>
+<div class="w-14 h-1.5 bg-white/5 rounded-full mt-2 overflow-hidden">
+<div class="w-[98%] h-full performance-gradient rounded-full"></div>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-5 p-5 rounded-2xl bg-white/5 border border-outline group hover:border-primary/40 transition-all cursor-pointer">
+<img alt="Meera" class="w-14 h-14 rounded-xl object-cover grayscale group-hover:grayscale-0 transition-all border border-outline" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBYbsW5aYvYAtIoOwm5HOa5VFkSexou5QjiG1GJXZD35Wboa9ajf9LvJOUhX-LcsVmXrqUyu1TFowf6FfaT50QhbbH7MNXBGEB7Om_R4ph-XymQN9PVKA1fxBWr5R35abh92zZCbd8afh4AI05BndvP98dd2dwyI8QgMy9shbsowKDqGdRbVBhyWcMPPYbOYYII_RyAUNfATvIkyymUEa8wZGeB965tNbJksANWVaOhSkbrzb4PyegLQBOEVa2avaycD6iaL_uVfSU"/>
+<div class="flex-1">
+<p class="text-sm font-bold text-white">Meera K.</p>
+<p class="text-[9px] text-on-surface-variant font-label-caps tracking-widest mt-0.5">CERAMIC LEAD</p>
+</div>
+<div class="text-right">
+<p class="font-data text-sm text-primary font-bold">22 JOBS</p>
+<div class="w-14 h-1.5 bg-white/5 rounded-full mt-2 overflow-hidden">
+<div class="w-[85%] h-full performance-gradient rounded-full"></div>
+</div>
+</div>
+</div>
+</div>
+<button class="w-full mt-8 py-4 border border-outline hover:border-primary/40 text-[10px] font-label-caps text-on-surface-variant tracking-widest uppercase rounded-xl transition-all">Manage Personnel</button>
+</div>
+</div>
+<!-- Footer Row -->
+<div class="grid grid-cols-12 gap-8">
+<div class="col-span-12 lg:col-span-5 bg-obsidian-glass p-8 rounded-2xl">
+<p class="font-label-caps text-[10px] text-on-surface-variant tracking-[0.2em] mb-10 flex justify-between items-center">
+<span><span class="w-1.5 h-1.5 bg-primary rounded-full"></span> CONSUMABLES VELOCITY</span>
+<span class="text-[8px] px-2 py-1 bg-white/5 border border-outline rounded text-primary">Q4 TRACKING</span>
+</p>
+<div class="space-y-10">
+<div class="space-y-4 progress-group" data-extra="82.6% Yield" data-label="XPEL ULTIMATE PLUS" data-value="1,240 / 1,500 SQ.FT">
+<div class="flex justify-between items-end">
+<span class="font-label-caps text-[10px] tracking-widest text-on-surface-variant">XPEL ULTIMATE PLUS</span>
+<span class="font-data text-sm text-white">1,240 <span class="text-[9px] opacity-50">SQ.FT</span></span>
+</div>
+<div class="w-full h-2 bg-white/5 rounded-full overflow-hidden border border-outline">
+<div class="h-full metallic-progress rounded-full" style="width: 85%"></div>
+</div>
+</div>
+<div class="space-y-4 progress-group" data-extra="65.3% Yield" data-label="STEK DYNO-SHIELD" data-value="980 / 1,500 SQ.FT">
+<div class="flex justify-between items-end">
+<span class="font-label-caps text-[10px] tracking-widest text-on-surface-variant">STEK DYNO-SHIELD</span>
+<span class="font-data text-sm text-white">980 <span class="text-[9px] opacity-50">SQ.FT</span></span>
+</div>
+<div class="w-full h-2 bg-white/5 rounded-full overflow-hidden border border-outline">
+<div class="h-full metallic-progress rounded-full opacity-70" style="width: 65%"></div>
+</div>
+</div>
+</div>
+</div>
+<div class="col-span-12 lg:col-span-7 bg-obsidian-glass p-0 rounded-2xl overflow-hidden flex flex-col red-ambient-glow">
+<div class="px-8 py-6 border-b border-outline flex justify-between items-center bg-white/[0.02]">
+<p class="font-label-caps text-[10px] text-on-surface-variant tracking-[0.2em]">
+<span class="w-1.5 h-1.5 bg-primary rounded-full"></span> LIVE STATUS FEED
+                    </p>
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span class="font-data text-[9px] text-primary tracking-widest uppercase">Telemetry Active</span>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto custom-scrollbar max-h-[300px]">
+<table class="w-full text-left">
+<tbody class="divide-y divide-outline">
+<tr class="hover:bg-primary/5 transition-colors group cursor-default">
+<td class="px-8 py-5">
+<div class="flex items-center gap-4">
+<div class="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_#FF2B2B]"></div>
+<span class="font-data text-sm text-white tracking-tight">Porsche 911 GT3 RS</span>
+</div>
+</td>
+<td class="px-8 py-5 font-label-caps text-[10px] text-on-surface-variant tracking-widest">DELIVERY READY</td>
+<td class="px-8 py-5 font-data text-[10px] text-right text-primary">14:22</td>
+</tr>
+<tr class="hover:bg-primary/5 transition-colors group cursor-default">
+<td class="px-8 py-5">
+<div class="flex items-center gap-4">
+<div class="w-2 h-2 rounded-full bg-white/20"></div>
+<span class="font-data text-sm text-on-surface-variant tracking-tight">Mercedes G63 AMG</span>
+</div>
+</td>
+<td class="px-8 py-5 font-label-caps text-[10px] text-on-surface-variant tracking-widest uppercase">Coating Stage 2/3</td>
+<td class="px-8 py-5 font-data text-[10px] text-right text-on-surface-variant/50">13:45</td>
+</tr>
+<tr class="hover:bg-primary/5 transition-colors group cursor-default">
+<td class="px-8 py-5">
+<div class="flex items-center gap-4">
+<div class="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_#FF2B2B]"></div>
+<span class="font-data text-sm text-white tracking-tight">Lamborghini Huracán</span>
+</div>
+</td>
+<td class="px-8 py-5 font-label-caps text-[10px] text-on-surface-variant tracking-widest">QC PASSED</td>
+<td class="px-8 py-5 font-data text-[10px] text-right text-primary">12:10</td>
+</tr>
+<tr class="hover:bg-primary/5 transition-colors group cursor-default bg-primary/5">
+<td class="px-8 py-5">
+<div class="flex items-center gap-4">
+<div class="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+<span class="font-data text-sm text-primary font-bold tracking-tight">BMW M4 Competition</span>
+</div>
+</td>
+<td class="px-8 py-5 font-label-caps text-[10px] text-primary tracking-widest font-bold">RE-WORK TASK</td>
+<td class="px-8 py-5 font-data text-[10px] text-right text-primary">11:05</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</main>
+<script>
+    const tooltip = document.getElementById('chart-tooltip');
+    const tLabel = document.getElementById('tooltip-label');
+    const tValue = document.getElementById('tooltip-value');
+    const tExtra = document.getElementById('tooltip-extra');
+
+    function showTooltip(e, label, value, extra = '') {
+        tLabel.textContent = label;
+        tValue.textContent = value;
+        tExtra.textContent = extra;
+        tooltip.classList.add('visible');
+        updateTooltipPosition(e);
+    }
+
+    function hideTooltip() {
+        tooltip.classList.remove('visible');
+    }
+
+    function updateTooltipPosition(e) {
+        const x = e.clientX + 20;
+        const y = e.clientY + 20;
+        const tooltipRect = tooltip.getBoundingClientRect();
+        const adjustedX = (x + tooltipRect.width > window.innerWidth) ? e.clientX - tooltipRect.width - 20 : x;
+        const adjustedY = (y + tooltipRect.height > window.innerHeight) ? e.clientY - tooltipRect.height - 20 : y;
+        tooltip.style.left = `${adjustedX}px`;
+        tooltip.style.top = `${adjustedY}px`;
+    }
+
+    document.querySelectorAll('.chart-hitbox').forEach(hitbox => {
+        hitbox.addEventListener('mouseenter', (e) => {
+            showTooltip(e, hitbox.getAttribute('data-day'), hitbox.getAttribute('data-val'), hitbox.getAttribute('data-trend'));
+            hitbox.setAttribute('r', '20');
+        });
+        hitbox.addEventListener('mousemove', updateTooltipPosition);
+        hitbox.addEventListener('mouseleave', () => {
+            hideTooltip();
+            hitbox.setAttribute('r', '15');
+        });
+    });
+
+    document.querySelectorAll('.donut-segment, .funnel-stage, .progress-group').forEach(el => {
+        el.addEventListener('mouseenter', (e) => {
+            const label = el.getAttribute('data-type') || el.getAttribute('data-label');
+            const value = el.getAttribute('data-val') || el.getAttribute('data-value');
+            const extra = el.getAttribute('data-extra');
+            showTooltip(e, label, value, extra);
+        });
+        el.addEventListener('mousemove', updateTooltipPosition);
+        el.addEventListener('mouseleave', hideTooltip);
+    });
+
+    // Tile Hover Effects
+    document.querySelectorAll('.bg-obsidian-glass').forEach(tile => {
+        tile.addEventListener('mouseenter', () => {
+            tile.style.transform = 'translateY(-4px)';
+        });
+        tile.addEventListener('mouseleave', () => {
+            tile.style.transform = 'translateY(0)';
+        });
+    });
+</script>
+</body></html>

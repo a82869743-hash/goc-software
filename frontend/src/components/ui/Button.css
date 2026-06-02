@@ -1,0 +1,166 @@
+/* ============================================================
+   GOC Studio — Button Component (from Stitch)
+   ============================================================ */
+
+.goc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  position: relative;
+  white-space: nowrap;
+  outline: none;
+}
+
+.goc-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.goc-btn:active {
+  transform: scale(0.97);
+}
+
+.goc-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── Sizes ────────────────────────────────────────────── */
+.goc-btn--sm {
+  font-size: var(--text-label);
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  min-height: 32px;
+}
+
+.goc-btn--md {
+  font-size: var(--text-label);
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
+  min-height: 40px;
+}
+
+.goc-btn--lg {
+  font-size: var(--text-body-sm);
+  padding: 12px 24px;
+  border-radius: var(--radius-md);
+  min-height: 48px;
+}
+
+/* ── Variants ─────────────────────────────────────────── */
+/* Primary — from Stitch: bg-gradient-to-br from-primary-container to-[#8B0000] */
+.goc-btn--primary {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+  color: var(--color-text-white);
+  box-shadow: var(--shadow-glow-sm);
+  border: 1px solid rgba(204, 0, 0, 0.5);
+}
+
+.goc-btn--primary:hover:not(:disabled) {
+  box-shadow: var(--shadow-glow);
+  background: linear-gradient(135deg, var(--color-primary), #8B0000);
+}
+
+/* Secondary — from Stitch: border border-white/10 */
+.goc-btn--secondary {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border-medium);
+  box-shadow: var(--shadow-sm);
+}
+
+.goc-btn--secondary:hover:not(:disabled) {
+  background: var(--color-surface-2);
+  color: var(--color-text-inverse);
+  border-color: var(--color-border-strong);
+}
+
+/* Ghost — from Stitch: text-only hover */
+.goc-btn--ghost {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: none;
+}
+
+.goc-btn--ghost:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--color-text-inverse);
+}
+
+/* Danger */
+.goc-btn--danger {
+  background: var(--color-error);
+  color: var(--color-text-white);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+}
+
+.goc-btn--danger:hover:not(:disabled) {
+  background: #dc2626;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
+}
+
+/* Success */
+.goc-btn--success {
+  background: var(--color-success);
+  color: var(--color-text-white);
+  border: 1px solid rgba(34, 197, 94, 0.5);
+}
+
+.goc-btn--success:hover:not(:disabled) {
+  background: #16a34a;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.3);
+}
+
+/* ── Full Width ───────────────────────────────────────── */
+.goc-btn--full {
+  width: 100%;
+}
+
+/* ── Loading ──────────────────────────────────────────── */
+.goc-btn--loading .goc-btn-label {
+  opacity: 0.7;
+}
+
+.goc-btn-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: btn-spin 0.6s linear infinite;
+}
+
+@keyframes btn-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Icon ─────────────────────────────────────────────── */
+.goc-btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.goc-btn-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.goc-btn--lg .goc-btn-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ── Material Icon inside button ──────────────────────── */
+.goc-btn .material-symbols-outlined {
+  font-size: 18px;
+}

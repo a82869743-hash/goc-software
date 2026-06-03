@@ -1,12 +1,88 @@
+/**
+ * GOC Studio — Webhook Controller
+ * Handles Meta (Facebook / Instagram) Lead Ads webhooks, and WhatsApp inbound webhooks.
+ *
+ * IMPORTANT: Webhook routes are PUBLIC — no auth middleware.
+ * Meta must always receive HTTP 200. All processing is async.
+ */
 import { Request, Response } from 'express';
 import pool from '../utils/db';
+import { ResultSetHeader, RowDataPacket } from 'mysql2';
 import { generateCode } from '../utils/codes';
 import { WhatsAppTemplates } from '../services/whatsappService';
 import { notifyByRole } from '../services/notificationService';
-import { ResultSetHeader, RowDataPacket } from 'mysql2';
+import {
+  fetchMetaLeadFromGraph,
+  normalizeMetaLead,
+  isFormAllowed,
+} from '../services/metaLeadService';
+import { MetaWebhookPayload, NormalizedMetaLead } from '../types/meta';
+
+// ─── Helper: get app_settings value ────────────────────────────────────
+async function getSetting(key: string): Promise<string> {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    'SELECT setting_value FROM app_settings WHERE setting_key = ? LIMIT 1',
+    [key]
+  );
+  return rows.length > 0 ? (rows[0].setting_value || '') : '';
+}
+
+// ─── Helper: log webhook event ───────────────────────────────────────────
+async function logWebhook(data: {
+  event_type: string;
+  leadgen_id?: string;
+  form_id?: string;
+  page_id?: string;
+  raw_payload?: string;
+  processing_status: string;
+  created_lead_id?: number | null;
+  error_message?: string | null;
+}): Promise<number> {
+  try {
+    const [result] = await pool.query<ResultSetHeader>(
+      `INSERT INTO webhook_logs
+         (source, event_type, leadgen_id, form_id, page_id,
+          raw_payload, processing_status, created_lead_id, error_message)
+       VALUES ('meta', ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        data.event_type,
+        data.leadgen_id || null,
+        data.form_id || null,
+        data.page_id || null,
+        data.raw_payload || null,
+        data.processing_status,
+        data.created_lead_id || null,
+        data.error_message || null,
+      ]
+    );
+    return result.insertId;
+  } catch (err) {
+    console.error('[Webhook] Failed to write webhook log:', err);
+    return 0;
+  }
+}
+
+// ─── Helper: update webhook log status ───────────────────────────────────
+async function updateWebhookLog(
+  logId: number,
+  status: string,
+  createdLeadId?: number,
+  errorMessage?: string
+): Promise<void> {
+  try {
+    await pool.query(
+      `UPDATE webhook_logs
+       SET processing_status = ?, created_lead_id = ?, error_message = ?
+       WHERE id = ?`,
+      [status, createdLeadId || null, errorMessage || null, logId]
+    );
+  } catch (err) {
+    console.error('[Webhook] Failed to update webhook log:', err);
+  }
+}
 
 // ──────────────────────────────────────────────────────────────
-// HELPER: Get default assignee from webhook_configs
+// HELPERS FOR WHATSAPP INBOUND
 // ──────────────────────────────────────────────────────────────
 async function getDefaultAssignee(platform: string): Promise<number | null> {
   const [rows] = await pool.query<RowDataPacket[]>(
@@ -16,9 +92,6 @@ async function getDefaultAssignee(platform: string): Promise<number | null> {
   return rows.length > 0 ? rows[0].default_assignee : null;
 }
 
-// ──────────────────────────────────────────────────────────────
-// HELPER: Log webhook event for debugging
-// ──────────────────────────────────────────────────────────────
 async function logWebhookEvent(
   platform: 'facebook' | 'instagram' | 'whatsapp',
   eventId: string | null,
@@ -31,9 +104,6 @@ async function logWebhookEvent(
   return result.insertId;
 }
 
-// ──────────────────────────────────────────────────────────────
-// HELPER: Mark webhook event as processed
-// ──────────────────────────────────────────────────────────────
 async function markWebhookProcessed(eventId: number, leadId: number | null, error?: string): Promise<void> {
   await pool.query(
     `UPDATE webhook_events SET processed = 1, lead_id_created = ?, error_message = ?, processed_at = NOW() WHERE id = ?`,
@@ -41,9 +111,6 @@ async function markWebhookProcessed(eventId: number, leadId: number | null, erro
   );
 }
 
-// ──────────────────────────────────────────────────────────────
-// HELPER: Update webhook stats
-// ──────────────────────────────────────────────────────────────
 async function updateWebhookStats(platform: string): Promise<void> {
   await pool.query(
     `UPDATE webhook_configs SET last_received = NOW(), total_received = total_received + 1 WHERE platform = ?`,
@@ -51,9 +118,6 @@ async function updateWebhookStats(platform: string): Promise<void> {
   );
 }
 
-// ──────────────────────────────────────────────────────────────
-// HELPER: Create lead from webhook data
-// ──────────────────────────────────────────────────────────────
 async function createLeadFromWebhook(data: {
   full_name: string;
   phone: string;
@@ -69,10 +133,9 @@ async function createLeadFromWebhook(data: {
   raw_payload?: object;
 }): Promise<{ leadId: number; leadCode: string; isNew: boolean }> {
   
-  // ── Deduplication Check ──────────────────────────────────────
   if (data.fb_lead_id) {
     const [existing] = await pool.query<RowDataPacket[]>(
-      'SELECT id, lead_code FROM leads WHERE fb_lead_id = ? LIMIT 1',
+      'SELECT id, lead_code FROM leads WHERE fb_lead_id = ? AND deleted_at IS NULL LIMIT 1',
       [data.fb_lead_id]
     );
     if (existing.length > 0) {
@@ -82,7 +145,7 @@ async function createLeadFromWebhook(data: {
 
   if (data.ig_lead_id) {
     const [existing] = await pool.query<RowDataPacket[]>(
-      'SELECT id, lead_code FROM leads WHERE ig_lead_id = ? LIMIT 1',
+      'SELECT id, lead_code FROM leads WHERE ig_lead_id = ? AND deleted_at IS NULL LIMIT 1',
       [data.ig_lead_id]
     );
     if (existing.length > 0) {
@@ -91,7 +154,6 @@ async function createLeadFromWebhook(data: {
   }
 
   if (data.source === 'whatsapp' && data.phone) {
-    // For WhatsApp: check if this phone already has a recent open lead
     const [existing] = await pool.query<RowDataPacket[]>(
       `SELECT id, lead_code FROM leads 
        WHERE phone = ? AND source = 'whatsapp' 
@@ -106,7 +168,6 @@ async function createLeadFromWebhook(data: {
     }
   }
 
-  // ── Create New Lead ──────────────────────────────────────────
   const leadCode = await generateCode('lead');
   
   const [result] = await pool.query<ResultSetHeader>(
@@ -135,7 +196,6 @@ async function createLeadFromWebhook(data: {
 
   const leadId = result.insertId;
 
-  // ── Log activity ─────────────────────────────────────────────
   await pool.query(
     `INSERT INTO lead_activity_log (lead_id, staff_id, action, new_value, notes) 
      VALUES (?, NULL, 'auto_captured', 'new', ?)`,
@@ -145,333 +205,326 @@ async function createLeadFromWebhook(data: {
   return { leadId, leadCode, isNew: true };
 }
 
-// ══════════════════════════════════════════════════════════════
-// META WEBHOOK (Facebook + Instagram)
-// ══════════════════════════════════════════════════════════════
-
-/**
- * GET /api/v1/webhooks/meta
- * Meta verification handshake — called once when you set up the webhook in Meta dashboard
- */
+// ═══════════════════════════════════════════════════════════════════════
+// GET /api/v1/webhooks/meta — Meta Webhook Verification
+// ═══════════════════════════════════════════════════════════════════════
 export const verifyMetaWebhook = async (req: Request, res: Response): Promise<void> => {
-  const mode = req.query['hub.mode'];
-  const token = req.query['hub.verify_token'];
-  const challenge = req.query['hub.challenge'];
-
-  if (mode !== 'subscribe') {
-    res.status(400).send('Invalid mode');
-    return;
-  }
-
-  // Check token against DB config
-  const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT verify_token FROM webhook_configs 
-     WHERE platform IN ('facebook', 'instagram') AND is_active = 1 LIMIT 1`
-  );
-
-  const configuredToken = rows.length > 0 ? rows[0].verify_token : process.env.META_VERIFY_TOKEN;
-
-  if (token === configuredToken) {
-    console.log('✅ Meta webhook verified successfully');
-    res.status(200).send(challenge);
-  } else {
-    console.warn('❌ Meta webhook token mismatch. Got:', token, 'Expected:', configuredToken);
-    res.status(403).send('Forbidden');
-  }
-};
-
-/**
- * POST /api/v1/webhooks/meta
- * Receives Facebook Lead Ads and Instagram Lead Form submissions
- * 
- * Meta payload structure:
- * {
- *   object: 'page',
- *   entry: [{
- *     id: 'PAGE_ID',
- *     changes: [{
- *       field: 'leadgen',
- *       value: {
- *         leadgen_id: 'LEAD_ID',
- *         page_id: 'PAGE_ID',
- *         form_id: 'FORM_ID',
- *         ad_id: 'AD_ID',
- *         created_time: 1234567890
- *       }
- *     }]
- *   }]
- * }
- * 
- * After getting leadgen_id, you call Graph API to get field_data:
- * GET /{leadgen_id}?fields=field_data&access_token={PAGE_ACCESS_TOKEN}
- */
-export const receiveMetaWebhook = async (req: Request, res: Response): Promise<void> => {
-  // Always respond 200 immediately — Meta will retry if it doesn't get a fast response
-  res.status(200).json({ success: true });
-
   try {
-    const payload = req.body;
-    
-    if (!payload || payload.object !== 'page') {
-      console.log('Meta webhook: non-page event, skipping');
+    const mode      = req.query['hub.mode'] as string;
+    const token     = req.query['hub.verify_token'] as string;
+    const challenge = req.query['hub.challenge'] as string;
+
+    const savedToken = await getSetting('META_VERIFY_TOKEN');
+    const expectedToken = savedToken || process.env.META_VERIFY_TOKEN || '';
+
+    if (mode === 'subscribe' && token === expectedToken) {
+      console.log('[Webhook] Meta webhook verification successful.');
+      res.status(200).send(challenge);
       return;
     }
 
-    const entries = payload.entry || [];
-
-    for (const entry of entries) {
-      const changes = entry.changes || [];
-
-      for (const change of changes) {
-        if (change.field !== 'leadgen') continue;
-
-        const leadgenId = change.value?.leadgen_id;
-        if (!leadgenId) continue;
-
-        // Log the raw event
-        const eventLogId = await logWebhookEvent('facebook', leadgenId, payload);
-        await updateWebhookStats('facebook');
-
-        try {
-          // Fetch full lead data from Meta Graph API
-          const leadData = await fetchMetaLeadData(leadgenId);
-          if (!leadData) {
-            await markWebhookProcessed(eventLogId, null, 'Could not fetch lead data from Meta Graph API');
-            continue;
-          }
-
-          const defaultAssignee = await getDefaultAssignee('facebook');
-
-          const { leadId, leadCode, isNew } = await createLeadFromWebhook({
-            full_name: leadData.full_name || 'Facebook Lead',
-            phone: leadData.phone_number || leadData.phone || '',
-            vehicle_make: leadData.vehicle_make || undefined,
-            vehicle_model: leadData.vehicle_model || undefined,
-            requirement: leadData.requirement || leadData.services_interested || undefined,
-            source: 'facebook',
-            fb_lead_id: leadgenId,
-            notes: `Auto-captured from Facebook Lead Ad. Form ID: ${change.value?.form_id || 'unknown'}`,
-            assigned_to: defaultAssignee,
-            raw_payload: payload,
-          });
-
-          await markWebhookProcessed(eventLogId, leadId);
-
-          if (isNew) {
-            console.log(`✅ Facebook lead created: ${leadCode} — ${leadData.full_name}`);
-
-            // Send welcome WhatsApp if phone available
-            if (leadData.phone_number || leadData.phone) {
-              const phone = (leadData.phone_number || leadData.phone).replace(/\D/g, '');
-              if (phone.length >= 10) {
-                await WhatsAppTemplates.leadWelcome(phone, leadData.full_name || 'there');
-              }
-            }
-
-            // Notify sales staff
-            await notifyByRole(
-              ['admin', 'manager', 'receptionist'],
-              'new_lead',
-              `New Facebook Lead: ${leadData.full_name || 'Unknown'}`,
-              `Phone: ${leadData.phone_number || leadData.phone || 'N/A'} | Lead: ${leadCode}`,
-              'lead',
-              leadId
-            );
-          } else {
-            console.log(`ℹ️ Facebook lead duplicate skipped: ${leadgenId}`);
-          }
-
-        } catch (innerError: any) {
-          console.error('Error processing Meta leadgen change:', innerError);
-          await markWebhookProcessed(eventLogId, null, innerError.message);
-        }
-      }
-    }
-  } catch (error: any) {
-    console.error('❌ Meta webhook processing error:', error);
+    console.warn('[Webhook] Meta webhook verification FAILED. Token mismatch.');
+    res.status(403).send('Forbidden');
+  } catch (error) {
+    console.error('[Webhook] Verification error:', error);
+    res.status(403).send('Error');
   }
 };
 
-/**
- * Fetch lead field data from Meta Graph API
- * Calls: GET /{leadgen_id}?fields=field_data&access_token={PAGE_ACCESS_TOKEN}
- */
-async function fetchMetaLeadData(leadgenId: string): Promise<Record<string, string> | null> {
-  const accessToken = process.env.META_PAGE_ACCESS_TOKEN;
-  if (!accessToken) {
-    console.warn('⚠️ META_PAGE_ACCESS_TOKEN not set — cannot fetch lead field data from Graph API');
-    return null;
+// ═══════════════════════════════════════════════════════════════════════
+// POST /api/v1/webhooks/meta — Receive Meta Lead Events
+// ═══════════════════════════════════════════════════════════════════════
+export const receiveMetaWebhook = async (req: Request, res: Response): Promise<void> => {
+  // ⚠️ ALWAYS respond 200 immediately — Meta retries if it doesn't get 200
+  res.status(200).json({ received: true });
+
+  const rawBody = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : JSON.stringify(req.body);
+  const body: MetaWebhookPayload = typeof req.body === 'object' && !Buffer.isBuffer(req.body)
+    ? req.body
+    : JSON.parse(rawBody);
+
+  // Process asynchronously — do NOT await here
+  processMetaWebhookAsync(body).catch(err => {
+    console.error('[Webhook] Async processing fatal error:', err);
+  });
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// GET /api/v1/webhooks/instagram / POST /api/v1/webhooks/instagram
+// ═══════════════════════════════════════════════════════════════════════
+export const receiveInstagramWebhook = async (req: Request, res: Response): Promise<void> => {
+  // Instagram webhook payload is structurally identical to Facebook Page Webhook payload.
+  // We can delegate to receiveMetaWebhook.
+  await receiveMetaWebhook(req, res);
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// Async Lead Processing Pipeline
+// ═══════════════════════════════════════════════════════════════════════
+async function processMetaWebhookAsync(body: MetaWebhookPayload): Promise<void> {
+  if (!body || body.object !== 'page') return;
+
+  for (const entry of body.entry || []) {
+    for (const change of entry.changes || []) {
+      if (change.field !== 'leadgen') continue;
+
+      const value = change.value;
+      const { leadgen_id, form_id, page_id } = value;
+
+      // Log the incoming event immediately
+      const logId = await logWebhook({
+        event_type: 'leadgen',
+        leadgen_id,
+        form_id,
+        page_id,
+        raw_payload: JSON.stringify(body),
+        processing_status: 'processing',
+      });
+
+      try {
+        // Check if specific form filter is configured
+        const formAllowed = await isFormAllowed(form_id);
+        if (!formAllowed) {
+          console.log(`[Webhook] Form ${form_id} not in allowed list — skipping.`);
+          await updateWebhookLog(logId, 'skipped_form_filter');
+          continue;
+        }
+
+        // Check if source is enabled
+        const fbEnabled  = await getSetting('META_FB_LEADS_ENABLED');
+        const igEnabled  = await getSetting('META_IG_LEADS_ENABLED');
+
+        // Fetch from Meta Graph API
+        const graphData = await fetchMetaLeadFromGraph(leadgen_id);
+        if (!graphData) {
+          await updateWebhookLog(logId, 'failed', undefined, 'Meta Graph API returned null');
+          continue;
+        }
+
+        // Normalize
+        const lead = normalizeMetaLead(graphData, value);
+
+        // Source check (after we know if it's FB or IG)
+        if (lead.source === 'facebook' && fbEnabled !== 'true') {
+          console.log('[Webhook] Facebook leads disabled in settings — skipping.');
+          await updateWebhookLog(logId, 'skipped_disabled');
+          continue;
+        }
+        if (lead.source === 'instagram' && igEnabled !== 'true') {
+          console.log('[Webhook] Instagram leads disabled in settings — skipping.');
+          await updateWebhookLog(logId, 'skipped_disabled');
+          continue;
+        }
+
+        // Duplicate check
+        const isDuplicate = await checkDuplicateLead(lead.phone, leadgen_id);
+        if (isDuplicate) {
+          await updateWebhookLog(logId, 'duplicate');
+          continue;
+        }
+
+        // Create lead in CRM
+        const newLeadId = await createMetaLeadInCRM(lead);
+        if (!newLeadId) {
+          await updateWebhookLog(logId, 'failed', undefined, 'DB insert returned no ID');
+          continue;
+        }
+
+        // Update log with success
+        await updateWebhookLog(logId, 'success', newLeadId);
+
+        // Fire notifications and WhatsApp (non-blocking)
+        fireLeadNotifications(lead, newLeadId).catch(err =>
+          console.error('[Webhook] Notification error (non-blocking):', err)
+        );
+
+      } catch (err: any) {
+        const errMsg = err?.message || 'Unknown processing error';
+        console.error(`[Webhook] Processing error for leadgen ${leadgen_id}:`, errMsg);
+        await updateWebhookLog(logId, 'failed', undefined, errMsg);
+      }
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Duplicate Check
+// ═══════════════════════════════════════════════════════════════════════
+async function checkDuplicateLead(phone: string, leadgenId: string): Promise<boolean> {
+  // Check by leadgen_id first (most precise)
+  const [byId] = await pool.query<RowDataPacket[]>(
+    'SELECT id FROM leads WHERE fb_lead_id = ? AND deleted_at IS NULL LIMIT 1',
+    [leadgenId]
+  );
+  if (byId.length > 0) {
+    console.log(`[Webhook] Duplicate by fb_lead_id: ${leadgenId} → lead #${byId[0].id}`);
+    await pool.query(
+      `INSERT INTO lead_activity_log (lead_id, staff_id, action, notes)
+       VALUES (?, NULL, 'meta_duplicate', ?)`,
+      [byId[0].id, `Duplicate Meta webhook received. leadgen_id: ${leadgenId}`]
+    );
+    return true;
   }
 
+  // Check by phone (if phone is valid)
+  if (phone && phone.length === 10) {
+    const [byPhone] = await pool.query<RowDataPacket[]>(
+      'SELECT id, lead_code FROM leads WHERE phone = ? AND deleted_at IS NULL LIMIT 1',
+      [phone]
+    );
+    if (byPhone.length > 0) {
+      console.log(`[Webhook] Lead with phone ${phone} already exists — adding activity.`);
+      await pool.query(
+        `INSERT INTO lead_activity_log (lead_id, staff_id, action, notes)
+         VALUES (?, NULL, 'meta_duplicate_phone', ?)`,
+        [
+          byPhone[0].id,
+          `Duplicate Meta lead (same phone). leadgen_id: ${leadgenId}`
+        ]
+      );
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Create Lead in CRM
+// ═══════════════════════════════════════════════════════════════════════
+async function createMetaLeadInCRM(lead: NormalizedMetaLead): Promise<number | null> {
   try {
-    const axios = require('axios');
-    const response = await axios.get(`https://graph.facebook.com/v18.0/${leadgenId}`, {
-      params: {
-        fields: 'field_data,created_time,ad_name,form_id',
-        access_token: accessToken,
-      },
-      timeout: 10000,
-    });
+    const leadCode    = await generateCode('lead');
+    const defaultStaffStr = await getSetting('META_DEFAULT_ASSIGNED_STAFF');
+    const defaultStaff = defaultStaffStr ? Number(defaultStaffStr) : null;
 
-    const fieldData: Array<{ name: string; values: string[] }> = response.data?.field_data || [];
-    
-    // Normalize field data to a flat object
-    // Facebook form field names vary — we map common variations
-    const FIELD_MAP: Record<string, string> = {
-      'full_name': 'full_name',
-      'full name': 'full_name',
-      'name': 'full_name',
-      'first_name': 'first_name',
-      'last_name': 'last_name',
-      'phone_number': 'phone_number',
-      'phone': 'phone_number',
-      'mobile': 'phone_number',
-      'mobile_number': 'phone_number',
-      'email': 'email',
-      'email_address': 'email',
-      'car_model': 'vehicle_model',
-      'vehicle_model': 'vehicle_model',
-      'car_make': 'vehicle_make',
-      'vehicle_make': 'vehicle_make',
-      'service': 'requirement',
-      'services': 'requirement',
-      'requirement': 'requirement',
-      'services_interested': 'requirement',
-    };
+    // Build notes: combine extra fields + campaign info
+    const noteParts: string[] = [];
+    if (lead.notes) noteParts.push(lead.notes);
+    if (lead.campaignName) noteParts.push(`Campaign: ${lead.campaignName}`);
+    if (lead.adName) noteParts.push(`Ad: ${lead.adName}`);
+    if (lead.email) noteParts.push(`Email: ${lead.email}`);
+    if (lead.city) noteParts.push(`City: ${lead.city}`);
+    noteParts.push(`Form ID: ${lead.formId}`);
+    noteParts.push(`Imported via Meta Lead Form`);
+    const combinedNotes = noteParts.join(' | ');
 
-    const result: Record<string, string> = {};
-    
-    for (const field of fieldData) {
-      const normalizedKey = FIELD_MAP[field.name.toLowerCase()] || field.name.toLowerCase();
-      result[normalizedKey] = field.values?.[0] || '';
-    }
+    const [result] = await pool.query<ResultSetHeader>(
+      `INSERT INTO leads
+         (lead_code, full_name, phone, vehicle_make, vehicle_model,
+          requirement, source, assigned_to, notes, fb_lead_id, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new')`,
+      [
+        leadCode,
+        lead.fullName,
+        lead.phone || '0000000000', // fallback if phone missing
+        lead.vehicleMake || null,
+        lead.vehicleModel || null,
+        lead.requirement || null,
+        lead.source,
+        defaultStaff,
+        combinedNotes,
+        lead.leadgenId,
+      ]
+    );
 
-    // Build full_name from first_name + last_name if full_name not present
-    if (!result.full_name && (result.first_name || result.last_name)) {
-      result.full_name = `${result.first_name || ''} ${result.last_name || ''}`.trim();
-    }
+    const newLeadId = result.insertId;
+    console.log(`[Webhook] ✅ Created lead #${newLeadId} (${leadCode}) from Meta: ${lead.fullName}`);
 
-    return result;
-  } catch (error: any) {
-    console.error(`Failed to fetch Meta lead data for ${leadgenId}:`, error.message);
+    // Lead activity log
+    await pool.query(
+      `INSERT INTO lead_activity_log (lead_id, staff_id, action, new_value, notes)
+       VALUES (?, NULL, 'imported', 'new', ?)`,
+      [
+        newLeadId,
+        JSON.stringify({
+          via: 'Meta Lead Form',
+          source: lead.source,
+          form_id: lead.formId,
+          page_id: lead.pageId,
+          leadgen_id: lead.leadgenId,
+          campaign: lead.campaignName,
+          ad: lead.adName,
+        })
+      ]
+    );
+
+    return newLeadId;
+  } catch (err: any) {
+    console.error('[Webhook] createMetaLeadInCRM error:', err.message);
     return null;
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-// INSTAGRAM WEBHOOK (Same endpoint as Meta, separate handler for clarity)
-// ══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
+// Fire Notifications and WhatsApp (always non-blocking)
+// ═══════════════════════════════════════════════════════════════════════
+async function fireLeadNotifications(
+  lead: NormalizedMetaLead,
+  leadId: number
+): Promise<void> {
+  const sourceName = lead.source === 'instagram' ? 'Instagram' : 'Facebook';
 
-/**
- * POST /api/v1/webhooks/instagram
- * Instagram Lead Forms — same Meta Graph API, separate route for tracking
- * Delegates to receiveMetaWebhook after logging as instagram source
- */
-export const receiveInstagramWebhook = async (req: Request, res: Response): Promise<void> => {
-  res.status(200).json({ success: true });
-
+  // In-app notification to admin/manager
   try {
-    const payload = req.body;
-    const entries = payload.entry || [];
-
-    for (const entry of entries) {
-      const changes = entry.changes || [];
-      for (const change of changes) {
-        if (change.field !== 'leadgen') continue;
-
-        const leadgenId = change.value?.leadgen_id;
-        if (!leadgenId) continue;
-
-        const eventLogId = await logWebhookEvent('instagram', leadgenId, payload);
-        await updateWebhookStats('instagram');
-
-        try {
-          const leadData = await fetchMetaLeadData(leadgenId);
-          if (!leadData) {
-            await markWebhookProcessed(eventLogId, null, 'Could not fetch Instagram lead data');
-            continue;
-          }
-
-          const defaultAssignee = await getDefaultAssignee('instagram');
-
-          const { leadId, leadCode, isNew } = await createLeadFromWebhook({
-            full_name: leadData.full_name || 'Instagram Lead',
-            phone: leadData.phone_number || '',
-            vehicle_make: leadData.vehicle_make || undefined,
-            vehicle_model: leadData.vehicle_model || undefined,
-            requirement: leadData.requirement || undefined,
-            source: 'instagram',
-            ig_lead_id: leadgenId,
-            notes: `Auto-captured from Instagram Lead Form`,
-            assigned_to: defaultAssignee,
-            raw_payload: payload,
-          });
-
-          await markWebhookProcessed(eventLogId, leadId);
-
-          if (isNew) {
-            console.log(`✅ Instagram lead created: ${leadCode}`);
-
-            if (leadData.phone_number) {
-              const phone = leadData.phone_number.replace(/\D/g, '');
-              if (phone.length >= 10) {
-                await WhatsAppTemplates.leadWelcome(phone, leadData.full_name || 'there');
-              }
-            }
-
-            await notifyByRole(
-              ['admin', 'manager', 'receptionist'],
-              'new_lead',
-              `New Instagram Lead: ${leadData.full_name || 'Unknown'}`,
-              `Phone: ${leadData.phone_number || 'N/A'} | Lead: ${leadCode}`,
-              'lead',
-              leadId
-            );
-          }
-        } catch (err: any) {
-          await markWebhookProcessed(eventLogId, null, err.message);
-        }
-      }
-    }
-  } catch (error) {
-    console.error('Instagram webhook error:', error);
+    await notifyByRole(
+      ['admin', 'manager', 'receptionist'],
+      'new_lead',
+      `📱 New ${sourceName} Lead: ${lead.fullName}`,
+      `Phone: ${lead.phone || 'N/A'} | Vehicle: ${[lead.vehicleMake, lead.vehicleModel].filter(Boolean).join(' ') || 'N/A'} | ${lead.requirement || 'No requirement specified'}`,
+      'lead',
+      leadId
+    );
+    console.log(`[Webhook] In-app notification sent for lead #${leadId}`);
+  } catch (err) {
+    console.error('[Webhook] Notification error (non-blocking):', err);
   }
-};
 
-// ══════════════════════════════════════════════════════════════
-// WHATSAPP INBOUND WEBHOOK (MSG91)
-// ══════════════════════════════════════════════════════════════
+  // Assigned staff notification
+  try {
+    const defaultStaffStr = await getSetting('META_DEFAULT_ASSIGNED_STAFF');
+    if (defaultStaffStr) {
+      const staffId = Number(defaultStaffStr);
+      const { createNotification } = await import('../services/notificationService');
+      await createNotification({
+        staffId,
+        type: 'lead_assigned',
+        title: `📋 Meta Lead Assigned: ${lead.fullName}`,
+        body: `A new ${sourceName} lead has been assigned to you. Phone: ${lead.phone || 'N/A'}`,
+        referenceType: 'lead',
+        referenceId: leadId,
+      });
+    }
+  } catch (err) {
+    console.error('[Webhook] Staff assignment notification error:', err);
+  }
 
-/**
- * POST /api/v1/webhooks/whatsapp
- * MSG91 fires this when a customer sends a WhatsApp message to the studio number.
- * 
- * MSG91 inbound payload:
- * {
- *   type: "message",
- *   from: "919876543210",
- *   to: "919999999999",
- *   message_id: "wamid.xxxxx",
- *   timestamp: "1234567890",
- *   text: { body: "Hello, I want PPF for my car" },
- *   contact: { name: "Amit Shah" }
- * }
- */
+  // WhatsApp welcome message
+  if (lead.phone && lead.phone.length === 10) {
+    try {
+      await WhatsAppTemplates.leadWelcome(lead.phone, lead.fullName);
+      console.log(`[Webhook] WhatsApp welcome sent to ${lead.phone} (${lead.fullName})`);
+    } catch (err) {
+      console.error('[Webhook] WhatsApp error (non-blocking):', err);
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// GET /api/v1/webhooks/whatsapp — WhatsApp webhook (MSG91 inbound message)
+// ═══════════════════════════════════════════════════════════════════════
 export const receiveWhatsAppWebhook = async (req: Request, res: Response): Promise<void> => {
   res.status(200).json({ success: true });
 
   try {
     const payload = req.body;
 
-    // Support both MSG91 and Meta WhatsApp Business API format
-    // MSG91 format
     let fromPhone = payload.from || payload.sender || '';
     let messageId = payload.message_id || payload.id || '';
     let messageText = payload.text?.body || payload.message || payload.text || '';
     let contactName = payload.contact?.name || payload.sender_name || '';
     let messageType = payload.type || 'text';
 
-    // Meta WhatsApp Business API format (alternative)
     if (payload.entry && payload.entry[0]?.changes) {
       const change = payload.entry[0].changes[0];
       const messages = change.value?.messages;
@@ -488,13 +541,11 @@ export const receiveWhatsAppWebhook = async (req: Request, res: Response): Promi
       }
     }
 
-    // Only process text messages (ignore images, docs, etc. for lead capture)
     if (!fromPhone) {
       console.log('WhatsApp webhook: no sender phone, skipping');
       return;
     }
 
-    // Normalize phone — remove country code prefix for storage
     const normalizedPhone = fromPhone.replace(/^91/, '').replace(/\D/g, '').slice(-10);
     if (normalizedPhone.length !== 10) {
       console.log('WhatsApp webhook: invalid phone format:', fromPhone);
@@ -524,10 +575,13 @@ export const receiveWhatsAppWebhook = async (req: Request, res: Response): Promi
     if (isNew) {
       console.log(`✅ WhatsApp lead created: ${leadCode} — ${normalizedPhone}`);
 
-      // Send auto-reply welcome message
-      await WhatsAppTemplates.leadWelcome(normalizedPhone, displayName);
+      // Welcome WhatsApp
+      try {
+        await WhatsAppTemplates.leadWelcome(normalizedPhone, displayName);
+      } catch (waErr) {
+        console.error('[WhatsApp Webhook] welcome message failed:', waErr);
+      }
 
-      // Notify sales staff
       await notifyByRole(
         ['admin', 'manager', 'receptionist'],
         'new_lead',
@@ -537,7 +591,6 @@ export const receiveWhatsAppWebhook = async (req: Request, res: Response): Promi
         leadId
       );
     } else {
-      // Existing lead — update notes with latest message
       if (messageText) {
         await pool.query(
           `UPDATE leads SET updated_at = NOW() WHERE id = ?`,
@@ -556,14 +609,9 @@ export const receiveWhatsAppWebhook = async (req: Request, res: Response): Promi
   }
 };
 
-// ══════════════════════════════════════════════════════════════
-// WEBHOOK ADMIN ROUTES (for Settings page)
-// ══════════════════════════════════════════════════════════════
-
-/**
- * GET /api/v1/webhooks/status
- * Returns the current status and stats for all webhook integrations
- */
+// ═══════════════════════════════════════════════════════════════════════
+// GET /api/v1/webhooks/status — Configuration Status Check
+// ═══════════════════════════════════════════════════════════════════════
 export const getWebhookStatus = async (_req: Request, res: Response): Promise<void> => {
   try {
     const [configs] = await pool.query<RowDataPacket[]>(
@@ -579,16 +627,50 @@ export const getWebhookStatus = async (_req: Request, res: Response): Promise<vo
        GROUP BY platform`
     );
 
-    res.json({ success: true, data: { configs, recentEvents } });
+    const token       = await getSetting('META_PAGE_ACCESS_TOKEN');
+    const verifyToken = await getSetting('META_VERIFY_TOKEN');
+    const fbEnabled   = await getSetting('META_FB_LEADS_ENABLED');
+    const igEnabled   = await getSetting('META_IG_LEADS_ENABLED');
+    const appId       = await getSetting('META_APP_ID');
+
+    const [recentLogs] = await pool.query<RowDataPacket[]>(
+      `SELECT id, event_type, leadgen_id, processing_status, created_lead_id, created_at
+       FROM webhook_logs ORDER BY id DESC LIMIT 5`
+    );
+
+    const [totalStats] = await pool.query<RowDataPacket[]>(
+      `SELECT
+         COUNT(*) as total,
+         SUM(CASE WHEN processing_status='success' THEN 1 ELSE 0 END) as success,
+         SUM(CASE WHEN processing_status='failed' THEN 1 ELSE 0 END) as failed,
+         SUM(CASE WHEN processing_status='duplicate' THEN 1 ELSE 0 END) as duplicate
+       FROM webhook_logs WHERE source='meta'`
+    );
+
+    res.json({
+      success: true,
+      data: {
+        configs,
+        webhookConfigured: !!(token && verifyToken),
+        pageConnected: !!token,
+        facebookLeadSyncEnabled: fbEnabled === 'true',
+        instagramLeadSyncEnabled: igEnabled === 'true',
+        appIdConfigured: !!appId,
+        webhookUrl: '/api/v1/webhooks/meta',
+        recentEvents: recentLogs,
+        stats: totalStats[0] || {},
+        whatsappRecentEvents: recentEvents
+      }
+    });
   } catch (error) {
-    res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: 'Failed to get webhook status' } });
+    console.error('[Webhook] Status check error:', error);
+    res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: 'Failed to get webhook status.' } });
   }
 };
 
-/**
- * PATCH /api/v1/webhooks/config
- * Update webhook configuration (tokens, assignees, active status)
- */
+// ═══════════════════════════════════════════════════════════════════════
+// PATCH /api/v1/webhooks/config
+// ═══════════════════════════════════════════════════════════════════════
 export const updateWebhookConfig = async (req: Request, res: Response): Promise<void> => {
   try {
     const { platform, verify_token, default_assignee, is_active, page_id } = req.body;
@@ -615,10 +697,9 @@ export const updateWebhookConfig = async (req: Request, res: Response): Promise<
   }
 };
 
-/**
- * GET /api/v1/webhooks/events
- * Returns recent webhook events for debugging
- */
+// ═══════════════════════════════════════════════════════════════════════
+// GET /api/v1/webhooks/events
+// ═══════════════════════════════════════════════════════════════════════
 export const getWebhookEvents = async (req: Request, res: Response): Promise<void> => {
   try {
     const { platform, page = 1, limit = 20 } = req.query as any;
@@ -636,5 +717,36 @@ export const getWebhookEvents = async (req: Request, res: Response): Promise<voi
     res.json({ success: true, data: events });
   } catch (error) {
     res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: 'Failed to fetch events' } });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// GET /api/v1/webhooks/logs — Webhook Event Logs
+// ═══════════════════════════════════════════════════════════════════════
+export const getWebhookLogs = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { page = 1, limit = 30, status } = req.query as any;
+    const offset = (Number(page) - 1) * Number(limit);
+    const conds: string[] = ['source = ?'];
+    const params: any[] = ['meta'];
+
+    if (status) { conds.push('processing_status = ?'); params.push(status); }
+
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT * FROM webhook_logs WHERE ${conds.join(' AND ')}
+       ORDER BY id DESC LIMIT ? OFFSET ?`,
+      [...params, Number(limit), offset]
+    );
+    const [countR] = await pool.query<RowDataPacket[]>(
+      `SELECT COUNT(*) as total FROM webhook_logs WHERE ${conds.join(' AND ')}`,
+      params
+    );
+    res.json({
+      success: true,
+      data: rows,
+      meta: { total: countR[0].total, page: Number(page), limit: Number(limit) }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: 'Failed to fetch logs.' } });
   }
 };

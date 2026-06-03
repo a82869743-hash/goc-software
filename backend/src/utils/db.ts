@@ -330,6 +330,37 @@ pool.getConnection()
       console.error('❌ Failed to modify vehicle_id on quotations:', err.message);
     });
 
+    // ── Meta Webhook Integration Migration ──
+    // 1. Create webhook_logs table if not exists
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS webhook_logs (
+        id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        source           VARCHAR(50)  NOT NULL DEFAULT 'meta',
+        event_type       VARCHAR(100) NOT NULL,
+        leadgen_id       VARCHAR(100) NULL,
+        form_id          VARCHAR(100) NULL,
+        page_id          VARCHAR(100) NULL,
+        raw_payload      LONGTEXT     NULL,
+        processing_status ENUM('received','processing','success','failed','duplicate','skipped_disabled','skipped_form_filter') NOT NULL DEFAULT 'received',
+        created_lead_id  INT UNSIGNED NULL,
+        error_message    TEXT         NULL,
+        created_at       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `).catch(err => console.error('❌ Failed to auto-migrate webhook_logs table:', err.message));
+
+    // 2. Seed Meta settings in app_settings (only if keys do not exist)
+    await conn.query(`
+      INSERT IGNORE INTO app_settings (setting_key, setting_value, description) VALUES
+        ('META_FB_LEADS_ENABLED',     'false',  'Enable Facebook Lead Ads auto-import'),
+        ('META_IG_LEADS_ENABLED',     'false',  'Enable Instagram Lead Ads auto-import'),
+        ('META_APP_ID',               '',       'Meta App ID from developers.facebook.com'),
+        ('META_APP_SECRET',           '',       'Meta App Secret (keep confidential)'),
+        ('META_PAGE_ACCESS_TOKEN',    '',       'Page Access Token from Meta Business Suite'),
+        ('META_VERIFY_TOKEN',         'GOC_META_WEBHOOK_2024', 'Webhook verification token — change to a random string'),
+        ('META_DEFAULT_ASSIGNED_STAFF', '',     'Staff ID to auto-assign Meta leads'),
+        ('META_LEAD_FORM_IDS',        '',       'Comma-separated Form IDs to accept (leave blank = accept all)')
+    `).catch(err => console.error('❌ Failed to seed Meta integration app settings:', err.message));
+
     conn.release();
   })
   .catch((err) => {

@@ -5,6 +5,7 @@ import { webhooksAPI } from '../api/webhooks';
 import { staffAPI } from '../api/staff';
 import toast from 'react-hot-toast';
 import SMSSettingsPage from './SMSSettingsPage';
+import MetaIntegrationPage from './MetaIntegrationPage';
 
 function IntegrationStatusPanel() {
   const queryClient = useQueryClient();
@@ -32,7 +33,7 @@ function IntegrationStatusPanel() {
     onError: () => toast.error('Failed to save settings'),
   });
 
-  const configs: any[] = statusData?.data?.configs || [];
+  const configs: any[] = (statusData?.data?.configs || []).filter((c: any) => c.platform === 'whatsapp');
   const staffList: any[] = staffData?.data || [];
 
   const PLATFORM_INFO: Record<string, { label: string; icon: string; color: string; description: string; setupUrl: string }> = {
@@ -71,7 +72,6 @@ function IntegrationStatusPanel() {
         <p className="text-xs font-bold text-tertiary uppercase tracking-wider mb-3">Your Webhook URLs</p>
         <div className="flex flex-col gap-2">
           {[
-            { label: 'Facebook / Instagram', url: `${window.location.origin.replace('5173', '4000')}/api/v1/webhooks/meta` },
             { label: 'WhatsApp (MSG91)', url: `${window.location.origin.replace('5173', '4000')}/api/v1/webhooks/whatsapp` },
           ].map(({ label, url }) => (
             <div key={label} className="flex items-center justify-between gap-3 bg-black/30 rounded-lg px-3 py-2">
@@ -232,7 +232,7 @@ function IntegrationStatusPanel() {
 
 const SettingsPage: React.FC = () => {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'studio' | 'integrations' | 'sms'>('studio');
+  const [activeTab, setActiveTab] = useState<'studio' | 'integrations' | 'meta' | 'sms'>('studio');
   
   const { data: settingsData, isLoading } = useQuery({
     queryKey: ['settings'],
@@ -320,7 +320,8 @@ const SettingsPage: React.FC = () => {
         <div className="flex items-center gap-1.5 p-1 bg-black/30 border border-white/5 rounded-xl">
           {([
             { id: 'studio', icon: 'storefront', label: 'Studio Profile' },
-            { id: 'integrations', icon: 'hub', label: 'Integrations' },
+            { id: 'integrations', icon: 'chat_bubble', label: 'WhatsApp Capture' },
+            { id: 'meta', icon: 'campaign', label: 'Meta Lead Ads' },
             { id: 'sms', icon: 'sms', label: 'SMS Integration' }
           ] as const).map((tab) => (
             <button
@@ -480,6 +481,12 @@ const SettingsPage: React.FC = () => {
         {activeTab === 'integrations' && (
           <div className="flex flex-col gap-6">
             <IntegrationStatusPanel />
+          </div>
+        )}
+
+        {activeTab === 'meta' && (
+          <div className="flex flex-col gap-6">
+            <MetaIntegrationPage />
           </div>
         )}
 

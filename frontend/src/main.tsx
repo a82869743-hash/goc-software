@@ -6,13 +6,9 @@ import { Toaster } from 'react-hot-toast';
 import App from './App';
 import './styles/globals.css';
 
-// Initialize Theme (Dark Mode by default)
-const savedTheme = localStorage.getItem('theme') || 'dark';
-if (savedTheme === 'dark') {
-  document.documentElement.classList.add('dark');
-} else {
-  document.documentElement.classList.remove('dark');
-}
+// Initialize Theme (Force Light Mode, remove dark mode completely)
+document.documentElement.classList.remove('dark');
+localStorage.setItem('theme', 'light');
 
 const queryClient = new QueryClient({
   defaultOptions: {

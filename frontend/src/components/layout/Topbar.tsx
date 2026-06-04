@@ -11,20 +11,7 @@ export default function Topbar() {
   const { staff, logout } = useAuthStore();
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    return (document.documentElement.classList.contains('dark') ? 'dark' : 'light');
-  });
 
-  const toggleTheme = () => {
-    const nextTheme = theme === 'dark' ? 'light' : 'dark';
-    setTheme(nextTheme);
-    localStorage.setItem('theme', nextTheme);
-    if (nextTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  };
 
   // Live Query for notifications
   const { data: notifsRes } = useQuery({
@@ -165,16 +152,7 @@ export default function Topbar() {
           )}
         </div>
 
-        {/* Theme Toggle Button */}
-        <button
-          onClick={toggleTheme}
-          title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-          className="text-on-surface-variant hover:text-performance-red transition-all flex items-center justify-center p-1 rounded-lg hover:bg-white/5"
-        >
-          <span className="material-symbols-outlined">
-            {theme === 'dark' ? 'light_mode' : 'dark_mode'}
-          </span>
-        </button>
+
 
         <button className="text-on-surface-variant hover:text-performance-red transition-all">
           <span className="material-symbols-outlined">diamond</span>

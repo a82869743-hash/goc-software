@@ -361,6 +361,78 @@ pool.getConnection()
         ('META_LEAD_FORM_IDS',        '',       'Comma-separated Form IDs to accept (leave blank = accept all)')
     `).catch(err => console.error('❌ Failed to seed Meta integration app settings:', err.message));
 
+    // 3. Create meta_integration_settings table
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS meta_integration_settings (
+        id                   INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        facebook_enabled     TINYINT(1) NOT NULL DEFAULT 0,
+        instagram_enabled    TINYINT(1) NOT NULL DEFAULT 0,
+        app_id               VARCHAR(255) NULL,
+        app_secret           TEXT NULL,
+        page_access_token    TEXT NULL,
+        verify_token         VARCHAR(255) NOT NULL DEFAULT 'GOC_META_WEBHOOK_2024',
+        auto_assign_staff_id INT UNSIGNED NULL,
+        allowed_form_ids     TEXT NULL,
+        created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (auto_assign_staff_id) REFERENCES staff(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `).catch(err => console.error('❌ Failed to auto-migrate meta_integration_settings table:', err.message));
+
+    // Seed default settings row if empty
+    await conn.query(`
+      INSERT IGNORE INTO meta_integration_settings (id, facebook_enabled, instagram_enabled, verify_token)
+      VALUES (1, 0, 0, 'GOC_META_WEBHOOK_2024');
+    `).catch(err => console.error('❌ Failed to seed default meta_integration_settings:', err.message));
+
+    // Migrate existing settings from app_settings to meta_integration_settings
+    try {
+      const [existingSettings] = await conn.query(`
+        SELECT setting_key, setting_value FROM app_settings 
+        WHERE setting_key IN ('META_FB_LEADS_ENABLED', 'META_IG_LEADS_ENABLED', 'META_APP_ID', 'META_APP_SECRET', 'META_PAGE_ACCESS_TOKEN', 'META_VERIFY_TOKEN', 'META_DEFAULT_ASSIGNED_STAFF', 'META_LEAD_FORM_IDS')
+      `);
+      if (existingSettings && (existingSettings as any[]).length > 0) {
+        const settingsMap: Record<string, string> = {};
+        (existingSettings as any[]).forEach((row: any) => {
+          settingsMap[row.setting_key] = row.setting_value;
+        });
+
+        // Check if meta_integration_settings is unconfigured (empty app_id)
+        const [metaSettings] = await conn.query('SELECT app_id FROM meta_integration_settings WHERE id = 1');
+        const currentAppId = (metaSettings as any[])[0]?.app_id;
+
+        if (!currentAppId && (settingsMap['META_APP_ID'] || settingsMap['META_PAGE_ACCESS_TOKEN'])) {
+          console.log('🔄 Migrating Meta settings from app_settings to meta_integration_settings...');
+          const { encrypt } = require('./encryption');
+          await conn.query(`
+            UPDATE meta_integration_settings
+            SET 
+              facebook_enabled = ?,
+              instagram_enabled = ?,
+              app_id = ?,
+              app_secret = ?,
+              page_access_token = ?,
+              verify_token = ?,
+              auto_assign_staff_id = ?,
+              allowed_form_ids = ?
+            WHERE id = 1
+          `, [
+            settingsMap['META_FB_LEADS_ENABLED'] === 'true' ? 1 : 0,
+            settingsMap['META_IG_LEADS_ENABLED'] === 'true' ? 1 : 0,
+            settingsMap['META_APP_ID'] || null,
+            settingsMap['META_APP_SECRET'] ? encrypt(settingsMap['META_APP_SECRET']) : null,
+            settingsMap['META_PAGE_ACCESS_TOKEN'] ? encrypt(settingsMap['META_PAGE_ACCESS_TOKEN']) : null,
+            settingsMap['META_VERIFY_TOKEN'] || 'GOC_META_WEBHOOK_2024',
+            settingsMap['META_DEFAULT_ASSIGNED_STAFF'] ? Number(settingsMap['META_DEFAULT_ASSIGNED_STAFF']) : null,
+            settingsMap['META_LEAD_FORM_IDS'] || null
+          ]);
+          console.log('✅ Meta settings successfully migrated and encrypted.');
+        }
+      }
+    } catch (migErr: any) {
+      console.error('❌ Failed to migrate Meta settings:', migErr.message);
+    }
+
     conn.release();
   })
   .catch((err) => {

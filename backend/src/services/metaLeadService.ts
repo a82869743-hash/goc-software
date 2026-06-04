@@ -5,6 +5,7 @@
 import axios from 'axios';
 import pool from '../utils/db';
 import { RowDataPacket } from 'mysql2';
+import { decrypt } from '../utils/encryption';
 import {
   MetaLeadGenResponse,
   MetaWebhookLeadgenValue,
@@ -14,15 +15,41 @@ import {
 const META_GRAPH_VERSION = 'v23.0';
 const META_GRAPH_BASE = `https://graph.facebook.com/${META_GRAPH_VERSION}`;
 
+export interface MetaSettings {
+  facebookEnabled: boolean;
+  instagramEnabled: boolean;
+  appId: string;
+  appSecret: string;
+  pageAccessToken: string;
+  verifyToken: string;
+  autoAssignStaffId: number | null;
+  allowedFormIds: string;
+}
+
 /**
- * Get a setting value from app_settings
+ * Fetch Meta Lead Ads configuration settings
  */
-async function getSetting(key: string): Promise<string> {
-  const [rows] = await pool.query<RowDataPacket[]>(
-    'SELECT setting_value FROM app_settings WHERE setting_key = ? LIMIT 1',
-    [key]
-  );
-  return rows.length > 0 ? (rows[0].setting_value || '') : '';
+export async function getMetaSettings(): Promise<MetaSettings | null> {
+  try {
+    const [rows] = await pool.query<RowDataPacket[]>(
+      'SELECT * FROM meta_integration_settings WHERE id = 1 LIMIT 1'
+    );
+    if (rows.length === 0) return null;
+    const s = rows[0];
+    return {
+      facebookEnabled: s.facebook_enabled === 1,
+      instagramEnabled: s.instagram_enabled === 1,
+      appId: s.app_id || '',
+      appSecret: s.app_secret ? decrypt(s.app_secret) : '',
+      pageAccessToken: s.page_access_token ? decrypt(s.page_access_token) : '',
+      verifyToken: s.verify_token || 'GOC_META_WEBHOOK_2024',
+      autoAssignStaffId: s.auto_assign_staff_id,
+      allowedFormIds: s.allowed_form_ids || ''
+    };
+  } catch (err: any) {
+    console.error('[MetaLeadService] getMetaSettings error:', err.message);
+    return null;
+  }
 }
 
 /**
@@ -44,7 +71,12 @@ export async function fetchMetaLeadFromGraph(
   pageAccessToken?: string
 ): Promise<MetaLeadGenResponse | null> {
   try {
-    const token = pageAccessToken || await getSetting('META_PAGE_ACCESS_TOKEN');
+    let token = pageAccessToken;
+    if (!token) {
+      const settings = await getMetaSettings();
+      token = settings?.pageAccessToken || '';
+    }
+    
     if (!token) {
       console.error('[MetaLeadService] META_PAGE_ACCESS_TOKEN not configured.');
       return null;
@@ -160,7 +192,8 @@ export function normalizeMetaLead(
  * Empty setting = accept all forms
  */
 export async function isFormAllowed(formId: string): Promise<boolean> {
-  const allowedStr = await getSetting('META_LEAD_FORM_IDS');
+  const settings = await getMetaSettings();
+  const allowedStr = settings?.allowedFormIds || '';
   if (!allowedStr || !allowedStr.trim()) return true; // accept all
   const allowedIds = allowedStr.split(',').map(s => s.trim()).filter(Boolean);
   return allowedIds.includes(formId);

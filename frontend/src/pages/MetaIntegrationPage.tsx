@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { webhooksAPI, WebhookLogEntry } from '../api/webhooks';
-import { settingsApi } from '../api/settings';
+import { integrationsAPI, MetaIntegrationSettings } from '../api/integrations';
 import { staffAPI } from '../api/staff';
 import toast from 'react-hot-toast';
 
@@ -21,6 +21,19 @@ export default function MetaIntegrationPage() {
   const [logFilter, setLogFilter] = useState('');
   const [expandedLogId, setExpandedLogId] = useState<number | null>(null);
 
+  // Password / Secret masking states
+  const [showAppSecret, setShowAppSecret] = useState(false);
+  const [showPageAccessToken, setShowPageAccessToken] = useState(false);
+
+  // Validation Action states
+  const [isValidating, setIsValidating] = useState(false);
+  const [validationResult, setValidationResult] = useState<any>(null);
+
+  // Connection Test Diagnostics states
+  const [isTesting, setIsTesting] = useState(false);
+  const [testResult, setTestResult] = useState<any>(null);
+  const [showTestModal, setShowTestModal] = useState(false);
+
   // Load active staff members for assignment dropdown
   const { data: staffData } = useQuery({
     queryKey: ['staff'],
@@ -28,35 +41,60 @@ export default function MetaIntegrationPage() {
   });
   const staffList = staffData?.data || [];
 
-  // Settings form query & state
-  const { data: settingsData } = useQuery({ queryKey: ['settings'], queryFn: settingsApi.getAll });
-  const [form, setForm] = useState<Record<string, string>>({});
+  // Settings form query & state targeting `/api/v1/integrations/meta/settings`
+  const { data: settingsData, isLoading: settingsLoading } = useQuery({
+    queryKey: ['metaSettings'],
+    queryFn: integrationsAPI.getMetaSettings,
+  });
+
+  const [form, setForm] = useState<MetaIntegrationSettings>({
+    facebookEnabled: false,
+    instagramEnabled: false,
+    appId: '',
+    appSecret: '',
+    pageAccessToken: '',
+    verifyToken: 'GOC_META_WEBHOOK_2024',
+    autoAssignStaffId: null,
+    allowedFormIds: '',
+  });
   
   React.useEffect(() => {
-    if (settingsData) {
-      const f: Record<string, string> = {};
-      [
-        'META_FB_LEADS_ENABLED', 'META_IG_LEADS_ENABLED',
-        'META_APP_ID', 'META_APP_SECRET', 'META_VERIFY_TOKEN',
-        'META_PAGE_ACCESS_TOKEN', 'META_DEFAULT_ASSIGNED_STAFF',
-        'META_LEAD_FORM_IDS',
-      ].forEach(k => { f[k] = settingsData[k]?.value || ''; });
-      if (!f['META_VERIFY_TOKEN']) f['META_VERIFY_TOKEN'] = 'GOC_META_WEBHOOK_2024';
-      setForm(f);
+    if (settingsData?.data) {
+      setForm({
+        facebookEnabled: !!settingsData.data.facebookEnabled,
+        instagramEnabled: !!settingsData.data.instagramEnabled,
+        appId: settingsData.data.appId || '',
+        appSecret: settingsData.data.appSecret || '',
+        pageAccessToken: settingsData.data.pageAccessToken || '',
+        verifyToken: settingsData.data.verifyToken || 'GOC_META_WEBHOOK_2024',
+        autoAssignStaffId: settingsData.data.autoAssignStaffId,
+        allowedFormIds: settingsData.data.allowedFormIds || '',
+      });
     }
   }, [settingsData]);
 
   const saveSettingsMutation = useMutation({
-    mutationFn: () => settingsApi.batchUpdate(
-      Object.entries(form).map(([key, value]) => ({ key, value }))
-    ),
+    mutationFn: (payload: Partial<MetaIntegrationSettings>) => integrationsAPI.updateMetaSettings(payload),
     onSuccess: () => { 
-      toast.success('Settings saved!'); 
-      queryClient.invalidateQueries({ queryKey: ['settings'] });
+      toast.success('Meta configuration saved successfully!'); 
+      queryClient.invalidateQueries({ queryKey: ['metaSettings'] });
       queryClient.invalidateQueries({ queryKey: ['webhookStatus'] });
     },
-    onError: () => toast.error('Failed to save settings.'),
+    onError: () => toast.error('Failed to save configuration settings.'),
   });
+
+  const handleSaveSettings = () => {
+    saveSettingsMutation.mutate({
+      facebookEnabled: form.facebookEnabled,
+      instagramEnabled: form.instagramEnabled,
+      appId: form.appId,
+      appSecret: form.appSecret,
+      pageAccessToken: form.pageAccessToken,
+      verifyToken: form.verifyToken,
+      autoAssignStaffId: form.autoAssignStaffId ? Number(form.autoAssignStaffId) : null,
+      allowedFormIds: form.allowedFormIds,
+    });
+  };
 
   // Webhook status
   const { data: statusRes, isLoading: statusLoading, refetch: refetchStatus } = useQuery({
@@ -76,6 +114,65 @@ export default function MetaIntegrationPage() {
 
   // Compute webhook URL for display
   const webhookUrl = `${window.location.origin.replace('5173', '4000')}/api/v1/webhooks/meta`;
+
+  // Validate Meta Connection Action Handler
+  const handleValidate = async () => {
+    setIsValidating(true);
+    setValidationResult(null);
+    try {
+      const res = await integrationsAPI.validateMetaConnection();
+      if (res.success && res.data) {
+        setValidationResult(res.data);
+        if (res.data.pageConnected && res.data.webhookVerified && res.data.leadSyncEnabled) {
+          toast.success(`Connected! Verified for Page: "${res.data.data?.pageName || 'Connected Page'}"`);
+        } else if (res.data.error) {
+          toast.error(`Validation Error: ${res.data.error}`);
+        } else {
+          toast.error('Validation completed. Warning: check missing subscription status.');
+        }
+        queryClient.invalidateQueries({ queryKey: ['webhookStatus'] });
+      } else {
+        toast.error((res as any).error?.message || 'Connection validation failed');
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.response?.data?.error?.message || 'Failed to validate Meta connection');
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  // Run Detailed Test Diagnostics Action Handler
+  const handleRunTest = async () => {
+    setIsTesting(true);
+    setTestResult(null);
+    setShowTestModal(true);
+    try {
+      const res = await integrationsAPI.runMetaTest();
+      if (res.success && res.data) {
+        setTestResult(res.data);
+      } else {
+        setTestResult({
+          tokenValid: false,
+          pageConnected: false,
+          permissions: {},
+          appSubscribed: false,
+          logs: ['Error: Failed to obtain response from test diagnostics.']
+        });
+      }
+    } catch (err: any) {
+      console.error(err);
+      setTestResult({
+        tokenValid: false,
+        pageConnected: false,
+        permissions: {},
+        appSubscribed: false,
+        logs: [`Error: Diagnostics request failed — ${err.response?.data?.error?.message || err.message}`]
+      });
+    } finally {
+      setIsTesting(false);
+    }
+  };
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -109,22 +206,25 @@ export default function MetaIntegrationPage() {
         </div>
       )}
 
-      {/* Connection Status Banner */}
+      {/* Connection Status Banner (Subscription Status) */}
       <div className="bg-[#0c0c0c]/45 backdrop-blur-2xl rounded-xl p-4 border border-white/5 shadow-md">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
-            { label: 'Webhook Configured', ok: status?.webhookConfigured, icon: 'webhook' },
-            { label: 'Page Token Connected', ok: status?.pageConnected, icon: 'link' },
-            { label: 'Facebook/Instagram Sync', ok: status?.facebookLeadSyncEnabled || status?.instagramLeadSyncEnabled, icon: 'thumb_up' },
+            { label: 'Webhook Verified', ok: status?.webhookConfigured, icon: 'webhook' },
+            { label: 'Page Connected', ok: status?.pageConnected, icon: 'link' },
+            { label: 'Lead Sync Enabled', ok: status?.facebookLeadSyncEnabled || status?.instagramLeadSyncEnabled, icon: 'thumb_up' },
           ].map(({ label, ok, icon }) => (
-            <div key={label} className="flex items-center gap-3">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${ok ? 'bg-green-500/10' : 'bg-amber-500/10'}`}>
-                <span className={`material-symbols-outlined text-lg ${ok ? 'text-green-400' : 'text-amber-400'}`}>{icon}</span>
+            <div key={label} className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${ok ? 'bg-green-500/10' : 'bg-amber-500/10'}`}>
+                  <span className={`material-symbols-outlined text-lg ${ok ? 'text-green-400' : 'text-amber-400'}`}>{icon}</span>
+                </div>
+                <div>
+                  <p className="font-label-caps text-[9px] text-on-surface-variant/50 tracking-widest">{label}</p>
+                  <p className={`text-xs font-bold ${ok ? 'text-green-400' : 'text-amber-400'}`}>{ok ? 'Active' : 'Not Configured'}</p>
+                </div>
               </div>
-              <div>
-                <p className="font-label-caps text-[9px] text-on-surface-variant/50 tracking-widest">{label}</p>
-                <p className={`text-xs font-bold ${ok ? 'text-green-400' : 'text-amber-400'}`}>{ok ? 'Active' : 'Not Configured'}</p>
-              </div>
+              <div className="text-sm select-none">{ok ? '✅' : '❌'}</div>
             </div>
           ))}
         </div>
@@ -179,10 +279,10 @@ export default function MetaIntegrationPage() {
           <div className="p-4 rounded-xl border border-blue-500/20 bg-blue-500/5 flex items-center justify-between">
             <div>
               <p className="font-label-caps text-[9px] text-blue-400 tracking-widest mb-1 font-bold">YOUR VERIFY TOKEN (enter in Meta webhook setup)</p>
-              <code className="text-sm text-white font-mono">{form['META_VERIFY_TOKEN'] || 'GOC_META_WEBHOOK_2024'}</code>
+              <code className="text-sm text-white font-mono">{form.verifyToken || 'GOC_META_WEBHOOK_2024'}</code>
             </div>
             <button
-              onClick={() => { navigator.clipboard.writeText(form['META_VERIFY_TOKEN'] || 'GOC_META_WEBHOOK_2024'); toast.success('Verify Token copied!'); }}
+              onClick={() => { navigator.clipboard.writeText(form.verifyToken || 'GOC_META_WEBHOOK_2024'); toast.success('Verify Token copied!'); }}
               className="p-2.5 rounded-lg border border-white/10 hover:border-blue-400/30 text-on-surface-variant/50 hover:text-blue-400 hover:bg-blue-400/5 transition-all hover:cursor-pointer"
             >
               <span className="material-symbols-outlined text-sm">content_copy</span>
@@ -213,7 +313,7 @@ export default function MetaIntegrationPage() {
         </div>
       )}
 
-      {/* SETTINGS TAB */}
+      {/* CONFIGURATION TAB */}
       {activeTab === 'settings' && (
         <div className="bg-[#0c0c0c]/45 backdrop-blur-2xl border border-white/5 rounded-2xl p-6 space-y-6 animate-fade-in">
           <div className="flex justify-between items-center border-b border-white/5 pb-4">
@@ -226,13 +326,55 @@ export default function MetaIntegrationPage() {
             )}
           </div>
 
+          {/* Validation Banner results */}
+          {validationResult && (
+            <div className={`p-4 rounded-xl border ${
+              (validationResult.pageConnected && validationResult.leadSyncEnabled) 
+                ? 'border-green-500/20 bg-green-500/5 text-green-400' 
+                : 'border-red-500/20 bg-red-500/5 text-red-400'
+            } space-y-2 animate-fade-in`}>
+              <div className="flex items-center justify-between">
+                <p className="font-label-caps text-[9px] tracking-widest uppercase font-bold text-white">Connection Verification Result</p>
+                <button 
+                  onClick={() => setValidationResult(null)} 
+                  className="text-on-surface-variant/40 hover:text-white text-xs font-bold transition-all hover:cursor-pointer"
+                >
+                  Clear
+                </button>
+              </div>
+              <div className="text-xs space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-white/80">Connection Status:</span>
+                  <span className="font-bold">
+                    {(validationResult.pageConnected && validationResult.leadSyncEnabled) ? 'Connected' : 'Error / Incomplete'}
+                  </span>
+                </div>
+                {validationResult.error && (
+                  <p className="text-red-400 bg-red-950/20 p-2 rounded border border-red-500/10 text-[11px] font-mono leading-relaxed mt-2">
+                    {validationResult.error}
+                  </p>
+                )}
+                {validationResult.data && (
+                  <div className="space-y-1.5 pt-1.5 border-t border-white/5">
+                    <p className="text-white/60">Page: <span className="text-white font-bold">{validationResult.data.pageName}</span> (ID: {validationResult.data.pageId})</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px] bg-black/40 p-2 rounded mt-1.5 text-white/80">
+                      <div>Permission leads_retrieval: {validationResult.data.permissions?.leads_retrieval ? '✅ Granted' : '❌ Missing'}</div>
+                      <div>Permission pages_read_engagement: {validationResult.data.permissions?.pages_read_engagement ? '✅ Granted' : '❌ Missing'}</div>
+                      <div className="sm:col-span-2">Webhook App Subscription: {validationResult.data.appSubscribed ? '✅ Subscribed' : '❌ Not Subscribed'}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Sync Toggles */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
-              { key: 'META_FB_LEADS_ENABLED', label: 'Enable Facebook Lead Import', icon: 'thumb_up', color: 'text-blue-400' },
-              { key: 'META_IG_LEADS_ENABLED', label: 'Enable Instagram Lead Import', icon: 'photo_camera', color: 'text-pink-400' },
+              { key: 'facebookEnabled', label: 'Enable Facebook Lead Import', icon: 'thumb_up', color: 'text-blue-400' },
+              { key: 'instagramEnabled', label: 'Enable Instagram Lead Import', icon: 'photo_camera', color: 'text-pink-400' },
             ].map(({ key, label, icon, color }) => {
-              const isActive = form[key] === 'true';
+              const isActive = !!(form as any)[key];
               return (
                 <div key={key} className="flex items-center justify-between p-4 rounded-xl border border-white/[0.05] bg-white/[0.01] hover:border-white/10 transition-all">
                   <div className="flex items-center gap-3">
@@ -240,7 +382,7 @@ export default function MetaIntegrationPage() {
                     <p className="text-sm font-bold text-white">{label}</p>
                   </div>
                   <button
-                    onClick={() => setForm(prev => ({ ...prev, [key]: prev[key] === 'true' ? 'false' : 'true' }))}
+                    onClick={() => setForm(prev => ({ ...prev, [key]: !prev[key as keyof MetaIntegrationSettings] }))}
                     className={`relative w-11 h-6 rounded-full transition-colors hover:cursor-pointer ${isActive ? 'bg-performance-red' : 'bg-white/10'}`}
                   >
                     <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${isActive ? 'translate-x-6' : 'translate-x-1'}`} />
@@ -253,36 +395,62 @@ export default function MetaIntegrationPage() {
           {/* Credentials Form */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="flex flex-col gap-2">
-              <label className="font-label-caps text-xs text-on-surface-variant/80 uppercase tracking-widest font-bold">Meta App ID</label>
+              <label className="font-label-caps text-xs text-on-surface-variant/80 uppercase tracking-widest font-bold">Meta App ID *</label>
               <input
                 type="text"
                 className="w-full bg-black border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm font-mono focus:outline-none focus:border-performance-red/50 transition-all placeholder-white/20"
                 placeholder="Enter App ID"
-                value={form['META_APP_ID'] || ''}
-                onChange={e => setForm(p => ({ ...p, META_APP_ID: e.target.value }))}
+                value={form.appId || ''}
+                onChange={e => setForm(p => ({ ...p, appId: e.target.value }))}
+                required
               />
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="font-label-caps text-xs text-on-surface-variant/80 uppercase tracking-widest font-bold">Meta App Secret</label>
-              <input
-                type="password"
-                className="w-full bg-black border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm font-mono focus:outline-none focus:border-performance-red/50 transition-all placeholder-white/20"
-                placeholder="••••••••••••••••"
-                value={form['META_APP_SECRET'] || ''}
-                onChange={e => setForm(p => ({ ...p, META_APP_SECRET: e.target.value }))}
-              />
+              <label className="font-label-caps text-xs text-on-surface-variant/80 uppercase tracking-widest font-bold">Meta App Secret *</label>
+              <div className="relative">
+                <input
+                  type={showAppSecret ? 'text' : 'password'}
+                  className="w-full bg-black border border-white/10 rounded-lg pl-3 pr-10 py-2.5 text-white text-sm font-mono focus:outline-none focus:border-performance-red/50 transition-all placeholder-white/20"
+                  placeholder="••••••••••••••••"
+                  value={form.appSecret || ''}
+                  onChange={e => setForm(p => ({ ...p, appSecret: e.target.value }))}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAppSecret(!showAppSecret)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant/50 hover:text-white select-none hover:cursor-pointer flex items-center"
+                >
+                  <span className="material-symbols-outlined text-lg">
+                    {showAppSecret ? 'visibility_off' : 'visibility'}
+                  </span>
+                </button>
+              </div>
             </div>
 
             <div className="flex flex-col gap-2 md:col-span-2">
-              <label className="font-label-caps text-xs text-on-surface-variant/80 uppercase tracking-widest font-bold">Page Access Token</label>
-              <textarea
-                rows={3}
-                className="w-full bg-black border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm font-mono focus:outline-none focus:border-performance-red/50 transition-all placeholder-white/20"
-                placeholder="EAAE..."
-                value={form['META_PAGE_ACCESS_TOKEN'] || ''}
-                onChange={e => setForm(p => ({ ...p, META_PAGE_ACCESS_TOKEN: e.target.value }))}
-              />
+              <label className="font-label-caps text-xs text-on-surface-variant/80 uppercase tracking-widest font-bold">Page Access Token *</label>
+              <div className="relative">
+                <textarea
+                  rows={3}
+                  className="w-full bg-black border border-white/10 rounded-lg pl-3 pr-10 py-2.5 text-white text-sm font-mono focus:outline-none focus:border-performance-red/50 transition-all placeholder-white/20"
+                  style={{ WebkitTextSecurity: showPageAccessToken ? 'none' : 'disc' } as React.CSSProperties}
+                  placeholder="EAAW..."
+                  value={form.pageAccessToken || ''}
+                  onChange={e => setForm(p => ({ ...p, pageAccessToken: e.target.value }))}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPageAccessToken(!showPageAccessToken)}
+                  className="absolute right-3 top-4 text-on-surface-variant/50 hover:text-white select-none hover:cursor-pointer flex items-center"
+                >
+                  <span className="material-symbols-outlined text-lg">
+                    {showPageAccessToken ? 'visibility_off' : 'visibility'}
+                  </span>
+                </button>
+              </div>
               <p className="text-[10px] text-on-surface-variant/50">Provide a long-lived page access token (or system user token) from the Meta App Console.</p>
             </div>
 
@@ -292,8 +460,8 @@ export default function MetaIntegrationPage() {
                 type="text"
                 className="w-full bg-black border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm font-mono focus:outline-none focus:border-performance-red/50 transition-all placeholder-white/20"
                 placeholder="GOC_META_WEBHOOK_2024"
-                value={form['META_VERIFY_TOKEN'] || ''}
-                onChange={e => setForm(p => ({ ...p, META_VERIFY_TOKEN: e.target.value }))}
+                value={form.verifyToken || ''}
+                onChange={e => setForm(p => ({ ...p, verifyToken: e.target.value }))}
               />
               <p className="text-[10px] text-on-surface-variant/50">Change this token to secure your endpoints.</p>
             </div>
@@ -302,8 +470,8 @@ export default function MetaIntegrationPage() {
               <label className="font-label-caps text-xs text-on-surface-variant/80 uppercase tracking-widest font-bold">Auto-Assign To Staff</label>
               <select
                 className="w-full bg-black border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-performance-red/50 transition-all"
-                value={form['META_DEFAULT_ASSIGNED_STAFF'] || ''}
-                onChange={e => setForm(p => ({ ...p, META_DEFAULT_ASSIGNED_STAFF: e.target.value }))}
+                value={form.autoAssignStaffId || ''}
+                onChange={e => setForm(p => ({ ...p, autoAssignStaffId: e.target.value ? Number(e.target.value) : null }))}
               >
                 <option value="">No auto-assignment</option>
                 {staffList.map((s: any) => (
@@ -314,22 +482,44 @@ export default function MetaIntegrationPage() {
             </div>
 
             <div className="flex flex-col gap-2 md:col-span-2">
-              <label className="font-label-caps text-xs text-on-surface-variant/80 uppercase tracking-widest font-bold font-bold">Allowed Lead Form IDs (Optional)</label>
-              <input
-                type="text"
+              <label className="font-label-caps text-xs text-on-surface-variant/80 uppercase tracking-widest font-bold">Allowed Form IDs (Optional)</label>
+              <textarea
+                rows={2}
                 className="w-full bg-black border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm font-mono focus:outline-none focus:border-performance-red/50 transition-all placeholder-white/20"
-                placeholder="Comma separated Form IDs e.g. 129038290382,129382938292"
-                value={form['META_LEAD_FORM_IDS'] || ''}
-                onChange={e => setForm(p => ({ ...p, META_LEAD_FORM_IDS: e.target.value }))}
+                placeholder="Enter form IDs separated by commas or newlines, e.g. 129038290382, 129382938292"
+                value={form.allowedFormIds || ''}
+                onChange={e => setForm(p => ({ ...p, allowedFormIds: e.target.value }))}
               />
               <p className="text-[10px] text-on-surface-variant/50">Leave empty to accept leads from all forms. Specify form IDs to filter and sync only those campaigns.</p>
             </div>
           </div>
 
-          <div className="pt-4 border-t border-white/5 flex justify-end">
+          <div className="pt-4 border-t border-white/5 flex flex-wrap justify-between items-center gap-3">
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={handleValidate}
+                disabled={isValidating || settingsLoading}
+                className="px-4 py-2.5 bg-black border border-white/10 hover:border-white/20 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all disabled:opacity-50 hover:cursor-pointer flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-sm">{isValidating ? 'sync' : 'verified'}</span>
+                {isValidating ? 'Validating...' : 'Validate Meta Connection'}
+              </button>
+              
+              <button
+                type="button"
+                onClick={handleRunTest}
+                disabled={isTesting || settingsLoading}
+                className="px-4 py-2.5 bg-black border border-white/10 hover:border-white/20 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all disabled:opacity-50 hover:cursor-pointer flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-sm">{isTesting ? 'sync' : 'build'}</span>
+                {isTesting ? 'Testing...' : 'Run Test'}
+              </button>
+            </div>
+
             <button
-              onClick={() => saveSettingsMutation.mutate()}
-              disabled={saveSettingsMutation.isPending}
+              onClick={handleSaveSettings}
+              disabled={saveSettingsMutation.isPending || settingsLoading}
               className="px-6 py-3 bg-gradient-to-r from-performance-red to-deep-crimson text-white font-bold text-xs uppercase tracking-wider rounded-xl hover:cursor-pointer disabled:opacity-50 transition-all shadow-md flex items-center gap-2"
             >
               <span className="material-symbols-outlined text-sm">save</span>
@@ -343,7 +533,7 @@ export default function MetaIntegrationPage() {
       {activeTab === 'logs' && (
         <div className="bg-[#0c0c0c]/45 backdrop-blur-2xl border border-white/5 rounded-2xl p-6 space-y-6 animate-fade-in">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 border-b border-white/5 pb-4">
-            <p className="font-label-caps text-[9px] text-on-surface-variant/40 tracking-widest">WEBHOOK AUDIT & STATUS LOGS</p>
+            <p className="font-label-caps text-[9px] text-on-surface-variant/40 tracking-widest font-bold">WEBHOOK AUDIT & STATUS LOGS</p>
             
             <div className="flex gap-2">
               {['', 'success', 'duplicate', 'failed'].map(st => (
@@ -370,7 +560,7 @@ export default function MetaIntegrationPage() {
           ) : logs.length === 0 ? (
             <div className="text-center py-12 border border-dashed border-white/5 rounded-xl">
               <span className="material-symbols-outlined text-3xl text-on-surface-variant/20 mb-2">history</span>
-              <p className="text-xs text-on-surface-variant/50">No webhook audit events found matching the filter.</p>
+              <p className="text-xs text-on-surface-variant/50 font-bold">No webhook audit events found matching the filter.</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -431,6 +621,90 @@ export default function MetaIntegrationPage() {
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Test Diagnostics Modal */}
+      {showTestModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in">
+          <div className="bg-[#0f0f0f] border border-white/10 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl animate-scale-in">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-black/40">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-performance-red">diagnostics</span>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Meta Connection Diagnostics</h3>
+              </div>
+              <button
+                onClick={() => setShowTestModal(false)}
+                className="text-on-surface-variant/50 hover:text-white transition-colors hover:cursor-pointer"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10">
+              {isTesting ? (
+                <div className="text-center py-12 flex flex-col items-center gap-3">
+                  <div className="w-8 h-8 border-2 border-performance-red border-t-transparent rounded-full animate-spin" />
+                  <p className="text-xs text-on-surface-variant/60 font-label-caps tracking-wider">Running Graph API Telemetry Checks...</p>
+                </div>
+              ) : testResult ? (
+                <div className="space-y-4">
+                  {/* Status Checklist Card */}
+                  <div className="p-4 rounded-xl bg-black border border-white/5 space-y-3">
+                    <p className="font-label-caps text-[9px] text-on-surface-variant/40 tracking-widest font-bold">Diagnostic Checklist</p>
+                    <div className="space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-white/70">Page Connection (me)</span>
+                        <span className="font-bold">{testResult.pageConnected ? '✅ Valid' : '❌ Failed'}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-white/70">Token Validity (OAuth)</span>
+                        <span className="font-bold">{testResult.tokenValid ? '✅ Active' : '❌ Expired/Invalid'}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-white/70">leads_retrieval permission</span>
+                        <span className="font-bold">{testResult.permissions?.leads_retrieval ? '✅ Granted' : '❌ Missing'}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-white/70">pages_read_engagement permission</span>
+                        <span className="font-bold">{testResult.permissions?.pages_read_engagement ? '✅ Granted' : '❌ Missing'}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-white/70">App Page Subscription</span>
+                        <span className="font-bold">{testResult.appSubscribed ? '✅ Subscribed' : '❌ Unsubscribed'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Logs Terminal */}
+                  <div className="space-y-1.5">
+                    <p className="font-label-caps text-[9px] text-on-surface-variant/40 tracking-widest font-bold">Execution Logs</p>
+                    <div className="bg-black/90 p-4 rounded-lg font-mono text-[10px] leading-relaxed text-green-400 border border-white/5 max-h-60 overflow-y-auto space-y-1 scrollbar-thin scrollbar-thumb-white/10">
+                      {testResult.logs?.map((log: string, idx: number) => (
+                        <div key={idx} className={log.startsWith('❌') ? 'text-red-400' : log.startsWith('⚠️') ? 'text-amber-400' : 'text-green-400'}>
+                          {log}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-on-surface-variant/50">No diagnostics run yet.</p>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-white/5 bg-black/40 flex justify-end">
+              <button
+                onClick={() => setShowTestModal(false)}
+                className="px-4 py-2 border border-white/10 rounded-lg text-white text-xs font-bold uppercase tracking-wider hover:border-white/20 transition-all hover:cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

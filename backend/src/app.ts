@@ -32,6 +32,7 @@ import advanceBookingsRoutes from './routes/advanceBookings';
 import publicTrackingRoutes from './routes/publicTracking';
 import webhooksRoutes from './routes/webhooks';
 import smsAdminRoutes from './routes/smsAdmin';
+import integrationsRoutes from './routes/integrations';
 
 const app = express();
 
@@ -95,6 +96,7 @@ app.use(`${API_PREFIX}/quick-job-cards`, quickJobCardsRoutes);
 app.use(`${API_PREFIX}/advance-bookings`, advanceBookingsRoutes);
 app.use(`${API_PREFIX}/webhooks`, webhooksRoutes);
 app.use(`${API_PREFIX}/sms`, smsAdminRoutes);
+app.use(`${API_PREFIX}/integrations`, integrationsRoutes);
 app.use(`/public`, publicTrackingRoutes);
 // ── Initialize Cron Jobs ────────────────────────────────────
 if (process.env.NODE_ENV !== 'test') {

@@ -15,17 +15,9 @@ import {
   fetchMetaLeadFromGraph,
   normalizeMetaLead,
   isFormAllowed,
+  getMetaSettings,
 } from '../services/metaLeadService';
 import { MetaWebhookPayload, NormalizedMetaLead } from '../types/meta';
-
-// ─── Helper: get app_settings value ────────────────────────────────────
-async function getSetting(key: string): Promise<string> {
-  const [rows] = await pool.query<RowDataPacket[]>(
-    'SELECT setting_value FROM app_settings WHERE setting_key = ? LIMIT 1',
-    [key]
-  );
-  return rows.length > 0 ? (rows[0].setting_value || '') : '';
-}
 
 // ─── Helper: log webhook event ───────────────────────────────────────────
 async function logWebhook(data: {
@@ -218,8 +210,8 @@ export const verifyMetaWebhook = async (req: Request, res: Response): Promise<vo
 
     console.log(`[Webhook Verification] Attempted. Mode: ${mode}, Token received: ${token}`);
 
-    const savedToken = await getSetting('META_VERIFY_TOKEN');
-    const expectedToken = savedToken || process.env.META_VERIFY_TOKEN || '';
+    const settings = await getMetaSettings();
+    const expectedToken = settings?.verifyToken || process.env.META_VERIFY_TOKEN || '';
 
     if (mode === 'subscribe' && token === expectedToken) {
       console.log('[Webhook Verification] Success. Verification token matched.');
@@ -320,8 +312,9 @@ async function processMetaWebhookAsync(body: MetaWebhookPayload): Promise<void> 
         }
 
         // Check if source is enabled
-        const fbEnabled  = await getSetting('META_FB_LEADS_ENABLED');
-        const igEnabled  = await getSetting('META_IG_LEADS_ENABLED');
+        const settings = await getMetaSettings();
+        const fbEnabled  = settings?.facebookEnabled ? 'true' : 'false';
+        const igEnabled  = settings?.instagramEnabled ? 'true' : 'false';
 
         // Fetch from Meta Graph API
         console.log(`[Webhook Async] Fetching fields from Meta Graph API for leadgen ID: ${leadgen_id}`);
@@ -431,8 +424,8 @@ async function checkDuplicateLead(phone: string, leadgenId: string): Promise<boo
 async function createMetaLeadInCRM(lead: NormalizedMetaLead): Promise<number | null> {
   try {
     const leadCode    = await generateCode('lead');
-    const defaultStaffStr = await getSetting('META_DEFAULT_ASSIGNED_STAFF');
-    const defaultStaff = defaultStaffStr ? Number(defaultStaffStr) : null;
+    const settings = await getMetaSettings();
+    const defaultStaff = settings?.autoAssignStaffId || null;
 
     // Build notes: combine extra fields + campaign info
     const noteParts: string[] = [];
@@ -518,9 +511,9 @@ async function fireLeadNotifications(
 
   // Assigned staff notification
   try {
-    const defaultStaffStr = await getSetting('META_DEFAULT_ASSIGNED_STAFF');
-    if (defaultStaffStr) {
-      const staffId = Number(defaultStaffStr);
+    const settings = await getMetaSettings();
+    if (settings?.autoAssignStaffId) {
+      const staffId = settings.autoAssignStaffId;
       const { createNotification } = await import('../services/notificationService');
       await createNotification({
         staffId,
@@ -664,11 +657,12 @@ export const getWebhookStatus = async (_req: Request, res: Response): Promise<vo
        GROUP BY platform`
     );
 
-    const token       = await getSetting('META_PAGE_ACCESS_TOKEN');
-    const verifyToken = await getSetting('META_VERIFY_TOKEN');
-    const fbEnabled   = await getSetting('META_FB_LEADS_ENABLED');
-    const igEnabled   = await getSetting('META_IG_LEADS_ENABLED');
-    const appId       = await getSetting('META_APP_ID');
+    const settings    = await getMetaSettings();
+    const token       = settings?.pageAccessToken;
+    const verifyToken = settings?.verifyToken;
+    const fbEnabled   = settings?.facebookEnabled ? 'true' : 'false';
+    const igEnabled   = settings?.instagramEnabled ? 'true' : 'false';
+    const appId       = settings?.appId;
 
     const [recentLogs] = await pool.query<RowDataPacket[]>(
       `SELECT id, event_type, leadgen_id, processing_status, created_lead_id, created_at

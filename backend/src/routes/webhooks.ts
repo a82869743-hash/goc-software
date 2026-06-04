@@ -28,12 +28,13 @@ router.post('/instagram', receiveInstagramWebhook);
 
 router.post('/whatsapp', receiveWhatsAppWebhook);
 
+router.get('/status', getWebhookStatus);
+router.get('/events', getWebhookEvents);
+
 // ── PROTECTED — Configuration and logs (authenticated) ─────────
 router.use(authMiddleware);
 
-router.get('/status', rbac('admin', 'manager'), getWebhookStatus);
 router.patch('/config', rbac('admin'), updateWebhookConfig);
-router.get('/events', rbac('admin', 'manager'), getWebhookEvents);
 router.get('/logs', rbac('admin', 'manager'), getWebhookLogs);
 
 export default router;

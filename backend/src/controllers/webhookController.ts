@@ -55,6 +55,7 @@ async function logWebhook(data: {
         data.error_message || null,
       ]
     );
+    console.log(`[Webhook Log] Created audit log entry #${result.insertId} with status ${data.processing_status}`);
     return result.insertId;
   } catch (err) {
     console.error('[Webhook] Failed to write webhook log:', err);
@@ -76,6 +77,7 @@ async function updateWebhookLog(
        WHERE id = ?`,
       [status, createdLeadId || null, errorMessage || null, logId]
     );
+    console.log(`[Webhook Log Update] Log entry #${logId} updated to status: ${status} (Lead: ${createdLeadId || 'N/A'})`);
   } catch (err) {
     console.error('[Webhook] Failed to update webhook log:', err);
   }
@@ -214,19 +216,21 @@ export const verifyMetaWebhook = async (req: Request, res: Response): Promise<vo
     const token     = req.query['hub.verify_token'] as string;
     const challenge = req.query['hub.challenge'] as string;
 
+    console.log(`[Webhook Verification] Attempted. Mode: ${mode}, Token received: ${token}`);
+
     const savedToken = await getSetting('META_VERIFY_TOKEN');
     const expectedToken = savedToken || process.env.META_VERIFY_TOKEN || '';
 
     if (mode === 'subscribe' && token === expectedToken) {
-      console.log('[Webhook] Meta webhook verification successful.');
+      console.log('[Webhook Verification] Success. Verification token matched.');
       res.status(200).send(challenge);
       return;
     }
 
-    console.warn('[Webhook] Meta webhook verification FAILED. Token mismatch.');
+    console.warn(`[Webhook Verification] Failed. Token mismatch. Expected: "${expectedToken}", Received: "${token}"`);
     res.status(403).send('Forbidden');
   } catch (error) {
-    console.error('[Webhook] Verification error:', error);
+    console.error('[Webhook Verification] Handshake error:', error);
     res.status(403).send('Error');
   }
 };
@@ -235,26 +239,32 @@ export const verifyMetaWebhook = async (req: Request, res: Response): Promise<vo
 // POST /api/v1/webhooks/meta — Receive Meta Lead Events
 // ═══════════════════════════════════════════════════════════════════════
 export const receiveMetaWebhook = async (req: Request, res: Response): Promise<void> => {
+  console.log('[Webhook Received] Meta Webhook Event received.');
+  
   // ⚠️ ALWAYS respond 200 immediately — Meta retries if it doesn't get 200
   res.status(200).json({ received: true });
 
-  const rawBody = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : JSON.stringify(req.body);
-  const body: MetaWebhookPayload = typeof req.body === 'object' && !Buffer.isBuffer(req.body)
-    ? req.body
-    : JSON.parse(rawBody);
+  try {
+    const rawBody = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : JSON.stringify(req.body);
+    console.log('[Webhook Received] Raw Payload String:', rawBody);
+    
+    const body: MetaWebhookPayload = typeof req.body === 'object' && !Buffer.isBuffer(req.body)
+      ? req.body
+      : JSON.parse(rawBody);
 
-  // Process asynchronously — do NOT await here
-  processMetaWebhookAsync(body).catch(err => {
-    console.error('[Webhook] Async processing fatal error:', err);
-  });
+    // Process asynchronously — do NOT await here
+    processMetaWebhookAsync(body).catch(err => {
+      console.error('[Webhook] Async processing fatal error:', err);
+    });
+  } catch (err: any) {
+    console.error('[Webhook Received] Error parsing payload:', err.message);
+  }
 };
 
 // ═══════════════════════════════════════════════════════════════════════
 // GET /api/v1/webhooks/instagram / POST /api/v1/webhooks/instagram
 // ═══════════════════════════════════════════════════════════════════════
 export const receiveInstagramWebhook = async (req: Request, res: Response): Promise<void> => {
-  // Instagram webhook payload is structurally identical to Facebook Page Webhook payload.
-  // We can delegate to receiveMetaWebhook.
   await receiveMetaWebhook(req, res);
 };
 
@@ -262,14 +272,21 @@ export const receiveInstagramWebhook = async (req: Request, res: Response): Prom
 // Async Lead Processing Pipeline
 // ═══════════════════════════════════════════════════════════════════════
 async function processMetaWebhookAsync(body: MetaWebhookPayload): Promise<void> {
-  if (!body || body.object !== 'page') return;
+  if (!body || body.object !== 'page') {
+    console.log('[Webhook Async] Event object is not "page", skipping.');
+    return;
+  }
 
   for (const entry of body.entry || []) {
     for (const change of entry.changes || []) {
-      if (change.field !== 'leadgen') continue;
+      if (change.field !== 'leadgen') {
+        console.log(`[Webhook Async] Skipping non-leadgen field: ${change.field}`);
+        continue;
+      }
 
       const value = change.value;
       const { leadgen_id, form_id, page_id } = value;
+      console.log(`[Webhook Async] Processing event. Leadgen ID: ${leadgen_id}, Form ID: ${form_id}, Page ID: ${page_id}`);
 
       // Log the incoming event immediately
       const logId = await logWebhook({
@@ -285,7 +302,7 @@ async function processMetaWebhookAsync(body: MetaWebhookPayload): Promise<void> 
         // Check if specific form filter is configured
         const formAllowed = await isFormAllowed(form_id);
         if (!formAllowed) {
-          console.log(`[Webhook] Form ${form_id} not in allowed list — skipping.`);
+          console.log(`[Webhook Async] Form ${form_id} not in allowed list — skipping.`);
           await updateWebhookLog(logId, 'skipped_form_filter');
           continue;
         }
@@ -295,23 +312,27 @@ async function processMetaWebhookAsync(body: MetaWebhookPayload): Promise<void> 
         const igEnabled  = await getSetting('META_IG_LEADS_ENABLED');
 
         // Fetch from Meta Graph API
+        console.log(`[Webhook Async] Fetching fields from Meta Graph API for leadgen ID: ${leadgen_id}`);
         const graphData = await fetchMetaLeadFromGraph(leadgen_id);
         if (!graphData) {
+          console.error(`[Webhook Async] Failed to fetch fields for leadgen ${leadgen_id}. Graph API returned null.`);
           await updateWebhookLog(logId, 'failed', undefined, 'Meta Graph API returned null');
           continue;
         }
+        console.log('[Webhook Async] Meta Graph Response Data:', JSON.stringify(graphData));
 
         // Normalize
         const lead = normalizeMetaLead(graphData, value);
+        console.log('[Webhook Async] Normalized Lead Data:', JSON.stringify(lead));
 
         // Source check (after we know if it's FB or IG)
         if (lead.source === 'facebook' && fbEnabled !== 'true') {
-          console.log('[Webhook] Facebook leads disabled in settings — skipping.');
+          console.log('[Webhook Async] Facebook leads disabled in settings — skipping.');
           await updateWebhookLog(logId, 'skipped_disabled');
           continue;
         }
         if (lead.source === 'instagram' && igEnabled !== 'true') {
-          console.log('[Webhook] Instagram leads disabled in settings — skipping.');
+          console.log('[Webhook Async] Instagram leads disabled in settings — skipping.');
           await updateWebhookLog(logId, 'skipped_disabled');
           continue;
         }
@@ -319,13 +340,16 @@ async function processMetaWebhookAsync(body: MetaWebhookPayload): Promise<void> 
         // Duplicate check
         const isDuplicate = await checkDuplicateLead(lead.phone, leadgen_id);
         if (isDuplicate) {
+          console.log(`[Webhook Async] Lead ${leadgen_id} is a duplicate, skipping insertion.`);
           await updateWebhookLog(logId, 'duplicate');
           continue;
         }
 
         // Create lead in CRM
+        console.log('[Webhook Async] Inserting lead into GOC CRM database...');
         const newLeadId = await createMetaLeadInCRM(lead);
         if (!newLeadId) {
+          console.error('[Webhook Async] Lead insertion failed. No ID returned.');
           await updateWebhookLog(logId, 'failed', undefined, 'DB insert returned no ID');
           continue;
         }
@@ -335,12 +359,12 @@ async function processMetaWebhookAsync(body: MetaWebhookPayload): Promise<void> 
 
         // Fire notifications and WhatsApp (non-blocking)
         fireLeadNotifications(lead, newLeadId).catch(err =>
-          console.error('[Webhook] Notification error (non-blocking):', err)
+          console.error('[Webhook Async] Notification error (non-blocking):', err)
         );
 
       } catch (err: any) {
         const errMsg = err?.message || 'Unknown processing error';
-        console.error(`[Webhook] Processing error for leadgen ${leadgen_id}:`, errMsg);
+        console.error(`[Webhook Async] Processing error for leadgen ${leadgen_id}:`, errMsg);
         await updateWebhookLog(logId, 'failed', undefined, errMsg);
       }
     }
@@ -357,7 +381,7 @@ async function checkDuplicateLead(phone: string, leadgenId: string): Promise<boo
     [leadgenId]
   );
   if (byId.length > 0) {
-    console.log(`[Webhook] Duplicate by fb_lead_id: ${leadgenId} → lead #${byId[0].id}`);
+    console.log(`[Duplicate Check] Duplicate by fb_lead_id: ${leadgenId} → lead #${byId[0].id}`);
     await pool.query(
       `INSERT INTO lead_activity_log (lead_id, staff_id, action, notes)
        VALUES (?, NULL, 'meta_duplicate', ?)`,
@@ -373,7 +397,7 @@ async function checkDuplicateLead(phone: string, leadgenId: string): Promise<boo
       [phone]
     );
     if (byPhone.length > 0) {
-      console.log(`[Webhook] Lead with phone ${phone} already exists — adding activity.`);
+      console.log(`[Duplicate Check] Lead with phone ${phone} already exists — adding activity.`);
       await pool.query(
         `INSERT INTO lead_activity_log (lead_id, staff_id, action, notes)
          VALUES (?, NULL, 'meta_duplicate_phone', ?)`,
@@ -429,7 +453,7 @@ async function createMetaLeadInCRM(lead: NormalizedMetaLead): Promise<number | n
     );
 
     const newLeadId = result.insertId;
-    console.log(`[Webhook] ✅ Created lead #${newLeadId} (${leadCode}) from Meta: ${lead.fullName}`);
+    console.log(`[CRM Insert] Created lead #${newLeadId} (${leadCode}) from Meta: ${lead.fullName}`);
 
     // Lead activity log
     await pool.query(
@@ -475,7 +499,7 @@ async function fireLeadNotifications(
       'lead',
       leadId
     );
-    console.log(`[Webhook] In-app notification sent for lead #${leadId}`);
+    console.log(`[Notification] In-app notification sent for lead #${leadId}`);
   } catch (err) {
     console.error('[Webhook] Notification error (non-blocking):', err);
   }
@@ -494,6 +518,7 @@ async function fireLeadNotifications(
         referenceType: 'lead',
         referenceId: leadId,
       });
+      console.log(`[Notification] Staff alert dispatched to ID: ${staffId}`);
     }
   } catch (err) {
     console.error('[Webhook] Staff assignment notification error:', err);
@@ -503,7 +528,7 @@ async function fireLeadNotifications(
   if (lead.phone && lead.phone.length === 10) {
     try {
       await WhatsAppTemplates.leadWelcome(lead.phone, lead.fullName);
-      console.log(`[Webhook] WhatsApp welcome sent to ${lead.phone} (${lead.fullName})`);
+      console.log(`[WhatsApp] Welcome message sent successfully to: ${lead.phone}`);
     } catch (err) {
       console.error('[Webhook] WhatsApp error (non-blocking):', err);
     }
@@ -610,7 +635,7 @@ export const receiveWhatsAppWebhook = async (req: Request, res: Response): Promi
 };
 
 // ═══════════════════════════════════════════════════════════════════════
-// GET /api/v1/webhooks/status — Configuration Status Check
+// GET /api/v1/webhooks/status — Configuration Status Check (PUBLIC)
 // ═══════════════════════════════════════════════════════════════════════
 export const getWebhookStatus = async (_req: Request, res: Response): Promise<void> => {
   try {
@@ -647,11 +672,19 @@ export const getWebhookStatus = async (_req: Request, res: Response): Promise<vo
        FROM webhook_logs WHERE source='meta'`
     );
 
+    const webhookConfigured = !!(token && verifyToken);
+    const leadSyncEnabled = fbEnabled === 'true' || igEnabled === 'true';
+    const verifyTokenConfigured = !!verifyToken;
+
     res.json({
       success: true,
+      webhookConfigured,
+      metaWebhookPublic: true,
+      leadSyncEnabled,
+      verifyTokenConfigured,
       data: {
         configs,
-        webhookConfigured: !!(token && verifyToken),
+        webhookConfigured,
         pageConnected: !!token,
         facebookLeadSyncEnabled: fbEnabled === 'true',
         instagramLeadSyncEnabled: igEnabled === 'true',
@@ -698,22 +731,13 @@ export const updateWebhookConfig = async (req: Request, res: Response): Promise<
 };
 
 // ═══════════════════════════════════════════════════════════════════════
-// GET /api/v1/webhooks/events
+// GET /api/v1/webhooks/events — Debugging Endpoint (Latest 50 events, PUBLIC)
 // ═══════════════════════════════════════════════════════════════════════
 export const getWebhookEvents = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { platform, page = 1, limit = 20 } = req.query as any;
-    const offset = (Number(page) - 1) * Number(limit);
-    const conditions = platform ? `WHERE platform = '${platform}'` : '';
-
     const [events] = await pool.query<RowDataPacket[]>(
-      `SELECT id, platform, event_id, processed, lead_id_created, error_message, received_at, processed_at
-       FROM webhook_events ${conditions}
-       ORDER BY received_at DESC
-       LIMIT ? OFFSET ?`,
-      [Number(limit), offset]
+      `SELECT * FROM webhook_logs ORDER BY id DESC LIMIT 50`
     );
-
     res.json({ success: true, data: events });
   } catch (error) {
     res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: 'Failed to fetch events' } });
@@ -721,7 +745,7 @@ export const getWebhookEvents = async (req: Request, res: Response): Promise<voi
 };
 
 // ═══════════════════════════════════════════════════════════════════════
-// GET /api/v1/webhooks/logs — Webhook Event Logs
+// GET /api/v1/webhooks/logs — Webhook Event Logs (Protected list query)
 // ═══════════════════════════════════════════════════════════════════════
 export const getWebhookLogs = async (req: Request, res: Response): Promise<void> => {
   try {

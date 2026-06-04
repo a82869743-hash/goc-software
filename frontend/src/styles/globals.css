@@ -197,10 +197,10 @@ html:not(.dark) .bg-black\/80,
 html:not(.dark) .bg-black\/85,
 html:not(.dark) .bg-black\/90,
 html:not(.dark) .bg-black\/95,
-html:not(.dark) [class*="fixed"][class*="bg-black/"],
-html:not(.dark) [class*="fixed"][class*="bg-[#"],
-html:not(.dark) [class*="absolute"][class*="bg-black/70"],
-html:not(.dark) [class*="absolute"][class*="bg-black/80"] {
+html:not(.dark) [class*="fixed"][class*="bg-black/"]:not(nav):not(header),
+html:not(.dark) [class*="fixed"][class*="bg-[#"]:not(nav):not(header),
+html:not(.dark) [class*="absolute"][class*="bg-black/70"]:not(nav):not(header),
+html:not(.dark) [class*="absolute"][class*="bg-black/80"]:not(nav):not(header) {
   background: rgba(0, 0, 0, 0.6) !important;
   background-color: rgba(0, 0, 0, 0.6) !important;
   border-color: transparent !important;
@@ -267,11 +267,19 @@ html.dark .input-obsidian {
 
 /* ── Sidebar and Topbar Light Mode Overrides ── */
 html:not(.dark) nav,
-html:not(.dark) header {
+html:not(.dark) header,
+html:not(.dark) nav[class*="fixed"],
+html:not(.dark) header[class*="fixed"],
+html:not(.dark) nav[class*="bg-black/"],
+html:not(.dark) header[class*="bg-black/"] {
   background-color: #ffffff !important;
   background: #ffffff !important;
   border-color: rgba(0, 0, 0, 0.08) !important;
   box-shadow: none !important;
+  --tw-shadow: none !important;
+  --tw-shadow-colored: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 /* Override sub-elements inside navbar and sidebar in light mode to keep them pure white */

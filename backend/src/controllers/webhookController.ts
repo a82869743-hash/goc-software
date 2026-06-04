@@ -252,6 +252,18 @@ export const receiveMetaWebhook = async (req: Request, res: Response): Promise<v
       ? req.body
       : JSON.parse(rawBody);
 
+    // Immediate Logging of Page ID, Form ID, Leadgen ID, and Timestamp
+    if (body && body.entry) {
+      for (const entry of body.entry) {
+        for (const change of entry.changes || []) {
+          if (change.field === 'leadgen' && change.value) {
+            const { page_id, form_id, leadgen_id } = change.value;
+            console.log(`[Webhook Event Details] Page ID: ${page_id || 'N/A'}, Form ID: ${form_id || 'N/A'}, Leadgen ID: ${leadgen_id || 'N/A'}, Timestamp: ${new Date().toISOString()}`);
+          }
+        }
+      }
+    }
+
     // Process asynchronously — do NOT await here
     processMetaWebhookAsync(body).catch(err => {
       console.error('[Webhook] Async processing fatal error:', err);

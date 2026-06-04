@@ -83,35 +83,35 @@
 /* ── Light Mode UI/UX Theme Overrides ── */
 html:not(.dark) {
   --bg-color-background: #ffffff;
-  --bg-color-on-background: #0a0a0a;
+  --bg-color-on-background: #050505;
   
-  --bg-color-surface: #f6f6f8;
-  --bg-color-surface-dim: #efefef;
+  --bg-color-surface: #ffffff;
+  --bg-color-surface-dim: #ffffff;
   --bg-color-surface-bright: #ffffff;
   
   --bg-color-surface-container-lowest: #ffffff;
-  --bg-color-surface-container-low: #f3f3f5;
-  --bg-color-surface-container: #ebebeb;
-  --bg-color-surface-container-high: #e1e1e4;
-  --bg-color-surface-container-highest: #d7d7da;
-  --bg-color-surface-variant: #e0e0e0;
+  --bg-color-surface-container-low: #ffffff;
+  --bg-color-surface-container: #ffffff;
+  --bg-color-surface-container-high: #ffffff;
+  --bg-color-surface-container-highest: #ffffff;
+  --bg-color-surface-variant: #ffffff;
   
-  --bg-color-on-surface: #0e0e0e;
+  --bg-color-on-surface: #050505;
   --bg-color-on-surface-variant: #930100;
   
   --bg-color-tertiary: #555555;
   --bg-color-tertiary-container: #888888;
   
-  --bg-color-outline: rgba(0, 0, 0, 0.1);
-  --bg-color-inverse-surface: #121414;
-  --bg-color-inverse-on-surface: #e2e2e2;
+  --bg-color-outline: rgba(0, 0, 0, 0.08);
+  --bg-color-inverse-surface: #050505;
+  --bg-color-inverse-on-surface: #ffffff;
   
-  --bg-obsidian-panel: rgba(245, 245, 247, 0.7);
+  --bg-obsidian-panel: #ffffff;
   --bg-carbon-border: rgba(0, 0, 0, 0.08);
-  --bg-glass-panel: rgba(250, 250, 252, 0.75);
-  --bg-deep-glass: rgba(240, 240, 242, 0.85);
+  --bg-glass-panel: #ffffff;
+  --bg-deep-glass: #ffffff;
   
-  --bg-input-glass: rgba(0, 0, 0, 0.02);
+  --bg-input-glass: #f3f3f5;
   --bg-input-glass-border: rgba(0, 0, 0, 0.12);
   
   --scroll-track: #f7f7f7;
@@ -210,26 +210,36 @@ html:not(.dark) [class*="absolute"][class*="bg-black/80"] {
 html:not(.dark) input,
 html:not(.dark) textarea,
 html:not(.dark) select,
-html:not(.dark) option,
-html:not(.dark) select option,
 html:not(.dark) .input-glass,
 html:not(.dark) .input-obsidian,
 html:not(.dark) [class*="input"],
-html:not(.dark) [class*="select"] {
-  background: #ffffff !important;
+html:not(.dark) [class*="select"],
+html:not(.dark) .goc-input {
+  background-color: #f3f3f5 !important;
+  background: #f3f3f5 !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  color: #050505 !important;
+  transition: all 0.2s ease-in-out;
+}
+
+html:not(.dark) option,
+html:not(.dark) select option {
   background-color: #ffffff !important;
-  border-color: rgba(0, 0, 0, 0.18) !important;
-  color: #0a0a0a !important;
+  background: #ffffff !important;
+  color: #050505 !important;
 }
 
 html:not(.dark) input:focus,
 html:not(.dark) textarea:focus,
 html:not(.dark) select:focus,
 html:not(.dark) .input-glass:focus,
-html:not(.dark) .input-obsidian:focus {
-  border-color: #FF2B2B !important;
+html:not(.dark) .input-obsidian:focus,
+html:not(.dark) .goc-input:focus {
+  background-color: #ffffff !important;
   background: #ffffff !important;
-  box-shadow: 0 0 0 2px rgba(255, 43, 43, 0.2) !important;
+  border-color: #FF2B2B !important;
+  box-shadow: 0 0 0 2px rgba(255, 43, 43, 0.15) !important;
+  outline: none !important;
 }
 
 html:not(.dark) input::placeholder,
@@ -258,8 +268,33 @@ html.dark .input-obsidian {
 /* ── Sidebar and Topbar Light Mode Overrides ── */
 html:not(.dark) nav,
 html:not(.dark) header {
-  background-color: rgba(246, 246, 248, 0.92) !important;
+  background-color: #ffffff !important;
+  background: #ffffff !important;
   border-color: rgba(0, 0, 0, 0.08) !important;
+  box-shadow: none !important;
+}
+
+/* Override sub-elements inside navbar and sidebar in light mode to keep them pure white */
+html:not(.dark) nav [class*="bg-black/"]:not(input):not(select),
+html:not(.dark) nav [class*="bg-white/"]:not(input):not(select),
+html:not(.dark) header [class*="bg-black/"]:not(input):not(select),
+html:not(.dark) header [class*="bg-white/"]:not(input):not(select) {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* Ensure primary action text remains white when nested under buttons */
+html:not(.dark) .btn-primary,
+html:not(.dark) .btn-primary *,
+html:not(.dark) .goc-btn--primary,
+html:not(.dark) .goc-btn--primary *,
+html:not(.dark) .goc-btn--danger,
+html:not(.dark) .goc-btn--danger *,
+html:not(.dark) .goc-btn--success,
+html:not(.dark) .goc-btn--success *,
+html:not(.dark) .performance-gradient,
+html:not(.dark) .performance-gradient * {
+  color: #ffffff !important;
 }
 
 /* ── White Text Conversion in Light Mode ── */
@@ -441,6 +476,19 @@ html:not(.dark) .kanban-col {
   --color-surface-container-highest: var(--bg-color-surface-container-highest);
   --color-surface-variant: var(--bg-color-surface-variant);
   --color-surface-tint: #FF2B2B;
+
+  /* Stitch Custom Design System Token Mapping */
+  --color-surface-2: var(--bg-color-surface-container);
+  --color-border: var(--bg-color-outline);
+  --color-border-medium: var(--bg-color-outline);
+  --color-border-strong: var(--bg-color-outline);
+  --color-text: var(--bg-color-on-background);
+  --color-text-muted: var(--bg-color-on-surface-variant);
+  --color-text-inverse: var(--bg-color-on-background);
+  --color-text-dim: var(--bg-color-tertiary);
+  --color-text-white: #ffffff;
+  --color-primary-dark: #930100;
+  --color-success: #10b981;
 
   --color-on-surface: var(--bg-color-on-surface);
   --color-on-surface-variant: var(--bg-color-on-surface-variant);

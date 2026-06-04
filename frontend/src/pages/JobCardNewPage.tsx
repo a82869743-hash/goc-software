@@ -5,6 +5,7 @@ import { customersAPI, vehiclesAPI } from '../api/customers';
 import { jobsAPI } from '../api/jobs';
 import type { Customer, Vehicle } from '../types';
 import toast from 'react-hot-toast';
+import { carDataset, basicColors } from '../utils/carDataset';
 
 const STEPS = [
   { id: 1, label: 'Customer & Vehicle', icon: 'person' },
@@ -38,6 +39,13 @@ export default function JobCardNewPage() {
     model: '',
     color: '',
   });
+
+  const selectedBrandData = carDataset.find(
+    item => item.brand.toLowerCase() === detailsForm.make.toLowerCase()
+  );
+  const modelSuggestions = selectedBrandData 
+    ? selectedBrandData.models 
+    : Array.from(new Set(carDataset.flatMap(item => item.models))).sort();
 
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
@@ -308,6 +316,7 @@ export default function JobCardNewPage() {
                 <input
                   type="text"
                   required
+                  list="brands-datalist"
                   placeholder="e.g. Maruti Suzuki"
                   value={detailsForm.make}
                   onChange={e => setDetailsForm(prev => ({ ...prev, make: e.target.value }))}
@@ -320,6 +329,7 @@ export default function JobCardNewPage() {
                 <input
                   type="text"
                   required
+                  list="models-datalist"
                   placeholder="e.g. Swift"
                   value={detailsForm.model}
                   onChange={e => setDetailsForm(prev => ({ ...prev, model: e.target.value }))}
@@ -331,6 +341,7 @@ export default function JobCardNewPage() {
                 <label className="font-label-caps text-[9px] text-on-surface-variant/50 tracking-widest block mb-1">Color</label>
                 <input
                   type="text"
+                  list="colors-datalist"
                   placeholder="e.g. Red"
                   value={detailsForm.color}
                   onChange={e => setDetailsForm(prev => ({ ...prev, color: e.target.value }))}
@@ -604,6 +615,25 @@ export default function JobCardNewPage() {
           </button>
         )}
       </div>
+
+      {/* Autocomplete Datalists */}
+      <datalist id="brands-datalist">
+        {carDataset.map(item => (
+          <option key={item.brand} value={item.brand} />
+        ))}
+      </datalist>
+
+      <datalist id="models-datalist">
+        {modelSuggestions.map(model => (
+          <option key={model} value={model} />
+        ))}
+      </datalist>
+
+      <datalist id="colors-datalist">
+        {basicColors.map(color => (
+          <option key={color} value={color} />
+        ))}
+      </datalist>
     </div>
   );
 }

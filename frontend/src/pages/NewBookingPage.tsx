@@ -5,6 +5,7 @@ import { customersAPI, vehiclesAPI } from '../api/customers';
 import { bookingsAPI } from '../api/bookings';
 import type { LeadSource, Customer, Vehicle, TimeSlot, PackageTier, PaymentMode } from '../types';
 import toast from 'react-hot-toast';
+import { carDataset, basicColors } from '../utils/carDataset';
 
 export default function NewBookingPage() {
   const navigate = useNavigate();
@@ -35,6 +36,13 @@ export default function NewBookingPage() {
     reg_number: '',
     is_primary: true,
   });
+
+  const selectedBrandDataBooking = carDataset.find(
+    item => item.brand.toLowerCase() === vehForm.make.toLowerCase()
+  );
+  const modelSuggestionsBooking = selectedBrandDataBooking 
+    ? selectedBrandDataBooking.models 
+    : Array.from(new Set(carDataset.flatMap(item => item.models))).sort();
 
   // Selected vehicle state
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
@@ -297,23 +305,46 @@ export default function NewBookingPage() {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-[10px] text-gray-500 mb-1">Make *</label>
-                        <input type="text" placeholder="e.g. Porsche, BMW" value={vehForm.make} onChange={(e) => setVehForm({ ...vehForm, make: e.target.value })}
-                          className="w-full bg-white/[0.03] border border-white/10 rounded px-2.5 py-1.5 text-xs text-white placeholder-gray-700 focus:outline-none focus:border-[#CC0000]/40" />
+                        <input
+                          type="text"
+                          list="brands-datalist-booking"
+                          placeholder="e.g. Porsche, BMW"
+                          value={vehForm.make}
+                          onChange={(e) => setVehForm({ ...vehForm, make: e.target.value })}
+                          className="w-full bg-white/[0.03] border border-white/10 rounded px-2.5 py-1.5 text-xs text-white placeholder-gray-700 focus:outline-none focus:border-[#CC0000]/40"
+                        />
                       </div>
                       <div>
                         <label className="block text-[10px] text-gray-500 mb-1">Model *</label>
-                        <input type="text" placeholder="e.g. 911 GT3, Swift" value={vehForm.model} onChange={(e) => setVehForm({ ...vehForm, model: e.target.value })}
-                          className="w-full bg-white/[0.03] border border-white/10 rounded px-2.5 py-1.5 text-xs text-white placeholder-gray-700 focus:outline-none focus:border-[#CC0000]/40" />
+                        <input
+                          type="text"
+                          list="models-datalist-booking"
+                          placeholder="e.g. 911 GT3, Swift"
+                          value={vehForm.model}
+                          onChange={(e) => setVehForm({ ...vehForm, model: e.target.value })}
+                          className="w-full bg-white/[0.03] border border-white/10 rounded px-2.5 py-1.5 text-xs text-white placeholder-gray-700 focus:outline-none focus:border-[#CC0000]/40"
+                        />
                       </div>
                       <div>
                         <label className="block text-[10px] text-gray-500 mb-1">Reg Plate *</label>
-                        <input type="text" placeholder="e.g. GJ-06-XX-XXXX" value={vehForm.reg_number} onChange={(e) => setVehForm({ ...vehForm, reg_number: e.target.value.toUpperCase() })}
-                          className="w-full bg-white/[0.03] border border-white/10 rounded px-2.5 py-1.5 text-xs text-white placeholder-gray-700 focus:outline-none focus:border-[#CC0000]/40" />
+                        <input
+                          type="text"
+                          placeholder="e.g. GJ-06-XX-XXXX"
+                          value={vehForm.reg_number}
+                          onChange={(e) => setVehForm({ ...vehForm, reg_number: e.target.value.toUpperCase() })}
+                          className="w-full bg-white/[0.03] border border-white/10 rounded px-2.5 py-1.5 text-xs text-white placeholder-gray-700 focus:outline-none focus:border-[#CC0000]/40"
+                        />
                       </div>
                       <div>
                         <label className="block text-[10px] text-gray-500 mb-1">Color</label>
-                        <input type="text" placeholder="e.g. Black" value={vehForm.color} onChange={(e) => setVehForm({ ...vehForm, color: e.target.value })}
-                          className="w-full bg-white/[0.03] border border-white/10 rounded px-2.5 py-1.5 text-xs text-white placeholder-gray-700 focus:outline-none focus:border-[#CC0000]/40" />
+                        <input
+                          type="text"
+                          list="colors-datalist-booking"
+                          placeholder="e.g. Black"
+                          value={vehForm.color}
+                          onChange={(e) => setVehForm({ ...vehForm, color: e.target.value })}
+                          className="w-full bg-white/[0.03] border border-white/10 rounded px-2.5 py-1.5 text-xs text-white placeholder-gray-700 focus:outline-none focus:border-[#CC0000]/40"
+                        />
                       </div>
                     </div>
                     <div className="flex justify-end gap-2 border-t border-white/5 pt-2.5 mt-1">
@@ -574,6 +605,25 @@ export default function NewBookingPage() {
           </div>
         </aside>
       </div>
+
+      {/* Autocomplete Datalists */}
+      <datalist id="brands-datalist-booking">
+        {carDataset.map(item => (
+          <option key={item.brand} value={item.brand} />
+        ))}
+      </datalist>
+
+      <datalist id="models-datalist-booking">
+        {modelSuggestionsBooking.map(model => (
+          <option key={model} value={model} />
+        ))}
+      </datalist>
+
+      <datalist id="colors-datalist-booking">
+        {basicColors.map(color => (
+          <option key={color} value={color} />
+        ))}
+      </datalist>
     </main>
   );
 }

@@ -5,6 +5,7 @@ import { jobsAPI } from '../api/jobs';
 import { customersAPI } from '../api/customers';
 import toast from 'react-hot-toast';
 import JobCardMediaSection from '../components/ui/JobCardMediaSection';
+import { carDataset } from '../utils/carDataset';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string; dot: string }> = {
   scheduled: { label: 'Scheduled', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20', dot: 'bg-blue-400' },
@@ -58,6 +59,13 @@ export default function QuickJobCards() {
     km_reading: '',
     notes: '',
   });
+
+  const selectedBrandDataQuick = carDataset.find(
+    item => item.brand.toLowerCase() === createForm.car_make.toLowerCase()
+  );
+  const modelSuggestionsQuick = selectedBrandDataQuick 
+    ? selectedBrandDataQuick.models 
+    : Array.from(new Set(carDataset.flatMap(item => item.models))).sort();
 
   const [wizardConcerns, setWizardConcerns] = useState<string[]>([]);
   const [wizardCustomConcern, setWizardCustomConcern] = useState('');
@@ -851,6 +859,7 @@ export default function QuickJobCards() {
                     <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-bold mb-1.5">Car Brand / Make</label>
                     <input
                       type="text"
+                      list="brands-datalist-quick"
                       placeholder="e.g. Hyundai"
                       value={createForm.car_make}
                       onChange={(e) => setCreateForm(prev => ({ ...prev, car_make: e.target.value }))}
@@ -861,6 +870,7 @@ export default function QuickJobCards() {
                     <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-bold mb-1.5">Car Model</label>
                     <input
                       type="text"
+                      list="models-datalist-quick"
                       placeholder="e.g. Creta"
                       value={createForm.car_model}
                       onChange={(e) => setCreateForm(prev => ({ ...prev, car_model: e.target.value }))}
@@ -1205,6 +1215,19 @@ export default function QuickJobCards() {
           </div>
         </div>
       )}
+
+      {/* Autocomplete Datalists */}
+      <datalist id="brands-datalist-quick">
+        {carDataset.map(item => (
+          <option key={item.brand} value={item.brand} />
+        ))}
+      </datalist>
+
+      <datalist id="models-datalist-quick">
+        {modelSuggestionsQuick.map(model => (
+          <option key={model} value={model} />
+        ))}
+      </datalist>
     </div>
   );
 }

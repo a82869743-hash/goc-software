@@ -145,7 +145,22 @@ export const validateMetaConnection = async (req: Request, res: Response): Promi
       hasLeadsRetrieval = perms.some((p: any) => p.permission === 'leads_retrieval' && p.status === 'granted');
       hasPagesRead = perms.some((p: any) => p.permission === 'pages_read_engagement' && p.status === 'granted');
     } catch (err: any) {
-      console.error('[Validate] Failed to fetch permissions:', err.message);
+      console.log('[Validate] Failed to fetch permissions on /me/permissions, trying /debug_token fallback...');
+      if (settings?.appId && settings?.appSecret) {
+        try {
+          const debugRes = await axios.get(`https://graph.facebook.com/v23.0/debug_token`, {
+            params: {
+              input_token: token,
+              access_token: `${settings.appId}|${settings.appSecret}`
+            }
+          });
+          const scopes = debugRes.data?.data?.scopes || [];
+          hasLeadsRetrieval = scopes.includes('leads_retrieval');
+          hasPagesRead = scopes.includes('pages_read_engagement');
+        } catch (debugErr: any) {
+          console.error('[Validate] Debug token fallback failed:', debugErr.message);
+        }
+      }
     }
 
     // 3. Check page subscription via /{page_id}/subscribed_apps
@@ -262,7 +277,33 @@ export const runMetaTest = async (req: Request, res: Response): Promise<void> =>
         logs.push(`⚠️ Missing permissions. leads_retrieval: ${hasLeadsRetrieval ? '✅' : '❌'}, pages_read_engagement: ${hasPagesRead ? '✅' : '❌'}`);
       }
     } catch (err: any) {
-      logs.push(`❌ Failed to verify permissions: ${err.message}`);
+      logs.push(`⚠️ Failed to verify permissions on /me/permissions (${err.message}). Trying /debug_token fallback...`);
+      if (settings?.appId && settings?.appSecret) {
+        try {
+          const debugRes = await axios.get(`https://graph.facebook.com/v23.0/debug_token`, {
+            params: {
+              input_token: token,
+              access_token: `${settings.appId}|${settings.appSecret}`
+            }
+          });
+          const scopes = debugRes.data?.data?.scopes || [];
+          scopes.forEach((s: string) => {
+            permMap[s] = true;
+          });
+          hasLeadsRetrieval = permMap['leads_retrieval'] === true;
+          hasPagesRead = permMap['pages_read_engagement'] === true;
+          logs.push(`🔍 Granted Permissions (via debug_token): ${scopes.join(', ')}`);
+          if (hasLeadsRetrieval && hasPagesRead) {
+            logs.push('✅ Required permissions (leads_retrieval, pages_read_engagement) are present.');
+          } else {
+            logs.push(`⚠️ Missing permissions. leads_retrieval: ${hasLeadsRetrieval ? '✅' : '❌'}, pages_read_engagement: ${hasPagesRead ? '✅' : '❌'}`);
+          }
+        } catch (debugErr: any) {
+          logs.push(`❌ Debug token fallback failed: ${debugErr.message}`);
+        }
+      } else {
+        logs.push(`❌ Failed to run debug fallback: App ID or Secret not configured.`);
+      }
     }
 
     // 3. Verify Page Subscription

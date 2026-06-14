@@ -30,6 +30,14 @@ const pool = mysql.createPool({
   dateStrings: true,
 });
 
+pool.on('connection', (connection) => {
+  (connection as any).query("SET time_zone = '+05:30'", (err: any) => {
+    if (err) {
+      console.error('❌ Failed to set session timezone on connection:', err);
+    }
+  });
+});
+
 // Test connection on startup
 pool.getConnection()
   .then(async (conn) => {

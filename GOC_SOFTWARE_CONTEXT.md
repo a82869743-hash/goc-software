@@ -1,6 +1,6 @@
 # GOC SOFTWARE CONTEXT — GOD OF CERAMIC STUDIO MANAGEMENT SYSTEM v2.0
 
-> **Last Updated:** June 2026
+> **Last Updated:** 5 June 2026
 > **Purpose:** Single-source-of-truth context document for any AI agent working on this codebase.
 > **Location:** Vadodara, Gujarat, India | Business: God of Ceramic (Car PPF, Ceramic Coating, Detailing Studio)
 
@@ -27,6 +27,8 @@
 17. [Known Constraints & Gotchas](#17-known-constraints--gotchas)
 18. [Login & Test Credentials](#18-login--test-credentials)
 19. [How to Run](#19-how-to-run)
+20. [Meta Lead Ads Integration (Complete Reference)](#20-meta-lead-ads-integration-complete-reference)
+21. [SMS Integration Reference](#21-sms-integration-reference)
 
 ---
 
@@ -40,10 +42,11 @@
 - **Polish/Detailing** — various correction levels + interior/exterior detailing
 - **Quick Wash/Service** — walk-in services with simplified flow
 
-### Three Core Workflows
+### Four Core Workflows
 1. **Advance Booking** → Customer books in advance → arrives → Job Card created
 2. **Job Card Creating** → Walk-in or booked customer → Full job card with services, status tracking, invoicing
 3. **Quick Service/Wash** → Express walk-in → Simplified quick job card → Fast invoice/estimate
+4. **Lead Capture Automation** → Facebook/Instagram Lead Ads and inbound WhatsApp messages automatically create leads in the CRM pipeline without manual entry
 
 ---
 
@@ -62,6 +65,7 @@
 | Routing | React Router DOM | 7.x |
 | Charts | Recharts | 3.x |
 | HTTP Client | Axios | 1.x |
+| Whiteboard | @tldraw/tldraw | 5.x |
 | Icons | Google Material Symbols (CDN) | — |
 | Toasts | react-hot-toast | 2.x |
 
@@ -80,6 +84,8 @@
 | File Upload | Multer | 1.x |
 | Cron | node-cron | 3.x |
 | WhatsApp | MSG91 API (via axios) | — |
+| SMS | MSG91 Flow API (via axios) | — |
+| Encryption | Node.js crypto (AES-256-CBC) | built-in |
 
 ### Database
 - **MySQL 8.x** on `127.0.0.1:3306`
@@ -95,6 +101,9 @@
 goc-studio/
 ├── .env                          # Root environment variables (shared)
 ├── package.json                  # Root (only docx dependency)
+├── GOC_SOFTWARE_CONTEXT.md       # This context document
+├── SMS_INTEGRATION_GUIDE.md      # MSG91 SMS setup guide
+├── WEBHOOK_SETUP_GUIDE.md        # Meta webhook setup guide
 │
 ├── backend/
 │   ├── package.json              # Backend dependencies
@@ -107,11 +116,13 @@ goc-studio/
 │       │   ├── migration_goc_v2.sql       # Quick job cards, advance bookings, concern presets tables
 │       │   ├── migration_jobcard_v2.sql   # Job card v2 specific migrations
 │       │   ├── migration_whiteboard_quotation.sql # Whiteboard quotation module migrations
-│       │   ├── migration_sms_v1.sql       # SMS tables & configuration settings migration
-│       │   ├── smsEvents.ts               # SMS Event Key constants & variables definition
+│       │   ├── migration_meta_integration.sql    # webhook_logs table + Meta app_settings seeds
+│       │   ├── migration_sms_v1.sql             # sms_templates, sms_queue, sms_logs + seeds
+│       │   ├── migration_staff_permissions_v1.sql # Staff permissions tables and constraints
+│       │   ├── smsEvents.ts               # SMS_EVENTS constants + SmsEventKey type + SMS_EVENT_VARIABLES
 │       │   ├── run_migration.ts
 │       │   └── run_jobcard_migration.ts
-│       ├── controllers/          # 18 controller files (business logic)
+│       ├── controllers/          # 23 controller files (business logic)
 │       │   ├── authController.ts
 │       │   ├── jobCardController.ts       # ★ CRITICAL — largest controller (31KB)
 │       │   ├── bookingController.ts
@@ -126,9 +137,12 @@ goc-studio/
 │       │   ├── reportsController.ts
 │       │   ├── settingsController.ts
 │       │   ├── staffController.ts
+│       │   ├── integrationsController.ts  # Meta integration settings, validation, test diagnostics
 │       │   ├── smsAdminController.ts      # SMS templates, stats, logs, and queue retries endpoints
+│       │   ├── staffManagementController.ts # Staff CRUD, status, password resets (admin only)
+│       │   ├── staffPermissionsController.ts # Permissions fetch and updates (admin / self)
 │       │   ├── vehicleController.ts
-│       │   ├── webhookController.ts       # Meta and MSG91 webhooks logic
+│       │   ├── webhookController.ts       # Meta & WhatsApp webhook handlers
 │       │   └── commissionController.ts
 │       ├── middleware/
 │       │   ├── auth.ts            # JWT authentication middleware
@@ -136,7 +150,7 @@ goc-studio/
 │       │   ├── upload.ts          # Multer file upload config
 │       │   └── validate.ts        # Zod validation middleware
 │       ├── models/                # (mostly empty — raw SQL queries used)
-│       ├── routes/                # 21 route files
+│       ├── routes/                # 25 route files
 │       │   ├── auth.ts
 │       │   ├── jobs.ts            # ★ CRITICAL — job card CRUD + status + services + photos + completion
 │       │   ├── quickJobCards.ts   # ★ Quick wash/service job cards (26KB)
@@ -156,26 +170,32 @@ goc-studio/
 │       │   ├── commissions.ts
 │       │   ├── dashboard.ts
 │       │   ├── notifications.ts
-│       │   ├── webhooks.ts        # Meta and Inbound WhatsApp webhook targets
-│       │   ├── smsAdmin.ts        # SMS integration configuration endpoints
+│       │   ├── integrations.ts    # /api/v1/integrations — Meta settings + validation (admin only)
+│       │   ├── smsAdmin.ts        # /api/v1/sms — SMS templates, stats, logs management
+│       │   ├── webhooks.ts        # /api/v1/webhooks — Meta webhook + WhatsApp inbound
+│       │   ├── staffManagement.ts # /api/v1/staff-management — Staff CRUD and permissions (admin/auth)
 │       │   └── vehicles.ts
 │       ├── services/
-│       │   ├── cronJobs.ts         # Scheduled tasks (booking reminders, follow-ups, and SMS worker)
+│       │   ├── cronJobs.ts         # Scheduled tasks (birthday, follow-ups, SMS worker, booking reminders)
 │       │   ├── notificationService.ts
 │       │   ├── pdfService.ts       # Puppeteer-based PDF generation (21KB)
 │       │   ├── whatsappService.ts  # MSG91 WhatsApp integration
-│       │   ├── smsQueue.ts        # Normalize & enqueue SMS notifications asynchronously
-│       │   ├── smsService.ts       # Core MSG91 Flow API integration & queue worker
-│       │   └── events/            # Folder containing event-specific helpers:
-│       │       ├── bookingEvents.ts
-│       │       ├── jobEvents.ts
-│       │       ├── invoiceEvents.ts
-│       │       ├── paymentEvents.ts
-│       │       └── marketingEvents.ts
+│       │   ├── metaLeadService.ts  # Meta Graph API calls, settings fetch, lead field normalization
+│       │   ├── smsQueue.ts         # Queue-based SMS dispatcher (insert to sms_queue, normalize phone)
+│       │   ├── smsService.ts       # Core SMS worker — reads queue, calls MSG91 Flow API, logs results
+│       │   └── events/             # SMS event trigger helpers (one file per module)
+│       │       ├── bookingEvents.ts   # smsBookingConfirmation(), smsBookingReminder()
+│       │       ├── jobEvents.ts       # smsJobCreated(), smsVehicleReady()
+│       │       ├── invoiceEvents.ts   # smsInvoiceGenerated()
+│       │       ├── paymentEvents.ts   # smsPaymentReceived()
+│       │       └── marketingEvents.ts # smsServiceFollowup30Days()
+│       ├── types/
+│       │   └── meta.ts            # TypeScript interfaces for Meta webhook payloads and responses
 │       ├── utils/
 │       │   ├── db.ts              # ★ MySQL pool + auto-migrations on startup
 │       │   ├── constants.ts       # ★ JOB_STATUS, JOB_STATUS_FLOW, all enums
 │       │   ├── codes.ts           # Sequential code generator (GOC-CUST-0001, GOC-JC-0001, etc.)
+│       │   ├── encryption.ts      # AES-256-CBC encrypt/decrypt for sensitive credentials (Meta tokens)
 │       │   └── jwt.ts             # JWT sign/verify helpers
 │       └── validations/           # 10 Zod validation schema files
 │           ├── jobCardValidation.ts
@@ -198,7 +218,7 @@ goc-studio/
 │       ├── main.tsx               # React entry — QueryClient, BrowserRouter, Toaster
 │       ├── App.tsx                # ★ All routes defined here
 │       ├── vite-env.d.ts
-│       ├── api/                   # 19 API module files
+│       ├── api/                   # 23 API module files
 │       │   ├── client.ts          # ★ Axios instance with JWT interceptor + auto-logout on 401
 │       │   ├── jobs.ts            # ★ jobsAPI — all job card API functions
 │       │   ├── quickJobs.ts
@@ -210,29 +230,27 @@ goc-studio/
 │       │   ├── invoices.ts
 │       │   ├── leads.ts
 │       │   ├── marketing.ts
-│       │   ├── sms.ts             # smsAPI for templates, stats, logs, and retries
-│       │   ├── notifications.ts
 │       │   ├── payments.ts
 │       │   ├── quotations.ts
 │       │   ├── reports.ts
 │       │   ├── settings.ts
 │       │   ├── staff.ts
-│       │   ├── webhooks.ts        # Integration settings API functions
+│       │   ├── staffManagement.ts # staffManagementAPI — Staff list, CRUD, permissions get/update
 │       │   └── commissions.ts
 │       ├── components/
 │       │   ├── layout/
-│       │   │   ├── AppShell.tsx    # Sidebar + Topbar + Outlet wrapper
-│       │   │   ├── Sidebar.tsx     # ★ Navigation — 3 main + other modules
-│       │   │   └── Topbar.tsx      # Notifications, search, profile, theme toggle
+│       │   │   ├── AppShell.tsx    # Sidebar + Topbar + Outlet wrapper (mobile responsive)
+│       │   │   ├── Sidebar.tsx     # ★ Navigation — collapsible on mobile, slide-in drawer
+│       │   │   └── Topbar.tsx      # Hamburger menu (mobile), notifications, search, profile
 │       │   ├── modules/
 │       │   └── ui/
-│       ├── pages/                 # 25 page components
+│       ├── pages/                 # 29 page components
 │       │   ├── LoginPage.tsx
 │       │   ├── DashboardPage.tsx   # KPIs, charts, job progress bars
 │       │   ├── JobCardsPage.tsx    # ★ Job card list with pipeline tabs
-│       │   ├── JobCardNewPage.tsx  # ★ Create new job card form
+│       │   ├── JobCardNewPage.tsx  # ★ 3-step wizard: Customer & Vehicle → Services → Confirm
 │       │   ├── JobCardDetailPage.tsx # ★ Job detail + status pipeline + services + complete
-│       │   ├── JobCardEditPage.tsx
+│       │   ├── JobCardEditPage.tsx  # Edit job metadata (expected_out, notes)
 │       │   ├── QuickJobCards.tsx   # ★ Quick service/wash module (66KB — largest page)
 │       │   ├── AdvanceBookings.tsx # ★ Advance booking management
 │       │   ├── LeadsPage.tsx
@@ -245,22 +263,32 @@ goc-studio/
 │       │   ├── StaffPage.tsx
 │       │   ├── ReportsPage.tsx
 │       │   ├── SettingsPage.tsx
-│       │   ├── SMSSettingsPage.tsx    # Control panel for MSG91 configuration & templates
+│       │   ├── MetaIntegrationPage.tsx  # Meta Lead Ads management panel (3 tabs: setup/settings/logs)
+│       │   ├── SMSSettingsPage.tsx    # SMS integration control panel (settings + templates + logs)
 │       │   ├── CommissionsPage.tsx
 │       │   ├── MarketingPage.tsx
 │       │   ├── PublicTrackingPage.tsx
-│       │   └── NewBookingPage.tsx
+│       │   ├── NewBookingPage.tsx
+│       │   └── admin/
+│       │       ├── StaffManagementPage.tsx  # Staff list, create modal, password resets, active toggles
+│       │       └── StaffPermissionsPage.tsx # Module level toggles + granular action permissions edit grid
 │       ├── stores/
 │       │   ├── authStore.ts       # Zustand persisted auth (token, staff, isAuthenticated)
+│       │   ├── permissionsStore.ts # Zustand persisted permissions store (permissions list, fetch, clear)
 │       │   └── uiStore.ts        # UI state (sidebar, theme)
 │       ├── styles/
 │       │   └── globals.css        # ★ Full design system (DO NOT MODIFY)
 │       ├── types/
-│       │   └── index.ts           # ★ All TypeScript interfaces (501 lines)
+│       │   └── index.ts           # ★ All TypeScript interfaces (581 lines)
 │       └── utils/
-│           └── helpers.ts         # formatINR, formatDate, getStatusConfig, calculateGST, debounce
+│           ├── helpers.ts         # formatINR, formatDate, getStatusConfig, calculateGST, debounce
+│           ├── carDataset.ts      # Full car brand/model database; exports carDataset[] + basicColors[]
+│           └── usePermissions.ts  # Custom hook to gate layout navigation and actions using perm keys
 │
 ├── database/                      # SQL seed files
+│   └── migrations/
+│       ├── 005_webhook_integrations.sql    # webhook_configs, webhook_events tables + leads table columns
+│       └── 006_meta_integration_settings.sql  # meta_integration_settings table (singleton)
 └── uploads/                       # File upload directory
 ```
 
@@ -300,7 +328,23 @@ STUDIO_GSTIN=24XXXXX1234X1ZX
 STUDIO_NAME=God of Ceramic
 STUDIO_ADDRESS=Near Akshar Chowk, Alkapuri, Vadodara, Gujarat 390007
 STUDIO_PHONE=+919999999999
+STUDIO_EMAIL=info@packwolfservices.com
+
+# ── Facebook / Instagram Lead Ads ────────────────────────────
+META_APP_ID=                    # Facebook App ID from developers.facebook.com
+META_APP_SECRET=                # App Secret (stored encrypted in DB, not used from .env directly)
+META_PAGE_ACCESS_TOKEN=         # Long-lived Page Access Token
+META_VERIFY_TOKEN=GOC_META_WEBHOOK_2024   # Webhook verification token
+
+# ── WhatsApp Inbound (MSG91) ──────────────────────────────────
+MSG91_WEBHOOK_SECRET=GOC_WA_WEBHOOK_2026_SECURE_TOKEN
+
+# ── SMS (MSG91 Flow API) ─────────────────────────────────────
+MSG91_SMS_SENDER_ID=GOCSTD      # 6-char DLT-registered Sender ID
+MSG91_SMS_FLOW_IDS={}           # JSON map of flow IDs (managed via SMSSettingsPage UI instead)
 ```
+
+**Important**: The actual Meta credentials (App Secret, Page Access Token) are stored **encrypted in the `meta_integration_settings` database table**, not read from `.env` at runtime. The `.env` values are only used as fallback/initial seed.
 
 ### Vite Dev Server
 - Port: `5173`
@@ -316,9 +360,10 @@ STUDIO_PHONE=+919999999999
 | Table | Purpose | Key Columns |
 |-------|---------|-------------|
 | `staff` | All employees, login accounts | `staff_code`, `full_name`, `phone`, `password_hash`, `role`, `status` |
+| `staff_permissions` | Granular role-based page and action permission controls for staff. | `staff_id` (foreign key to `staff(id) ON DELETE CASCADE`, unique), `perm_dashboard`, `perm_leads`, `perm_customers`, `perm_bookings`, `perm_advance_bookings`, `perm_job_cards`, `perm_quick_jobs`, `perm_quotations`, `perm_invoices`, `perm_payments`, `perm_inventory`, `perm_reports`, `perm_marketing`, `perm_commissions`, `perm_settings`, `perm_staff_management`, `perm_job_cards_edit`, `perm_job_cards_delete`, `perm_job_cards_complete`, `perm_invoices_create`, `perm_payments_record`, `perm_leads_delete`, `perm_leads_assign`, `perm_customers_delete`, `perm_inventory_edit`, `perm_reports_revenue`, `perm_reports_accounts`, `perm_reports_salary` |
 | `customers` | Customer records | `customer_code`, `full_name`, `phone`, `city`, `lead_source`, `total_revenue`, `total_visits` |
 | `vehicles` | Customer vehicles | `vehicle_code`, `customer_id`, `make`, `model`, `reg_number`, `fuel_type` |
-| `leads` | Sales leads/prospects | `lead_code`, `full_name`, `phone`, `source`, `status`, `assigned_to`, `connector_id` |
+| `leads` | Sales leads/prospects | `lead_code`, `full_name`, `phone`, `source`, `status`, `assigned_to`, `connector_id`, `fb_lead_id`, `ig_lead_id`, `wa_message_id`, `auto_captured`, `raw_payload` |
 | `lead_activities` | Lead activity timeline | `lead_id`, `action`, `old_value`, `new_value`, `notes` |
 | `bookings` | Scheduled appointments | `booking_code`, `customer_id`, `vehicle_id`, `booking_date`, `time_slot`, `status` |
 | `job_cards` | ★ Regular job cards | `job_code`, `customer_id`, `vehicle_id`, `status`, `job_type`, `total_amount`, `completion_type` |
@@ -339,11 +384,23 @@ STUDIO_PHONE=+919999999999
 | `connectors` | Referral partners | `full_name`, `commission_type`, `commission_value` |
 | `notifications` | In-app notifications | `staff_id`, `type`, `title`, `body`, `reference_type`, `is_read` |
 | `settings` | App settings (key-value) | `setting_key`, `setting_value` |
-| `sms_templates` | SMS templates and Flow ID mapping | `event_key`, `template_name`, `dlt_template_id`, `msg91_flow_id`, `is_active` |
-| `sms_queue` | Asynchronous SMS sending queue | `mobile`, `event_key`, `payload`, `status`, `attempts`, `error_msg` |
-| `sms_logs` | SMS transmission history logs | `mobile`, `event_key`, `msg91_request_id`, `status`, `error_message` |
 | `service_catalog` | Pre-defined services | `name`, `category`, `service_type`, `default_rate`, `hsn_sac` |
 | `campaigns` | WhatsApp marketing campaigns | `name`, `template_name`, `segment_type`, `status` |
+
+### Meta Integration Tables
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| `meta_integration_settings` | Stores Meta app credentials and config (singleton row, id=1) | `facebook_enabled`, `instagram_enabled`, `app_id`, `app_secret` (AES-256-CBC encrypted), `page_access_token` (encrypted), `verify_token`, `auto_assign_staff_id`, `allowed_form_ids` |
+| `webhook_logs` | Audit log of all Meta webhook events | `source`, `event_type`, `leadgen_id`, `form_id`, `page_id`, `raw_payload`, `processing_status` (ENUM: received/processing/success/failed/duplicate/skipped_disabled/skipped_form_filter), `created_lead_id`, `error_message` |
+| `webhook_events` | Alternative webhook event store (from migration 005) | `platform`, `event_id`, `raw_payload`, `processed`, `lead_id_created`, `error_message` |
+| `webhook_configs` | Per-platform webhook configuration | `platform` (ENUM: facebook/instagram/whatsapp), `verify_token`, `app_secret`, `page_id`, `is_active`, `default_assignee`, `last_received`, `total_received` |
+
+### SMS Tables
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| `sms_templates` | 7 event template configs | `event_key` (UNIQUE), `template_name`, `dlt_template_id`, `msg91_flow_id`, `is_active` |
+| `sms_queue` | Async SMS sending queue | `mobile`, `event_key`, `payload` (JSON), `status` (ENUM: pending/processing/sent/failed), `attempts`, `last_attempt`, `error_msg` |
+| `sms_logs` | SMS transmission history | `mobile`, `event_key`, `msg91_request_id`, `request_payload`, `response_payload`, `status`, `error_message` |
 
 ### Quick Job Card Tables (Separate from Regular)
 | Table | Purpose |
@@ -362,6 +419,14 @@ STUDIO_PHONE=+919999999999
 | `concern_presets` | Pre-defined concern options |
 | `job_card_media` | Media files for both regular and quick jobs |
 
+### Leads Table — Additional Columns (from migration 005)
+The `leads` table has these columns added via migration:
+- `fb_lead_id VARCHAR(100)` — Facebook Lead Gen ID for deduplication
+- `ig_lead_id VARCHAR(100)` — Instagram Lead Gen ID for deduplication
+- `wa_message_id VARCHAR(100)` — WhatsApp message ID
+- `auto_captured TINYINT(1) DEFAULT 0` — Flag: 1 = auto-captured from webhook
+- `raw_payload JSON` — Full incoming payload stored for debugging
+
 ### Auto-Migrations (in `db.ts`)
 On every server startup, `db.ts` runs the following migrations automatically:
 1. Auto-updates default staff name to "Hiren Patel"
@@ -377,6 +442,10 @@ On every server startup, `db.ts` runs the following migrations automatically:
 11. Creates `sms_templates` table and seeds the 7 GOC system event templates
 12. Creates `sms_queue` and `sms_logs` tables (safely dropping old logs schema if detected)
 13. Seeds default SMS settings (`SMS_ENABLED`, `MSG91_SMS_AUTH_KEY`, etc.) in `app_settings`
+14. Creates `webhook_logs` table (Meta audit log)
+15. Creates `meta_integration_settings` table with singleton row id=1
+16. Seeds `webhook_configs` with default entries for facebook, instagram, whatsapp platforms
+17. Creates `staff_permissions` table (roles, modules, and granular action gates).
 
 ---
 
@@ -390,16 +459,47 @@ src/app.ts → loads middleware → mounts all routes under /api/v1 → initiali
 
 ### Middleware Stack (in order)
 1. `helmet` — Security headers (cross-origin resource policy: cross-origin)
-2. `cors` — Allows `localhost:5173` and `localhost:3000` in dev
-3. `express.json` — Body parser (10MB limit)
-4. `express.urlencoded` — URL-encoded body parser
-5. `morgan('dev')` — Request logging
-6. Static files: `/uploads` → `../../uploads/`
+2. `cors` — Allows `localhost:5173` and `localhost:3000` in dev; `godofceramic.in` in production
+3. `express.raw({ type: 'application/json' })` — **For `/api/v1/webhooks/meta` path ONLY** — must come BEFORE `express.json()`
+4. `express.json` — Body parser (10MB limit)
+5. `express.urlencoded` — URL-encoded body parser
+6. `morgan('dev')` — Request logging
+7. Static files: `/uploads` → `../../uploads/`
+8. Static files: `/uploads/quotation-pdfs` → `../../uploads/quotation-pdfs/`
+
+**Critical note**: The raw body middleware `express.raw({ type: 'application/json' })` is applied to the `/api/v1/webhooks/meta` path BEFORE `express.json()` in `app.ts`. Changing this order breaks Meta webhook signature verification.
 
 ### Route Mounting
 All routes mount at `/api/v1/<resource>` except:
 - `/public/track/:token` — Public job tracking (NO auth required)
 - `/api/health` — Health check endpoint
+
+```typescript
+app.use(`${API_PREFIX}/auth`, authRoutes);
+app.use(`${API_PREFIX}/leads`, leadsRoutes);
+app.use(`${API_PREFIX}/customers`, customersRoutes);
+app.use(`${API_PREFIX}/vehicles`, vehiclesRoutes);
+app.use(`${API_PREFIX}/bookings`, bookingsRoutes);
+app.use(`${API_PREFIX}/jobs`, jobsRoutes);
+app.use(`${API_PREFIX}/quotations`, quotationsRoutes);
+app.use(`${API_PREFIX}/invoices`, invoicesRoutes);
+app.use(`${API_PREFIX}/inventory`, inventoryRoutes);
+app.use(`${API_PREFIX}/staff`, staffRoutes);
+app.use(`${API_PREFIX}/dashboard`, dashboardRoutes);
+app.use(`${API_PREFIX}/reports`, reportsRoutes);
+app.use(`${API_PREFIX}/settings`, settingsRoutes);
+app.use(`${API_PREFIX}/commissions`, commissionsRoutes);
+app.use(`${API_PREFIX}/marketing`, marketingRoutes);
+app.use(`${API_PREFIX}/notifications`, notificationsRoutes);
+app.use(`${API_PREFIX}/payments`, paymentsRoutes);
+app.use(`${API_PREFIX}/quick-job-cards`, quickJobCardsRoutes);
+app.use(`${API_PREFIX}/advance-bookings`, advanceBookingsRoutes);
+app.use(`${API_PREFIX}/webhooks`, webhooksRoutes);
+app.use(`${API_PREFIX}/sms`, smsAdminRoutes);
+app.use(`${API_PREFIX}/integrations`, integrationsRoutes);
+app.use(`${API_PREFIX}/staff-management`, staffManagementRoutes);
+app.use(`/public`, publicTrackingRoutes);
+```
 
 ### Controller Pattern
 ```typescript
@@ -420,7 +520,7 @@ export const controllerFn = async (req: Request, res: Response) => {
 - **NO ORM** — All queries are raw SQL using `mysql2/promise`
 - Pool imported from `utils/db.ts`
 - Transactions used for multi-table operations (e.g., job creation, invoice generation)
-- Soft deletes: Some tables use `deleted_at` column (customers, vehicles)
+- Soft deletes: Some tables use `deleted_at` column (customers, vehicles, staff)
 
 ### Code Generation
 Sequential codes generated via `utils/codes.ts`:
@@ -437,6 +537,56 @@ Sequential codes generated via `utils/codes.ts`:
 ### Shared Utility: `saveCustomerAndVehicleFromJobDetails`
 Located in `db.ts` — used by Quick Jobs, Advance Bookings, and Job Card creation to auto-create/lookup customer and vehicle records from inline form data.
 
+### Backend Services
+
+**`smsQueue.ts`** — Async SMS queue manager
+- Export: `queueSMS({ phone, eventKey, payload })` — the ONLY function controllers should call to send SMS
+- Export: `normalizeMobile(phone)` — normalizes Indian phone numbers to 10-digit format
+- Pattern: Controllers NEVER send SMS directly — they call `queueSMS()` which inserts into `sms_queue` table
+- The actual sending happens when the cron worker processes the queue
+
+**`smsService.ts`** — Core MSG91 Flow API integration
+- Reads from `sms_queue` table, looks up `msg91_flow_id` from `sms_templates`
+- Calls MSG91 Flow API (`https://control.msg91.com/api/v5/flow`)
+- Logs result to `sms_logs` table
+- Called by cron worker every minute — NEVER called directly by controllers
+- Settings read from `app_settings`: `MSG91_SMS_AUTH_KEY`, `SMS_ENABLED`
+
+**`metaLeadService.ts`** — Meta Graph API integration
+- Export: `getMetaSettings()` — reads from `meta_integration_settings` table, decrypts secrets
+- Export: `fetchMetaLeadFromGraph(leadgenId, pageAccessToken)` — calls Meta Graph API v23.0
+- Export: `normalizeMetaLead(graphData, webhookValue)` — normalizes field_data array to flat object with phone/name/vehicle mappings
+- Export: `isFormAllowed(formId)` — checks if form ID is in allowed filter list
+- Uses `backend/src/types/meta.ts` for TypeScript interfaces
+
+**`encryption.ts`** — AES-256-CBC encryption utility
+- Export: `encrypt(text): string` — encrypts sensitive values before DB storage
+- Export: `decrypt(text): string` — decrypts values retrieved from DB
+- Key: derived from `JWT_SECRET` env var using SHA-256
+
+**`services/events/`** — SMS event trigger helpers folder
+- Pattern: Each module has its own event file that calls `queueSMS()`
+- `bookingEvents.ts` — `smsBookingConfirmation()`, `smsBookingReminder()`
+- `jobEvents.ts` — `smsJobCreated()`, `smsVehicleReady()`
+- `invoiceEvents.ts` — `smsInvoiceGenerated()`
+- `paymentEvents.ts` — `smsPaymentReceived()`
+- `marketingEvents.ts` — `smsServiceFollowup30Days()`
+- **Usage rule**: Controllers import from these event files, NOT from smsQueue directly
+
+### Cron Jobs
+| Schedule | Task | Description |
+|----------|------|-------------|
+| `0 9 * * *` | Birthday Wishes | Sends WhatsApp birthday greetings to customers |
+| `0 10 * * *` | 1-Day Lead Follow-Up | WhatsApp follow-up for leads created yesterday |
+| `0 11 * * *` | 3-Day Lead Follow-Up | WhatsApp follow-up for leads created 3 days ago |
+| `30 8 * * *` | Low Stock Check | Notifies managers of low stock items |
+| `30 9 * * *` | Customer Auto-Status | Marks inactive customers (no visit in 180 days) |
+| `* * * * *` | SMS Worker | Reads `sms_queue WHERE status='pending' LIMIT 5`, processes each via `smsService.ts`, marks as sent/failed |
+| `0 8 * * *` | Booking Day-Before Reminder | Finds advance bookings for tomorrow, calls `smsBookingReminder()` for each |
+| `30 10 * * *` | 30-Day Service Follow-up | Finds jobs delivered exactly 30 days ago, calls `smsServiceFollowup30Days()` |
+
+All cron jobs run in `Asia/Kolkata` timezone.
+
 ---
 
 ## 7. FRONTEND ARCHITECTURE
@@ -446,9 +596,12 @@ Located in `db.ts` — used by Quick Jobs, Advance Bookings, and Job Card creati
 main.tsx → QueryClientProvider → BrowserRouter → App → Toaster
 ```
 
+Note: `React.StrictMode` has been intentionally removed because it causes tldraw (whiteboard) canvas corruption via double-mounting in React 19.
+
 ### State Management
 - **Zustand** for global state:
   - `authStore.ts` — token, staff profile, isAuthenticated (persisted to localStorage as `goc-auth`)
+  - `permissionsStore.ts` — caches dynamic module and action permission key states (persisted as `goc-permissions`)
   - `uiStore.ts` — sidebar state, theme
 
 ### Data Fetching
@@ -468,6 +621,19 @@ const apiClient = axios.create({
 // Response interceptor: auto-logout on 401
 ```
 
+### API Module Map
+| File | Export Name | Key Functions |
+|------|-------------|---------------|
+| `api/integrations.ts` | `integrationsAPI` | `getMetaSettings`, `updateMetaSettings`, `validateMetaConnection`, `runMetaTest` |
+| `api/sms.ts` | `smsAPI` | `getTemplates`, `updateTemplate`, `getStats`, `getLogs`, `retryFailed` |
+| `api/webhooks.ts` | `webhooksAPI` | `getStatus`, `updateConfig`, `getEvents`, `getLogs` |
+| `api/staffManagement.ts` | `staffManagementAPI` | `listAll`, `create`, `update`, `resetPassword`, `toggleStatus`, `getPermissions`, `updatePermissions`, `getMyPermissions` |
+
+### Utilities
+- `utils/helpers.ts` — `formatINR`, `formatDate`, `getStatusConfig`, `calculateGST`, `debounce`
+- `utils/carDataset.ts` — Full Indian + international car brand/model database auto-generated from `car model dataset.csv`. Exports: `carDataset: CarBrand[]` (array of `{ brand: string, models: string[] }`) and `basicColors: string[]`. Used by: `JobCardNewPage.tsx` for vehicle make/model dropdowns.
+- `utils/usePermissions.ts` — Custom permissions client gate using `can(permKey: string): boolean` helper checking dynamic user permissions or admin bypass.
+
 ### Routing Structure (`App.tsx`)
 ```
 /login                    → LoginPage (PublicRoute)
@@ -486,6 +652,8 @@ const apiClient = axios.create({
 /invoices                 → InvoicesPage
 /inventory                → InventoryPage
 /staff                    → StaffPage
+/admin/staff              → StaffManagementPage
+/admin/staff/:id/permissions → StaffPermissionsPage
 /reports                  → ReportsPage
 /settings                 → SettingsPage
 /marketing                → MarketingPage
@@ -494,13 +662,19 @@ const apiClient = axios.create({
 /track/:token             → PublicTrackingPage (NO auth — public customer view)
 ```
 
-### Layout
+**Note**: `MetaIntegrationPage` and `SMSSettingsPage` exist as page components but are not currently mounted in `App.tsx` routes. They are intended to be accessed via Settings page sub-navigation or added to the router when needed.
+
+### Layout (Mobile Responsive)
 ```
 AppShell (ProtectedRoute wrapper)
-├── Sidebar (fixed left, 256px wide)
-├── Topbar (fixed top, 80px tall, offset by sidebar width)
-└── <Outlet /> (main content, ml-64 pt-20)
+├── Sidebar (fixed left, 256px wide on desktop; slide-in drawer on mobile with hamburger toggle)
+├── Topbar (fixed top, 80px tall desktop / 64px mobile; hamburger menu button on mobile)
+└── <Outlet /> (main content, md:ml-64 pt-16 md:pt-20)
 ```
+
+The entire application is mobile responsive:
+- **Desktop (md+)**: Sidebar always visible, content offset by sidebar width
+- **Mobile (<md)**: Sidebar hidden by default, toggled via hamburger menu in Topbar, overlay backdrop when open, auto-closes on route change
 
 ---
 
@@ -511,7 +685,8 @@ AppShell (ProtectedRoute wrapper)
 2. Backend validates against `staff` table, compares bcrypt hash
 3. Returns JWT token + staff profile
 4. Frontend stores in Zustand (`authStore`) → persisted to localStorage
-5. All subsequent API calls include `Authorization: Bearer <token>`
+5. Frontend calls `usePermissionsStore.getState().fetchPermissions()` to load and cache active permissions.
+6. All subsequent API calls include `Authorization: Bearer <token>`
 
 ### JWT Payload (`JWTPayload`)
 ```typescript
@@ -523,11 +698,14 @@ AppShell (ProtectedRoute wrapper)
 }
 ```
 
-### RBAC
-- `rbac.ts` middleware checks `req.staff.role` against allowed roles
-- Most routes require `authMiddleware`
-- Admin can access everything
-- Technicians have limited access
+### RBAC & Granular Access Control
+- `rbac.ts` middleware checks `req.staff.role` against allowed roles for core routing modules.
+- Most routes require `authMiddleware` verification.
+- **Granular Permissions System**:
+  - Module permissions (leads, customer registry, job cards, commissions, dashboard) and action permissions (edit job card, delete customer, record payment, etc.) are cached client-side in Zustand.
+  - The custom hook `usePermissions` exposes a `can(permKey)` helper that determines interface toggles and route availability.
+  - **Admin Bypass**: Staff with the role `'admin'` or `_isAdmin` flag bypass all check layers, automatically evaluating to 1 (full access).
+  - Admin accounts are protected at the database constraint level: their records, role, active status, and passwords cannot be disabled, updated, or reset via staff-management endpoints to prevent lockout.
 
 ### Protected vs Public Routes
 - **Protected:** Everything under `AppShell` (requires `isAuthenticated`)
@@ -543,6 +721,18 @@ AppShell (ProtectedRoute wrapper)
 |--------|------|-------------|
 | POST | `/login` | Phone + password login |
 | GET | `/me` | Get current user profile |
+
+### Staff & Permissions Management (`/api/v1/staff-management`)
+| Method | Path | Auth | Role | Description |
+|--------|------|------|------|-------------|
+| GET | `/my-permissions` | Yes | Any | Get permissions of the logged-in staff member (returns all 1s and `_isAdmin: true` for admin role) |
+| GET | `/list` | Yes | Admin | List all staff members with joined permissions data (excludes soft-deleted) |
+| POST | `/create` | Yes | Admin | Create a new staff member (auto-generates GOC@XXXX password format) |
+| PUT | `/:id` | Yes | Admin | Update staff details (excludes modifying admin account) |
+| POST | `/:id/reset-password` | Yes | Admin | Regenerate and set a new password (`GOC@XXXX`) for staff (excludes admins) |
+| PATCH | `/:id/status` | Yes | Admin | Toggle staff active/inactive status (excludes admins) |
+| GET | `/:id/permissions` | Yes | Admin | Retrieve permissions config for a staff member |
+| PUT | `/:id/permissions` | Yes | Admin | Update permissions config for a staff member (excludes admins) |
 
 ### Leads (`/api/v1/leads`)
 | Method | Path | Description |
@@ -705,15 +895,35 @@ AppShell (ProtectedRoute wrapper)
 | POST | `/campaigns` | Create campaign |
 | POST | `/campaigns/:id/send` | Execute campaign |
 
-### Webhooks & Integrations (`/api/v1/webhooks`)
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/status` | Retrieve active integration configurations and counts |
-| POST | `/config` | Update a platform's Verify Token or Auto-Assignee |
-| GET | `/events` | Fetch audit logs of recent webhook execution payloads |
-| GET | `/meta` | Verification handshake endpoint for Facebook/Instagram Webhooks |
-| POST | `/meta` | Event receiver payload dispatcher for Meta Lead Ads |
-| POST | `/whatsapp` | MSG91 inbound message handler (creates/logs leads) |
+### SMS Admin (`/api/v1/sms`)
+| Method | Path | Auth | Role | Description |
+|--------|------|------|------|-------------|
+| GET | `/templates` | Yes | Any | List all 7 SMS event templates with flow IDs |
+| PUT | `/templates/:id` | Yes | admin, manager | Update DLT template ID, MSG91 flow ID, or active status |
+| GET | `/stats` | Yes | Any | Get SMS queue stats (pending, sent, failed, today total) |
+| GET | `/logs` | Yes | Any | List SMS transmission logs with filters (event_key, status, page) |
+| POST | `/retry/:id` | Yes | admin, manager | Retry a failed SMS record from the logs |
+
+### Integrations (`/api/v1/integrations`)
+| Method | Path | Auth | Role | Description |
+|--------|------|------|------|-------------|
+| GET | `/meta/settings` | Yes | admin | Get Meta Lead Ads config (App ID, tokens, auto-assign, form filters) |
+| PATCH | `/meta/settings` | Yes | admin | Update Meta integration settings (credentials stored encrypted) |
+| POST | `/meta/validate` | Yes | admin | Run full Meta connection diagnostic (page connection, permissions, subscription status) |
+| POST | `/meta/test` | Yes | admin | Run test diagnostics against Meta Graph API |
+
+### Webhooks (`/api/v1/webhooks`)
+| Method | Path | Auth | Role | Description |
+|--------|------|------|------|-------------|
+| GET | `/meta` | **NO** | Public | Meta verification handshake (hub.verify_token challenge) |
+| POST | `/meta` | **NO** | Public | Meta Lead Ads event receiver (Facebook + Instagram leadgen) |
+| GET | `/instagram` | **NO** | Public | Instagram verification handshake (same handler as Meta) |
+| POST | `/instagram` | **NO** | Public | Instagram Lead Ads event receiver |
+| POST | `/whatsapp` | **NO** | Public | MSG91 inbound WhatsApp message handler |
+| GET | `/status` | **NO** | Public | Integration status overview with event counts |
+| GET | `/events` | **NO** | Public | Raw webhook event audit log |
+| PATCH | `/config` | Yes | admin | Update webhook platform config (verify token, assignee, active) |
+| GET | `/logs` | Yes | admin, manager | Processed webhook logs with lead creation status |
 
 ### Other
 | Method | Path | Description |
@@ -734,15 +944,22 @@ AppShell (ProtectedRoute wrapper)
 - Auto-creates customer/vehicle in DB via `saveCustomerAndVehicleFromJobDetails`
 - Statuses: `pending` → `confirmed` → `arrived` → `cancelled`
 - Booking reminders via cron jobs
+- SMS notification: `BOOKING_CONFIRMATION` event triggered on creation
 
 ### B. Job Card Module (Regular)
 - Full lifecycle management with 4-step status pipeline
-- Services from catalog or manual entry
+- **JobCardNewPage**: 3-step wizard — Step 1 (Customer & Vehicle with autocomplete from `carDataset`), Step 2 (Services from catalog; custom services have blank rate inputs by default to avoid leading zero entry bugs like `02000`, and calculate 18% GST on-the-fly), Step 3 (Confirm with full Subtotal, GST 18%, and Grand Total breakdown)
+- Supports URL param: `?from_booking=BOOKING_ID` to pre-fill from advance booking
+- **JobCardDetailPage**: Status pipeline (`in_progress → ready → estimate → delivered`), download invoice/estimate button when `job.completion_type` is present
+- Supports inline service editing and deletion for both admin and staff directly from the detail view list. The edit pen icon toggles inputs for name, type, price, GST %, and quantity.
+- Locking mechanism: All service modifications (add, edit, delete) are locked once the job card status reaches `delivered` (Final Delivered) or `cancelled`.
+- Delivered confirmation: Transitioning to `delivered` triggers a custom confirmation modal warning the user that modifications will be locked.
 - Before/during/after photo upload
 - Status transition with notes
 - Invoice/estimate generation
 - WhatsApp dispatch
 - Public tracking via unique token
+- SMS notifications: `JOB_CREATED`, `VEHICLE_READY` events
 
 ### C. Quick Service/Wash Module
 - Simplified job card for express services
@@ -773,6 +990,7 @@ AppShell (ProtectedRoute wrapper)
 - Serialized JSON canvas state (`canvas_data`) and base64 PNG snapshot (`canvas_snapshot`) saved to database.
 - PDF generation & fallback: Puppeteer searches for system-installed Google Chrome and Microsoft Edge on Windows (standard paths and Local AppData) to compile A4 PDFs without requiring Chromium downloads. If Puppeteer fails to launch for any reason, a robust HTML fallback compiles the document as a web-viewable HTML layout, ensuring the action always generates a valid preview link.
 - WhatsApp send: Dispatches quote number, grand total estimate, and PDF/HTML URL to customer's contact.
+- Mobile responsive: Canvas toolbar adapts to small screens, header truncates gracefully.
 
 ### G. Invoice & Billing
 - Two types: `tax_invoice` and `estimate`
@@ -780,6 +998,7 @@ AppShell (ProtectedRoute wrapper)
 - GST breakdown (CGST 9% + SGST 9%)
 - Payment tracking (cash, UPI, card, bank transfer, cheque)
 - Print-ready page
+- SMS notifications: `INVOICE_GENERATED`, `PAYMENT_RECEIVED` events
 
 ### H. Inventory Management
 - Categories: PPF rolls, ceramic, primer, car care, consumables
@@ -820,6 +1039,39 @@ AppShell (ProtectedRoute wrapper)
 - Quotation validity
 - PPF wastage percentage
 
+### N. Meta Lead Ads Integration (`/meta-integration` page — `MetaIntegrationPage.tsx`)
+- Dedicated management panel for Facebook and Instagram Lead Ads automation
+- **Setup Tab**: Displays the webhook URL (`https://godofceramic.cloud/api/v1/webhooks/meta`) and verify token; step-by-step instructions for Meta Developer portal configuration
+- **Settings Tab**: Credentials form — App ID, App Secret (masked), Page Access Token (masked), Verify Token, Auto-Assign Staff dropdown, Allowed Form IDs (comma-separated to filter by specific Lead Ad forms)
+- **Validation**: Live diagnostic check hits Meta Graph API to verify: Page Connection, OAuth Token Validity, `leads_retrieval` permission, `pages_read_engagement` permission, App Page Subscription
+- **Logs Tab**: Real-time event audit table showing all incoming Meta webhook payloads with processing status badges
+- All credentials stored **AES-256-CBC encrypted** in `meta_integration_settings` table (singleton row, id=1)
+- Deduplication: `fb_lead_id` checked before creating any lead to prevent duplicates
+- Form filtering: If `allowed_form_ids` is set, only leads from those specific form IDs are imported
+- Status badges: `success`, `failed`, `duplicate`, `processing`, `received`, `skipped_disabled`, `skipped_form_filter`
+
+### O. SMS Notifications (`/sms-settings` page — `SMSSettingsPage.tsx`)
+- MSG91 Flow API integration for transactional SMS notifications to customers
+- **Architecture: Queue-Based** — controllers NEVER send SMS directly; they call `queueSMS()` → inserts into `sms_queue` → cron worker sends every minute
+- **7 Automated SMS Events**:
+  1. `BOOKING_CONFIRMATION` — Triggered when advance booking is created
+  2. `BOOKING_REMINDER` — Triggered by daily cron, day before appointment
+  3. `JOB_CREATED` — Triggered when new job card is created
+  4. `VEHICLE_READY` — Triggered when job status changes to `ready`
+  5. `INVOICE_GENERATED` — Triggered when invoice/estimate is created
+  6. `PAYMENT_RECEIVED` — Triggered when a payment is recorded
+  7. `SERVICE_FOLLOWUP_30D` — Triggered by daily cron, 30 days after job delivery
+- **Config UI**: Each event has: DLT Template ID field, MSG91 Flow ID field, Active toggle
+- **DLT Registration**: India requires DLT registration — `dlt_template_id` must be filled from TRAI DLT portal
+- **SMS Statistics**: Cards showing pending, sent, failed, today total
+- **SMS Logs**: Filterable table with retry button for failed messages
+- **SMS is disabled by default**: `SMS_ENABLED=false` in `app_settings` — admin must explicitly enable
+
+### P. Staff Registration & Permissions Control Module
+- **Staff Registration Panel (`StaffManagementPage.tsx`)**: Exposes staff listing with active statuses, roles, and joined permission statistics. Allows creating new staff with custom passwords generated in a secure format (`GOC@XXXX`), password resets, status toggling, and detail updates. Fully locks admin records to prevent lockouts.
+- **Permissions Control Grid (`StaffPermissionsPage.tsx`)**: Generates toggle grids for module-level access flags (e.g. leads, bookings, job cards, reports) and granular action permissions (e.g. edit job cards, delete customers, view revenue reports). Integrates an upsert query to seamlessly insert or modify permissions.
+- **Permission Access Gate (`usePermissions` hook)**: Custom React hook that resolves permission gates via a `can(permKey)` helper. Evaluates user role and active state configuration, blocking side navigation tabs, page accesses, and operational buttons (like edit, delete, or completion).
+
 ---
 
 ## 11. JOB CARD STATUS PIPELINE (CRITICAL)
@@ -851,6 +1103,9 @@ JOB_STATUS_FLOW = {
 - New job cards are created with status `in_progress` (not `scheduled`)
 - Invoice/estimate can be generated when status is `ready`, `estimate`, or `delivered`
 - The `completion_type` column on `job_cards` stores whether invoice or estimate was generated
+- Service editing and deleting are fully available to admin and staff until status is transitioned to `delivered` (Final Delivered)
+- Transitioning to `delivered` status requires confirmation via a custom pop-up dialog
+- Once status is `delivered`, the backend rejects any service insertions, updates, or deletions
 - Old statuses (scheduled, car_in, washing, qc, rework) exist for backward compatibility only
 
 ### Quick Job Cards — Full Pipeline (Unchanged)
@@ -898,6 +1153,14 @@ When the invoice is updated to `paid` status (during payment capture), the syste
   - **Client Dossier Page:** An inline download action button appears next to each past visit (job card) item in the customer's operations registry.
   - **Invoices Page:** A "PDF" action button compiles and opens the invoice file in a new tab.
 
+### Invoice Template Layout (Tally Style)
+The invoice template (both backend Puppeteer `pdfService.ts` and frontend React `InvoiceTemplate.tsx` print preview) is modeled after the classic Tally ERP 9 invoice layout:
+- **Outer Grid Structure:** Solid 1px black borders encasing company details, invoice metadata, buyer, and dispatch/delivery details in structured split-column rows.
+- **Dynamic Columns:** The items table includes standard Sl No., Description, HSN/SAC, Quantity, Rate, per unit (`sqt` for PPF/films, `ml` for coatings, `job` for labor/polishing), and Amount.
+- **GST & HSN Breakdown Table:** A central taxation breakdown table shows CGST (9%), SGST (9%), and total tax amount per HSN/SAC code, followed by tax amount written in words.
+- **Company Bank Details:** Company bank account details (HDFC BANK LTD, Account No. 50200104786162, SUN PHARMA branch, IFSC HDFC0003688) are embedded in the footer.
+- **Declaration & Signatory Box:** Includes standard declaration text and a dedicated authorized signatory signature box.
+
 ### GST Calculation
 ```
 Subtotal = SUM(service line_totals)
@@ -905,7 +1168,7 @@ CGST = Subtotal × 9%
 SGST = Subtotal × 9%
 Grand Total = Subtotal + CGST + SGST
 ```
-GST is only applied when `gst_applicable = true`.
+GST is only applied when `gst_applicable = true`. During job card creation, `gst_applicable` is set to `1` by default. Backend recalculations of totals and GST are performed automatically using `recalculateJobCardTotals()` whenever a service line item is added, edited, or removed.
 
 ---
 
@@ -919,8 +1182,9 @@ GST is only applied when `gst_applicable = true`.
 ├─────────────────────────────┤
 │ ★ MAIN MODULES (Red themed) │
 │  ◆ ADVANCE BOOKING          │   → /advance-bookings
-│  ◆ JOB CARD CREATING        │   → /jobs
+│  ◆ JOB CARD CREATING        │   → /jobs/new
 │  ◆ QUICK SERVICE OR WASH    │   → /quick-jobs
+│  ◆ ALL JOB CARDS            │   → /jobs
 ├─────────────────────────────┤
 │ OTHER MODULES (Scrollable)   │
 │  ◇ DASHBOARD                │   → /dashboard
@@ -931,6 +1195,7 @@ GST is only applied when `gst_applicable = true`.
 │  ◇ INVOICES                 │   → /invoices
 │  ◇ INVENTORY                │   → /inventory
 │  ◇ STAFF                    │   → /staff
+│  ◇ STAFF & PERMISSIONS      │   → /admin/staff
 │  ◇ MARKETING                │   → /marketing
 │  ◇ COMMISSIONS              │   → /commissions
 │  ◇ REPORTS                  │   → /reports
@@ -941,13 +1206,20 @@ GST is only applied when `gst_applicable = true`.
 └─────────────────────────────┘
 ```
 
-### Main Modules (Top 3) — Red themed with bordered cards
+### Main Modules (Top 4) — Red themed with bordered cards
 - These are the primary workflows used daily
 - Styled with `performance-red` theme (red borders, red text, red active state)
 
 ### Other Modules — Scrollable section
 - Secondary management features
 - Standard neutral styling with red accent on active
+- Access to other modules is gated dynamically based on the active permissions loaded from the `goc-permissions` store (via the custom `can` helper).
+
+### Mobile Responsiveness
+- On mobile (<md), sidebar is hidden by default
+- Hamburger menu button in Topbar toggles sidebar as an overlay drawer
+- Sidebar slides in from left with smooth transition animation
+- Tapping outside sidebar or navigating to a route auto-closes it
 
 ---
 
@@ -1102,14 +1374,37 @@ export default function ModulePage() {
 - Some pages have `2` suffix duplicates (`JobCardsPage2.tsx`, `LeadsPage2.tsx`) — these are legacy/unused
 - The `jobs.ts` API file has `JobCard.status` type that doesn't include `estimate` — but the `types/index.ts` does
 - QuickJobCards.tsx is the largest page at 66KB — very complex component
+- `React.StrictMode` has been removed from `main.tsx` — it caused tldraw canvas corruption via double-mounting in React 19
+- `MetaIntegrationPage.tsx` and `SMSSettingsPage.tsx` exist as page components but are not currently mounted in `App.tsx` routes
+- Zustand store `goc-permissions` caches staff permissions client-side and must be cleared explicitly on logout to prevent state leaks.
+- Unrelated compiler resolution: Frontend build fixes include using an `as any` type assertion in `JobCardDetailPage.tsx` services mutations to resolve type mismatches between `unit_price: number | ''` and standard `number | undefined` definitions in `index.ts`.
 
 ### Backend
 - `jobCardController.ts` is the largest controller at 31KB — handles all job CRUD + completion
 - `quickJobCards.ts` route file is 26KB — contains inline controller logic (not separated)
 - Puppeteer PDF generation requires Chrome/Chromium installed
 - MSG91 WhatsApp integration requires valid API keys (currently empty in .env)
-- Meta Lead Ads require verification via token. Setting config via Setting -> Integration panel modifies tokens in MySQL.
+- Meta Lead Ads require verification via token. Setting config via Settings → Integration panel modifies tokens in MySQL.
 - MSG91 webhooks must match path `/api/v1/webhooks/whatsapp`.
+- Granular permissions modifying uses `ON DUPLICATE KEY UPDATE` to support staff members who don't yet have an entry in the `staff_permissions` table.
+- Admin lockout protection: The default admin account (and any account with the `'admin'` role) cannot be updated, disabled, or have its password reset via staff management endpoints, preventing lockout.
+
+### Meta Integration
+- Meta credentials are encrypted in DB using AES-256-CBC with key derived from `JWT_SECRET`. If `JWT_SECRET` changes, stored credentials become unreadable and must be re-entered.
+- Meta webhook verification token is stored in `meta_integration_settings.verify_token` (DB), NOT `.env`. Update via Settings → Integration panel.
+- The `express.raw()` middleware for the `/api/v1/webhooks/meta` path must come **BEFORE** `express.json()` in `app.ts` — changing the order breaks signature verification.
+- Meta webhook verification endpoint: `GET /api/v1/webhooks/meta?hub.mode=subscribe&hub.verify_token=TOKEN&hub.challenge=CHALLENGE`
+- Currently active Facebook Page: **God of Ceramic** (Page ID: `111517131913504`)
+- Meta App in use: **MyBusinessWA** — has `leads_retrieval` + `pages_read_engagement` permissions
+- Default verify token: `GOC_META_WEBHOOK_2024`
+- Meta Graph API version used: `v23.0`
+
+### SMS Integration
+- SMS uses **MSG91 Flow API** (not the older template API) — each event maps to a `msg91_flow_id`
+- DLT registration required in India — `dlt_template_id` must come from TRAI DLT portal approval
+- Sender ID `GOCSTD` must match the DLT-registered Header ID exactly
+- SMS queue uses `attempts` counter — max 3 retries before marking as permanently failed
+- `normalizeMobile()` in `smsQueue.ts` handles: +91XXXXXXXXXX, 91XXXXXXXXXX, 0XXXXXXXXXX → 10-digit format
 
 ### Port Conflicts
 - Backend runs on port 4000 — if `EADDRINUSE` error occurs, kill the existing process
@@ -1156,8 +1451,17 @@ npm run dev          # Starts Vite on port 5173
 ### First-Time Setup
 1. Create MySQL database: `CREATE DATABASE goc_studio;`
 2. Run migration SQL files in `backend/src/config/`
-3. Auto-migrations in `db.ts` will create remaining tables on first startup
-4. Default admin user should be seeded (phone: 9999999999, password: Admin@2024)
+3. Run new migrations (if not already applied):
+```bash
+mysql -u root -p goc_studio < backend/src/config/migration_meta_integration.sql
+mysql -u root -p goc_studio < backend/src/config/migration_sms_v1.sql
+mysql -u root -p goc_studio < backend/src/config/migration_staff_permissions_v1.sql
+mysql -u root -p goc_studio < database/migrations/005_webhook_integrations.sql
+mysql -u root -p goc_studio < database/migrations/006_meta_integration_settings.sql
+# Note: All above also run automatically via db.ts auto-migrations on first startup
+```
+4. Auto-migrations in `db.ts` will create remaining tables on first startup
+5. Default admin user should be seeded (phone: 9999999999, password: Admin@2024)
 
 ### Build for Production
 ```bash
@@ -1167,6 +1471,114 @@ cd backend && npm run build     # Compiles to dist/
 # Frontend
 cd frontend && npm run build    # Builds to dist/
 ```
+
+---
+
+## 20. META LEAD ADS INTEGRATION (COMPLETE REFERENCE)
+
+### Overview
+When a customer submits a Facebook or Instagram Lead Ad form:
+1. Meta sends POST to `https://godofceramic.cloud/api/v1/webhooks/meta`
+2. `webhookController.ts` receives the `leadgen_id`
+3. `metaLeadService.ts` calls Meta Graph API v23.0 to fetch field_data
+4. Lead is normalized and inserted into `leads` table with `source='facebook'` or `source='instagram'`
+5. Auto-deduplication: checks `fb_lead_id` before inserting
+6. If `auto_assign_staff_id` is set, lead is assigned automatically
+7. WhatsApp welcome message sent via `WhatsAppTemplates.leadWelcome()`
+8. In-app notification sent to admin/manager/receptionist staff
+
+### Current Configuration
+- Facebook Page: God of Ceramic (Page ID: 111517131913504)
+- Meta App: MyBusinessWA
+- Webhook URL: https://godofceramic.cloud/api/v1/webhooks/meta
+- Verify Token: GOC_META_WEBHOOK_2024 (stored in meta_integration_settings.verify_token)
+- Meta Graph API: v23.0
+- Permissions: leads_retrieval, pages_read_engagement, pages_manage_metadata, ads_management
+
+### Credential Storage
+- App Secret and Page Access Token stored AES-256-CBC encrypted in `meta_integration_settings` table
+- Encryption key derived from JWT_SECRET via SHA-256
+- DO NOT store raw credentials in .env for production — use Settings UI
+
+### Lead Field Mapping
+Meta form fields are normalized via a field map in `metaLeadService.ts`:
+```
+'full_name' / 'name' → fullName
+'phone_number' / 'phone' / 'mobile' → phone
+'email' / 'email_address' → email
+'city' / 'location' → city
+'vehicle_make' / 'vehicle_brand' → vehicleMake
+'vehicle_model' / 'vehicle' / 'car_model' / 'car_type' → vehicleModel
+'service_interested' / 'service' / 'requirement' → requirement
+```
+
+### TypeScript Types (`backend/src/types/meta.ts`)
+```typescript
+MetaWebhookPayload   // { object: string, entry: MetaWebhookEntry[] }
+MetaWebhookEntry     // { id: string, changes: MetaWebhookChange[], time?: number }
+MetaWebhookChange    // { field: string, value: MetaWebhookLeadgenValue }
+MetaWebhookLeadgenValue // { leadgen_id, form_id, page_id, ad_id, ad_name, ... }
+MetaLeadGenResponse  // { id, created_time, field_data: MetaFieldData[], ... }
+MetaFieldData        // { name: string, values: string[] }
+NormalizedMetaLead   // Flat normalized lead object after field mapping
+```
+
+### Troubleshooting: Lead Not Arriving
+If Meta sends test lead but it doesn't appear in CRM:
+1. Check `webhook_logs` table for `processing_status`
+2. Verify `meta_integration_settings.facebook_enabled = 1`
+3. Run `GET /api/v1/integrations/meta/validate` to check connection status
+4. Check Nginx access logs for incoming POST requests to /api/v1/webhooks/meta
+5. Most common cause: Another app (e.g., LeadPixie) is subscribed to the Facebook Page
+   - Fix: Remove other app via Facebook Business Settings → Integrations → Lead Access
+   - Then re-subscribe via Graph API: POST /111517131913504/subscribed_apps?subscribed_fields=leadgen
+
+---
+
+## 21. SMS INTEGRATION REFERENCE
+
+### Architecture (Queue-Based — NEVER Direct)
+```
+Controller/Event → queueSMS() → sms_queue table → Cron Worker (1 min) → MSG91 Flow API → sms_logs
+```
+
+### The 7 SMS Events
+| Event Key | Trigger | Variables |
+|-----------|---------|-----------|
+| BOOKING_CONFIRMATION | New advance booking created | customerName, bookingDate, timeSlot, vehicle |
+| BOOKING_REMINDER | Daily cron 8AM, day before appointment | customerName, bookingDate, timeSlot |
+| JOB_CREATED | New job card created | customerName, jobCode, vehicle |
+| VEHICLE_READY | Job status → ready | customerName, jobCode, vehicle |
+| INVOICE_GENERATED | Invoice/estimate created | customerName, invoiceNo, amount |
+| PAYMENT_RECEIVED | Payment recorded | customerName, amount, invoiceNo |
+| SERVICE_FOLLOWUP_30D | Daily cron 10:30AM, 30 days after delivery | customerName |
+
+### Adding SMS to a New Feature
+```typescript
+// 1. Import the relevant event helper
+import { smsJobCreated } from '../services/events/jobEvents';
+
+// 2. Call it after successful DB operation (fire-and-forget)
+await smsJobCreated({
+  phone: customer.phone,
+  customer_name: customer.full_name,
+  job_code: newJob.job_code,
+  vehicle: `${vehicle.make} ${vehicle.model}`,
+});
+// This inserts to sms_queue — actual sending happens via cron
+```
+
+### SMS Event Constants (`backend/src/config/smsEvents.ts`)
+- Export: `SMS_EVENTS` — object with 7 event key constants
+- Export: `SMS_EVENT_VARIABLES` — maps each event key to its expected template variables
+- Export: `SmsEventKey` type
+
+### MSG91 Setup Requirements
+1. Register DLT Principal Entity ID at TRAI portal
+2. Register SMS template text — get DLT Template ID
+3. Create MSG91 Flow with the template — get Flow ID
+4. Enter DLT Template ID + Flow ID in Settings → SMS → each event row
+5. Set SMS_ENABLED = true and enter MSG91_SMS_AUTH_KEY in Settings
 
 ---
 

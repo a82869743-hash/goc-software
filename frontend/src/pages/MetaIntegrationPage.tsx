@@ -231,7 +231,7 @@ export default function MetaIntegrationPage() {
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-1.5 p-1 bg-black/30 border border-white/5 rounded-xl w-fit">
+      <div className="flex gap-1.5 p-1 bg-black/30 border border-white/5 rounded-xl w-fit max-w-full overflow-x-auto custom-scrollbar">
         {([
           { key: 'setup', label: 'Setup Guide', icon: 'menu_book' },
           { key: 'settings', label: 'Configuration', icon: 'settings' },

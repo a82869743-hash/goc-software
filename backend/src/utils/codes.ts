@@ -31,7 +31,8 @@ export const generateCode = async (type: keyof typeof CODE_CONFIGS): Promise<str
   }
 
   const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT ${config.column} FROM ${config.table} ORDER BY id DESC LIMIT 1`
+    `SELECT ${config.column} FROM ${config.table} WHERE ${config.column} LIKE ? ORDER BY id DESC LIMIT 1`,
+    [`${config.prefix}%`]
   );
 
   let nextNum = 1;

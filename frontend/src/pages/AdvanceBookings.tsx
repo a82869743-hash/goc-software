@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { advanceBookingsAPI, AdvanceBooking } from '../api/advanceBookings';
 import { customersAPI } from '../api/customers';
+import { carDataset } from '../utils/carDataset';
 import toast from 'react-hot-toast';
 
 const STATUS_CFG: Record<string, { label: string; color: string; bg: string; border: string; dot: string }> = {
@@ -9,6 +11,7 @@ const STATUS_CFG: Record<string, { label: string; color: string; bg: string; bor
   confirmed: { label: 'Confirmed Slot', color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20', dot: 'bg-green-400' },
   arrived: { label: 'Arrived at Studio', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20', dot: 'bg-blue-400 animate-pulse' },
   cancelled: { label: 'Cancelled Slot', color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20', dot: 'bg-red-500' },
+  converted: { label: 'Converted to Job', color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20', dot: 'bg-purple-400' },
 };
 
 const TIMING_SLOTS = ['09:00', '11:00', '14:00', '16:00', '18:00'];
@@ -29,12 +32,45 @@ export default function AdvanceBookings() {
 
   // Lookup state
   const [lookupQuery, setLookupQuery] = useState('');
+  const [activeField, setActiveField] = useState<'customer_name' | 'mobile' | 'car_number' | null>(null);
   const { data: lookupRes } = useQuery({
     queryKey: ['customer-lookup-advance', lookupQuery],
     queryFn: () => customersAPI.search(lookupQuery),
     enabled: lookupQuery.length >= 2,
   });
   const lookupResults = lookupRes?.data || [];
+
+  const renderAutocomplete = (fieldName: 'customer_name' | 'mobile' | 'car_number') => {
+    if (activeField !== fieldName || lookupQuery.length < 2 || lookupResults.length === 0) return null;
+    return (
+      <div className="absolute left-0 right-0 top-full mt-1 bg-[#111111] border border-white/10 rounded-xl overflow-hidden max-h-48 overflow-y-auto z-50 shadow-2xl font-data-sm text-left">
+        {lookupResults.map((c: any) => (
+          <div
+            key={`${c.id}-${c.vehicle_id}`}
+            onMouseDown={(e) => {
+              e.preventDefault(); // prevents blur
+              setBookingForm(prev => ({
+                ...prev,
+                customer_name: c.full_name,
+                mobile: c.phone || '',
+                car_number: c.car_number || '',
+                car_make: c.car_make || '',
+                car_model: c.car_model || '',
+              }));
+              setLookupQuery('');
+              setActiveField(null);
+            }}
+            className="w-full text-left px-4 py-2.5 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 text-xs text-white cursor-pointer flex flex-col"
+          >
+            <span className="font-bold text-white">{c.full_name} ({c.phone})</span>
+            {c.car_number && (
+              <span className="text-[10px] text-performance-red mt-0.5 font-mono">{c.car_number} • {c.car_make} {c.car_model}</span>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   // Booking Create Form
   const [bookingForm, setBookingForm] = useState({
@@ -47,7 +83,18 @@ export default function AdvanceBookings() {
     booking_time: '09:00',
     concerns: '',
     notes: '',
+    advance_amount: '',
+    advance_mode: 'upi',
   });
+
+  const navigate = useNavigate();
+
+  const selectedBrandDataBooking = carDataset.find(
+    item => item.brand.toLowerCase() === bookingForm.car_make.toLowerCase()
+  );
+  const modelSuggestions = selectedBrandDataBooking
+    ? selectedBrandDataBooking.models
+    : Array.from(new Set(carDataset.flatMap(item => item.models))).sort();
 
   // Queries
   const { data: bookingsRes, isLoading } = useQuery({
@@ -116,6 +163,7 @@ export default function AdvanceBookings() {
   // Helpers
   const resetForm = () => {
     setLookupQuery('');
+    setActiveField(null);
     setBookingForm({
       customer_name: '',
       mobile: '',
@@ -126,6 +174,8 @@ export default function AdvanceBookings() {
       booking_time: '09:00',
       concerns: '',
       notes: '',
+      advance_amount: '',
+      advance_mode: 'upi',
     });
   };
 
@@ -204,102 +254,22 @@ export default function AdvanceBookings() {
       </div>
 
       {/* ── Main Scheduler Grid ────────────────────────────── */}
-      <div className="flex-grow min-h-0 flex gap-6 items-start">
-        {/* Left Column: Visual Slots Bay */}
-        <section className="w-1/2 flex flex-col glass-panel rounded-2xl h-full max-h-full overflow-hidden shadow-2xl">
-          <div className="p-5 border-b border-carbon-border/50 flex justify-between items-center bg-white/[0.01] shrink-0">
-            <div className="flex items-center gap-3">
-              <span className="w-2 h-2 rounded-full bg-performance-red animate-pulse shadow-[0_0_8px_#FF2B2B]"></span>
-              <h2 className="font-label-caps text-label-caps text-white tracking-widest">TIMELINE BAY SLOTS</h2>
-            </div>
-            <span className="font-data-sm text-[10px] text-performance-red bg-performance-red/10 border border-performance-red/20 px-3 py-1 rounded-full font-bold">
-              {activeCount} RESERVED
-            </span>
-          </div>
-
-          <div className="p-4 flex-1 overflow-y-auto flex flex-col gap-4 custom-scrollbar">
-            {TIMING_SLOTS.map((slot) => {
-              const b = getSlotBooking(slot);
-              if (b) {
-                const cfg = STATUS_CFG[b.status] || STATUS_CFG.pending;
-                return (
-                  <div
-                    key={slot}
-                    className="bg-void-black/80 border border-white/5 rounded-xl p-5 relative overflow-hidden group flex justify-between items-center"
-                  >
-                    <div className="absolute top-0 left-0 bottom-0 w-1 bg-performance-red"></div>
-                    <div className="space-y-1">
-                      <span className="font-data-lg text-sm text-white font-bold block">{slot} - Slot Booking</span>
-                      <p className="text-xs text-white/80">{b.customer_name} ({b.mobile})</p>
-                      <p className="text-[10px] text-gray-500 font-mono">Car: {b.car_number} | Ref: {b.booking_ref}</p>
-                    </div>
-                    <div className="flex flex-col items-end gap-2 relative z-10">
-                      <span className={`font-label-caps text-[7.5px] px-1.5 py-0.5 rounded border uppercase tracking-wider ${cfg.bg} ${cfg.border} ${cfg.color} flex items-center gap-1 font-bold`}>
-                        <span className={`w-1 h-1 rounded-full ${cfg.dot}`} />
-                        {cfg.label}
-                      </span>
-                      <div className="flex gap-1">
-                        {b.status === 'confirmed' && (
-                          <button
-                            onClick={() => updateStatusMutation.mutate({ id: b.id, status: 'arrived' })}
-                            className="px-2 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded text-[9px] font-label-caps tracking-widest uppercase hover:bg-blue-500 hover:text-white transition-all"
-                          >
-                            Mark Arrived
-                          </button>
-                        )}
-                        {b.status !== 'cancelled' && b.status !== 'arrived' && (
-                          <button
-                            onClick={() => {
-                              setSelectedBooking(b);
-                              setShowCancelModal(true);
-                            }}
-                            className="px-2 py-1 bg-red-500/10 border border-red-500/20 text-red-400 rounded text-[9px] font-label-caps tracking-widest uppercase hover:bg-red-500 hover:text-white transition-all"
-                          >
-                            Cancel
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              } else {
-                return (
-                  <div
-                    key={slot}
-                    onClick={() => {
-                      resetForm();
-                      setBookingForm(prev => ({ ...prev, booking_time: slot }));
-                      setShowScheduleModal(true);
-                    }}
-                    className="bg-performance-red/[0.01] border border-performance-red/10 rounded-xl p-5 relative cursor-pointer hover:bg-performance-red/[0.04] hover:border-performance-red/30 transition-all group flex justify-between items-center"
-                  >
-                    <div>
-                      <span className="font-data-lg text-sm text-performance-red/70 group-hover:text-performance-red transition-colors block font-bold">{slot} - Available Bay Slot</span>
-                      <span className="text-[10px] text-gray-600 block mt-1">No booking reservations currently scheduled.</span>
-                    </div>
-                    <span className="font-label-caps text-[8px] px-2 py-1 bg-performance-red/10 text-performance-red rounded flex items-center gap-1 tracking-widest font-bold">
-                      <span className="material-symbols-outlined text-[10px] animate-pulse">bolt</span> AVAILABLE
-                    </span>
-                  </div>
-                );
-              }
-            })}
-          </div>
-        </section>
-
-        {/* Right Column: Full scheduling manifest table list */}
-        <section className="w-1/2 flex flex-col glass-panel rounded-2xl h-full max-h-full overflow-hidden shadow-2xl">
+      <div className="flex-grow min-h-0 flex flex-col gap-6 items-start w-full">
+        {/* Full scheduling manifest table list */}
+        <section className="w-full flex flex-col glass-panel rounded-2xl h-auto lg:h-full lg:max-h-full overflow-hidden shadow-2xl">
           <div className="p-5 border-b border-carbon-border/50 flex justify-between items-center bg-white/[0.01] shrink-0">
             <h2 className="font-label-caps text-label-caps text-white tracking-widest">SCHEDULING MANIFEST</h2>
           </div>
 
           <div className="flex-grow min-h-0 overflow-y-auto custom-scrollbar p-4">
-            <table className="w-full text-left border-collapse text-xs font-data-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[600px] text-left border-collapse text-xs font-data-sm">
               <thead>
                 <tr className="border-b border-white/5 text-gray-500 uppercase tracking-widest text-[8px] font-label-caps pb-2">
                   <th className="pb-3 font-normal">Booking ID</th>
                   <th className="pb-3 font-normal">Customer</th>
                   <th className="pb-3 font-normal">Appointment</th>
+                  <th className="pb-3 font-normal">Advance</th>
                   <th className="pb-3 font-normal">Status</th>
                   <th className="pb-3 font-normal text-right">Actions</th>
                 </tr>
@@ -307,7 +277,7 @@ export default function AdvanceBookings() {
               <tbody className="divide-y divide-white/5">
                 {bookings.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-gray-600 italic">No bookings match the current query.</td>
+                    <td colSpan={6} className="py-8 text-center text-gray-600 italic">No bookings match the current query.</td>
                   </tr>
                 ) : (
                   bookings.map((b) => {
@@ -327,11 +297,31 @@ export default function AdvanceBookings() {
                           <p className="text-gray-500">{b.booking_time.substring(0, 5)}</p>
                         </td>
                         <td className="py-3">
+                          {b.advance_amount && Number(b.advance_amount) > 0 ? (
+                            <div>
+                              <p className="text-white font-medium">₹{Number(b.advance_amount).toLocaleString('en-IN')}</p>
+                              <p className="text-[9px] text-gray-500 uppercase tracking-widest font-mono">{b.advance_mode}</p>
+                            </div>
+                          ) : (
+                            <span className="text-gray-600">—</span>
+                          )}
+                        </td>
+                        <td className="py-3">
                           <span className={`font-label-caps text-[7px] px-1.5 py-0.5 rounded border uppercase tracking-wider ${cfg.bg} ${cfg.border} ${cfg.color} inline-flex items-center gap-1 font-bold`}>
                             {cfg.label}
                           </span>
                         </td>
-                        <td className="py-3 text-right">
+                        <td className="py-3 text-right font-medium">
+                          {b.status !== 'converted' && b.status !== 'cancelled' && (
+                            <button
+                              onClick={() => navigate(`/jobs/new?advance_booking_id=${b.id}`)}
+                              className="mr-3 px-2 py-1 bg-green-500/10 border border-green-500/20 text-green-400 rounded text-[9px] font-label-caps tracking-widest uppercase hover:bg-green-500 hover:text-white transition-all inline-flex items-center gap-1 font-bold"
+                              title="Create Job Card"
+                            >
+                              <span className="material-symbols-outlined text-[10px]">precision_manufacturing</span>
+                              Create Job
+                            </button>
+                          )}
                           <button
                             onClick={() => {
                               if (window.confirm('Delete this booking record permanently?')) {
@@ -350,6 +340,7 @@ export default function AdvanceBookings() {
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         </section>
       </div>
@@ -357,14 +348,14 @@ export default function AdvanceBookings() {
       {/* ── SCHEDULING FORM MODAL ─────────────────────────── */}
       {showScheduleModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm overflow-y-auto"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm overflow-y-auto p-4"
           onClick={() => setShowScheduleModal(false)}
         >
           <div
-            className="bg-[#111111] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden my-8"
+            className="bg-[#111111] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden my-auto max-h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-black/20">
+            <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-black/20 shrink-0">
               <h3 className="text-sm font-label-caps font-bold text-white flex items-center gap-2 tracking-wide">
                 <span className="material-symbols-outlined text-[20px] text-performance-red">calendar_today</span>
                 INITIALIZE SERVICE APPOINTMENT
@@ -378,9 +369,9 @@ export default function AdvanceBookings() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleCreateSubmit} className="p-6 space-y-4 overflow-y-auto custom-scrollbar">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
+                <div className="relative">
                   <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-bold mb-1.5">Customer Name *</label>
                   <input
                     type="text"
@@ -391,10 +382,16 @@ export default function AdvanceBookings() {
                       setBookingForm(prev => ({ ...prev, customer_name: e.target.value }));
                       setLookupQuery(e.target.value);
                     }}
+                    onFocus={() => {
+                      setActiveField('customer_name');
+                      setLookupQuery(bookingForm.customer_name);
+                    }}
+                    onBlur={() => setActiveField(null)}
                     className="w-full bg-white/[0.04] border border-white/[0.07] rounded-xl py-2 px-3.5 text-xs text-white focus:outline-none"
                   />
+                  {renderAutocomplete('customer_name')}
                 </div>
-                <div>
+                <div className="relative">
                   <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-bold mb-1.5">Mobile Contact *</label>
                   <input
                     type="text"
@@ -405,41 +402,19 @@ export default function AdvanceBookings() {
                       setBookingForm(prev => ({ ...prev, mobile: e.target.value }));
                       setLookupQuery(e.target.value);
                     }}
+                    onFocus={() => {
+                      setActiveField('mobile');
+                      setLookupQuery(bookingForm.mobile);
+                    }}
+                    onBlur={() => setActiveField(null)}
                     className="w-full bg-white/[0.04] border border-white/[0.07] rounded-xl py-2 px-3.5 text-xs text-white focus:outline-none"
                   />
+                  {renderAutocomplete('mobile')}
                 </div>
               </div>
 
-              {lookupQuery.length >= 2 && lookupResults.length > 0 && (
-                <div className="bg-[#0a0a0a] border border-white/10 rounded-xl overflow-hidden max-h-40 overflow-y-auto z-50 relative">
-                  {lookupResults.map((c: any) => (
-                    <button
-                      key={`${c.id}-${c.vehicle_id}`}
-                      type="button"
-                      onClick={() => {
-                        setBookingForm(prev => ({
-                          ...prev,
-                          customer_name: c.full_name,
-                          mobile: c.phone || '',
-                          car_number: c.car_number || '',
-                          car_make: c.car_make || '',
-                          car_model: c.car_model || '',
-                        }));
-                        setLookupQuery('');
-                      }}
-                      className="w-full text-left px-4 py-2.5 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 text-xs text-white flex flex-col"
-                    >
-                      <span className="font-bold text-white">{c.full_name} ({c.phone})</span>
-                      {c.car_number && (
-                        <span className="text-[10px] text-performance-red mt-0.5 font-mono">{c.car_number} • {c.car_make} {c.car_model}</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
+                <div className="relative">
                   <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-bold mb-1.5">License Plate *</label>
                   <input
                     type="text"
@@ -450,13 +425,20 @@ export default function AdvanceBookings() {
                       setBookingForm(prev => ({ ...prev, car_number: e.target.value.toUpperCase() }));
                       setLookupQuery(e.target.value);
                     }}
+                    onFocus={() => {
+                      setActiveField('car_number');
+                      setLookupQuery(bookingForm.car_number);
+                    }}
+                    onBlur={() => setActiveField(null)}
                     className="w-full bg-white/[0.04] border border-white/[0.07] rounded-xl py-2 px-3.5 text-xs text-white focus:outline-none font-mono"
                   />
+                  {renderAutocomplete('car_number')}
                 </div>
                 <div>
                   <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-bold mb-1.5">Car Make</label>
                   <input
                     type="text"
+                    list="brands-datalist-booking"
                     placeholder="e.g. Maruti"
                     value={bookingForm.car_make}
                     onChange={(e) => setBookingForm(prev => ({ ...prev, car_make: e.target.value }))}
@@ -467,6 +449,7 @@ export default function AdvanceBookings() {
                   <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-bold mb-1.5">Car Model</label>
                   <input
                     type="text"
+                    list="models-datalist-booking"
                     placeholder="e.g. Swift"
                     value={bookingForm.car_model}
                     onChange={(e) => setBookingForm(prev => ({ ...prev, car_model: e.target.value }))}
@@ -511,6 +494,33 @@ export default function AdvanceBookings() {
                 />
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-bold mb-1.5">Advance Amount (₹)</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 5000"
+                    value={bookingForm.advance_amount}
+                    onChange={(e) => setBookingForm(prev => ({ ...prev, advance_amount: e.target.value }))}
+                    className="w-full bg-white/[0.04] border border-white/[0.07] rounded-xl py-2 px-3.5 text-xs text-white focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-bold mb-1.5">Advance Payment Mode</label>
+                  <select
+                    value={bookingForm.advance_mode}
+                    onChange={(e) => setBookingForm(prev => ({ ...prev, advance_mode: e.target.value }))}
+                    className="w-full bg-white/[0.04] border border-white/[0.07] rounded-xl py-2.5 px-3 text-xs text-white focus:outline-none bg-black"
+                  >
+                    <option value="cash">Cash</option>
+                    <option value="upi">UPI</option>
+                    <option value="card">Card</option>
+                    <option value="bank_transfer">Bank Transfer</option>
+                    <option value="cheque">Cheque</option>
+                  </select>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-bold mb-1.5">Internal Remarks</label>
                 <textarea
@@ -545,14 +555,14 @@ export default function AdvanceBookings() {
       {/* ── CANCELLATION modal ────────────────────────────── */}
       {showCancelModal && selectedBooking && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
           onClick={() => setShowCancelModal(false)}
         >
           <div
-            className="bg-[#111111] border border-white/10 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden"
+            className="bg-[#111111] border border-white/10 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden my-auto max-h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-black/20">
+            <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-[#111111] bg-black/20 shrink-0">
               <h3 className="text-sm font-label-caps font-bold text-performance-red flex items-center gap-2 tracking-wide">
                 <span className="material-symbols-outlined text-[20px]">block</span>
                 CANCEL SERVICE APPOINTMENT
@@ -564,7 +574,7 @@ export default function AdvanceBookings() {
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
-            <div className="px-6 py-5 space-y-4">
+            <div className="px-6 py-5 space-y-4 overflow-y-auto custom-scrollbar">
               <div className="bg-performance-red/5 border border-performance-red/10 rounded-lg p-3.5 text-xs text-performance-red leading-relaxed">
                 Cancelling advance booking <span className="font-bold text-white">{selectedBooking.booking_ref}</span> for {selectedBooking.customer_name}. An alert SMS will be dispatched automatically.
               </div>
@@ -596,6 +606,17 @@ export default function AdvanceBookings() {
           </div>
         </div>
       )}
+      <datalist id="brands-datalist-booking">
+        {carDataset.map(item => (
+          <option key={item.brand} value={item.brand} />
+        ))}
+      </datalist>
+
+      <datalist id="models-datalist-booking">
+        {modelSuggestions.map(model => (
+          <option key={model} value={model} />
+        ))}
+      </datalist>
     </div>
   );
 }

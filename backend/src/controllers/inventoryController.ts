@@ -256,3 +256,22 @@ export const getPurchaseHistory = async (req: Request, res: Response): Promise<v
     res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed to fetch purchase history.' } });
   }
 };
+
+/** GET /inventory/usages — List all stock usages/deductions */
+export const getInventoryUsage = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT iu.*, s.full_name as staff_name, j.job_code, ii.name as item_name, ii.brand as item_brand
+       FROM inventory_usage iu
+       LEFT JOIN staff s ON iu.used_by = s.id
+       LEFT JOIN job_cards j ON iu.job_card_id = j.id
+       LEFT JOIN inventory_items ii ON iu.inventory_item_id = ii.id
+       ORDER BY iu.created_at DESC LIMIT 100`
+    );
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    console.error('Get inventory usage error:', error);
+    res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed to fetch inventory usage.' } });
+  }
+};
+

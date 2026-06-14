@@ -147,7 +147,7 @@ const ReportsPage: React.FC = () => {
 
   const handleInventoryRollsDownload = () => {
     if (!invReportData?.rolls) return;
-    const headers = ['Roll Code', 'Inventory Item Name', 'Balance (Sqft)', 'Status'];
+    const headers = ['Roll Code', 'Inventory Item Name', 'Balance (Sq feet)', 'Status'];
     const rows = invReportData.rolls.map((r: any) => [
       r.roll_code || '',
       r.item_name || '',
@@ -248,8 +248,8 @@ const ReportsPage: React.FC = () => {
       </div>
 
       {/* TABS SELECTOR */}
-      <div className="flex border-b border-white/5 pb-1">
-        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-black/30 border border-white/5 rounded-xl">
+      <div className="flex border-b border-white/5 pb-1 overflow-x-auto custom-scrollbar whitespace-nowrap min-w-full">
+        <div className="flex items-center gap-1.5 p-1 bg-black/30 border border-white/5 rounded-xl">
           {([
             { id: 'overview', icon: 'dashboard', label: 'Overview' },
             { id: 'job_cards', icon: 'description', label: 'Job Cards Ledger' },
@@ -259,7 +259,7 @@ const ReportsPage: React.FC = () => {
           ] as const).map((tab) => (
             <button
               key={tab.id}
-              className={`px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all hover:cursor-pointer ${
+              className={`px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all hover:cursor-pointer shrink-0 ${
                 activeTab === tab.id
                   ? 'bg-performance-red/10 text-performance-red border border-performance-red/20 shadow-[0_0_15px_rgba(255,43,43,0.15)] font-extrabold'
                   : 'text-tertiary/60 hover:text-white font-bold'
@@ -489,7 +489,7 @@ const ReportsPage: React.FC = () => {
                 onChange={e => setJcSearch(e.target.value)}
               />
             </div>
-            <div className="flex flex-col gap-1.5 w-40">
+            <div className="flex flex-col gap-1.5 w-full sm:w-40">
               <label className="text-[10px] font-extrabold text-tertiary uppercase tracking-wider">Status</label>
               <select
                 className="bg-black/30 border border-white/5 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-performance-red w-full font-bold"
@@ -508,7 +508,7 @@ const ReportsPage: React.FC = () => {
                 <option value="cancelled">Cancelled</option>
               </select>
             </div>
-            <div className="flex flex-col gap-1.5 w-44">
+            <div className="flex flex-col gap-1.5 w-full sm:w-44">
               <label className="text-[10px] font-extrabold text-tertiary uppercase tracking-wider">Date From</label>
               <input
                 type="date"
@@ -517,7 +517,7 @@ const ReportsPage: React.FC = () => {
                 onChange={e => setJcDateFrom(e.target.value)}
               />
             </div>
-            <div className="flex flex-col gap-1.5 w-44">
+            <div className="flex flex-col gap-1.5 w-full sm:w-44">
               <label className="text-[10px] font-extrabold text-tertiary uppercase tracking-wider">Date To</label>
               <input
                 type="date"
@@ -526,11 +526,11 @@ const ReportsPage: React.FC = () => {
                 onChange={e => setJcDateTo(e.target.value)}
               />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
                 onClick={handleJCDownload}
                 disabled={!jcReportData?.length}
-                className="bg-emerald-600/15 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/25 px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider flex items-center gap-2 transition-all hover:cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed h-10 shadow-[0_0_10px_rgba(16,185,129,0.05)]"
+                className="bg-emerald-600/15 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/25 px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider flex items-center gap-2 transition-all hover:cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed h-10 shadow-[0_0_10px_rgba(16,185,129,0.05)] w-full sm:w-auto justify-center"
               >
                 <span className="material-symbols-outlined text-[16px]">download</span>
                 Export Excel
@@ -546,8 +546,8 @@ const ReportsPage: React.FC = () => {
                 Querying Job Cards Ledger...
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+              <div className="overflow-x-auto custom-scrollbar">
+                <table className="w-full text-left border-collapse min-w-[950px]">
                   <thead>
                     <tr className="bg-black/45 text-on-surface-variant/50 text-[9px] font-label-caps uppercase tracking-widest border-b border-white/[0.06] font-bold">
                       {['Job Code', 'Customer', 'Vehicle', 'Job/Comp Type', 'Dates', 'Status', 'Amounts'].map(h => (
@@ -619,7 +619,7 @@ const ReportsPage: React.FC = () => {
           {/* Filters Bar */}
           <div className="flex flex-wrap items-end justify-between gap-4 bg-[#0c0c0c]/45 backdrop-blur-2xl border border-white/5 p-5 rounded-2xl">
             <div className="flex flex-wrap items-center gap-4 flex-1">
-              <div className="flex flex-col gap-1.5 w-72">
+              <div className="flex flex-col gap-1.5 w-full sm:w-72">
                 <label className="text-[10px] font-extrabold text-tertiary uppercase tracking-wider">Filter Items</label>
                 <input
                   type="text"
@@ -642,11 +642,11 @@ const ReportsPage: React.FC = () => {
                 </label>
               </div>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               <button
                 onClick={handleInventoryItemsDownload}
                 disabled={!invReportData?.items?.length}
-                className="bg-emerald-600/15 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/25 px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider flex items-center gap-2 transition-all hover:cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed h-10 shadow-[0_0_10px_rgba(16,185,129,0.05)]"
+                className="bg-emerald-600/15 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/25 px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider flex items-center gap-2 transition-all hover:cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed h-10 shadow-[0_0_10px_rgba(16,185,129,0.05)] w-full sm:w-auto justify-center"
               >
                 <span className="material-symbols-outlined text-[16px]">download</span>
                 Export Items Stock
@@ -654,7 +654,7 @@ const ReportsPage: React.FC = () => {
               <button
                 onClick={handleInventoryRollsDownload}
                 disabled={!invReportData?.rolls?.length}
-                className="bg-emerald-600/15 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/25 px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider flex items-center gap-2 transition-all hover:cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed h-10 shadow-[0_0_10px_rgba(16,185,129,0.05)]"
+                className="bg-emerald-600/15 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/25 px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider flex items-center gap-2 transition-all hover:cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed h-10 shadow-[0_0_10px_rgba(16,185,129,0.05)] w-full sm:w-auto justify-center"
               >
                 <span className="material-symbols-outlined text-[16px]">download</span>
                 Export PPF Rolls
@@ -676,8 +676,8 @@ const ReportsPage: React.FC = () => {
                   Stock Items Ledger
                 </h3>
                 <div className="bg-[#0c0c0c]/45 backdrop-blur-2xl border border-white/5 rounded-2xl overflow-hidden shadow-2xl">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                  <div className="overflow-x-auto custom-scrollbar">
+                    <table className="w-full text-left border-collapse min-w-[700px]">
                       <thead>
                         <tr className="bg-black/45 text-on-surface-variant/50 text-[9px] font-label-caps uppercase tracking-widest border-b border-white/[0.06] font-bold">
                           {['Item Code', 'Item Name', 'Category', 'Threshold', 'Stock Level', 'Status'].map(h => (
@@ -738,8 +738,8 @@ const ReportsPage: React.FC = () => {
                   PPF Rolls Ledger
                 </h3>
                 <div className="bg-[#0c0c0c]/45 backdrop-blur-2xl border border-white/5 rounded-2xl overflow-hidden shadow-2xl">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                  <div className="overflow-x-auto custom-scrollbar">
+                    <table className="w-full text-left border-collapse min-w-[350px]">
                       <thead>
                         <tr className="bg-black/45 text-on-surface-variant/50 text-[9px] font-label-caps uppercase tracking-widest border-b border-white/[0.06] font-bold">
                           {['Roll Code', 'Roll Name', 'Balance'].map(h => (
@@ -765,7 +765,7 @@ const ReportsPage: React.FC = () => {
                                 </span>
                               </td>
                               <td className="py-3.5 px-5 font-extrabold font-data-lg text-xs text-white">
-                                {r.balance_sqft} sqft
+                                {r.balance_sqft} sq feet
                               </td>
                             </tr>
                           );
@@ -792,7 +792,7 @@ const ReportsPage: React.FC = () => {
         <div className="space-y-6">
           {/* Filters Bar */}
           <div className="flex flex-wrap items-end gap-4 bg-[#0c0c0c]/45 backdrop-blur-2xl border border-white/5 p-5 rounded-2xl">
-            <div className="flex flex-col gap-1.5 w-52">
+            <div className="flex flex-col gap-1.5 w-full sm:w-52">
               <label className="text-[10px] font-extrabold text-tertiary uppercase tracking-wider">Payroll Period From</label>
               <input
                 type="date"
@@ -801,7 +801,7 @@ const ReportsPage: React.FC = () => {
                 onChange={e => setSalaryDateFrom(e.target.value)}
               />
             </div>
-            <div className="flex flex-col gap-1.5 w-52">
+            <div className="flex flex-col gap-1.5 w-full sm:w-52">
               <label className="text-[10px] font-extrabold text-tertiary uppercase tracking-wider">Payroll Period To</label>
               <input
                 type="date"
@@ -810,11 +810,11 @@ const ReportsPage: React.FC = () => {
                 onChange={e => setSalaryDateTo(e.target.value)}
               />
             </div>
-            <div className="flex-1 flex justify-end self-end">
+            <div className="w-full sm:w-auto sm:flex-1 flex sm:justify-end self-end">
               <button
                 onClick={handleSalaryDownload}
                 disabled={!salaryReportData?.length}
-                className="bg-emerald-600/15 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/25 px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider flex items-center gap-2 transition-all hover:cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed h-10 shadow-[0_0_10px_rgba(16,185,129,0.05)]"
+                className="bg-emerald-600/15 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/25 px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider flex items-center gap-2 transition-all hover:cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed h-10 shadow-[0_0_10px_rgba(16,185,129,0.05)] w-full sm:w-auto justify-center"
               >
                 <span className="material-symbols-outlined text-[16px]">download</span>
                 Export Payroll Ledger
@@ -830,8 +830,8 @@ const ReportsPage: React.FC = () => {
                 Calculating Staff Attendance & Salary Ledger...
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+              <div className="overflow-x-auto custom-scrollbar">
+                <table className="w-full text-left border-collapse min-w-[1000px]">
                   <thead>
                     <tr className="bg-black/45 text-on-surface-variant/50 text-[9px] font-label-caps uppercase tracking-widest border-b border-white/[0.06] font-bold">
                       {['Staff Code', 'Staff Member', 'Role', 'Salary Scheme', 'Attendance Tallies', 'Gross Salary', 'Advances Deductions', 'Net Salary'].map(h => (
@@ -923,7 +923,7 @@ const ReportsPage: React.FC = () => {
         <div className="space-y-6">
           {/* Filters Bar */}
           <div className="flex flex-wrap items-end gap-4 bg-[#0c0c0c]/45 backdrop-blur-2xl border border-white/5 p-5 rounded-2xl">
-            <div className="flex flex-col gap-1.5 w-44">
+            <div className="flex flex-col gap-1.5 w-full sm:w-44">
               <label className="text-[10px] font-extrabold text-tertiary uppercase tracking-wider">Date From</label>
               <input
                 type="date"
@@ -932,7 +932,7 @@ const ReportsPage: React.FC = () => {
                 onChange={e => setAccDateFrom(e.target.value)}
               />
             </div>
-            <div className="flex flex-col gap-1.5 w-44">
+            <div className="flex flex-col gap-1.5 w-full sm:w-44">
               <label className="text-[10px] font-extrabold text-tertiary uppercase tracking-wider">Date To</label>
               <input
                 type="date"
@@ -941,7 +941,7 @@ const ReportsPage: React.FC = () => {
                 onChange={e => setAccDateTo(e.target.value)}
               />
             </div>
-            <div className="flex flex-col gap-1.5 w-40">
+            <div className="flex flex-col gap-1.5 w-full sm:w-40">
               <label className="text-[10px] font-extrabold text-tertiary uppercase tracking-wider">Payment Mode</label>
               <select
                 className="bg-black/30 border border-white/5 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-performance-red w-full font-bold"
@@ -956,11 +956,11 @@ const ReportsPage: React.FC = () => {
                 <option value="cheque">Cheque</option>
               </select>
             </div>
-            <div className="flex-1 flex justify-end gap-3 self-end">
+            <div className="w-full sm:w-auto sm:flex-1 flex flex-wrap sm:justify-end gap-3 self-end">
               <button
                 onClick={handleAccountsCashInDownload}
                 disabled={!accReportData?.cash_in?.length}
-                className="bg-emerald-600/15 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/25 px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider flex items-center gap-2 transition-all hover:cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed h-10 shadow-[0_0_10px_rgba(16,185,129,0.05)]"
+                className="bg-emerald-600/15 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/25 px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider flex items-center gap-2 transition-all hover:cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed h-10 shadow-[0_0_10px_rgba(16,185,129,0.05)] w-full sm:w-auto justify-center"
               >
                 <span className="material-symbols-outlined text-[16px]">download</span>
                 Export Cash In
@@ -968,7 +968,7 @@ const ReportsPage: React.FC = () => {
               <button
                 onClick={handleAccountsCashOutDownload}
                 disabled={!accReportData?.cash_out?.length}
-                className="bg-emerald-600/15 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/25 px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider flex items-center gap-2 transition-all hover:cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed h-10 shadow-[0_0_10px_rgba(16,185,129,0.05)]"
+                className="bg-emerald-600/15 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/25 px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider flex items-center gap-2 transition-all hover:cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed h-10 shadow-[0_0_10px_rgba(16,185,129,0.05)] w-full sm:w-auto justify-center"
               >
                 <span className="material-symbols-outlined text-[16px]">download</span>
                 Export Cash Out
@@ -1019,8 +1019,8 @@ const ReportsPage: React.FC = () => {
                     Cash Inflow (Payments Received)
                   </h3>
                   <div className="bg-[#0c0c0c]/45 backdrop-blur-2xl border border-white/5 rounded-2xl overflow-hidden shadow-2xl">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse text-xs">
+                    <div className="overflow-x-auto custom-scrollbar">
+                      <table className="w-full text-left border-collapse text-xs min-w-[550px]">
                         <thead>
                           <tr className="bg-black/45 text-on-surface-variant/50 text-[9px] font-label-caps uppercase tracking-widest border-b border-white/[0.06] font-bold">
                             {['Date', 'Origin/Customer', 'Payment Details', 'Amount'].map(h => (
@@ -1069,8 +1069,8 @@ const ReportsPage: React.FC = () => {
                     Cash Outflow (Expenses & Payouts)
                   </h3>
                   <div className="bg-[#0c0c0c]/45 backdrop-blur-2xl border border-white/5 rounded-2xl overflow-hidden shadow-2xl">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse text-xs">
+                    <div className="overflow-x-auto custom-scrollbar">
+                      <table className="w-full text-left border-collapse text-xs min-w-[550px]">
                         <thead>
                           <tr className="bg-black/45 text-on-surface-variant/50 text-[9px] font-label-caps uppercase tracking-widest border-b border-white/[0.06] font-bold">
                             {['Date', 'Expense Description', 'Details', 'Amount'].map(h => (

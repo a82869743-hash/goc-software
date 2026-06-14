@@ -1,11 +1,16 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
+import { usePermissionsStore } from '../../stores/permissionsStore';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { notificationsAPI } from '../../api/notifications';
 import toast from 'react-hot-toast';
 
-export default function Topbar() {
+interface TopbarProps {
+  onMenuToggle?: () => void;
+}
+
+export default function Topbar({ onMenuToggle }: TopbarProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { staff, logout } = useAuthStore();
@@ -58,16 +63,25 @@ export default function Topbar() {
 
   const handleLogout = () => {
     logout();
+    usePermissionsStore.getState().clearPermissions();
     navigate('/login');
   };
 
   return (
-    <header className="fixed top-0 right-0 w-[calc(100%-16rem)] z-40 bg-void-black/80 backdrop-blur-xl border-b border-white/5 flex justify-between items-center px-gutter-md h-20">
-      {/* ── Left: System Status + Search ─────────────── */}
-      <div className="flex items-center gap-6">
+    <header className="fixed top-0 right-0 left-0 md:left-64 z-40 bg-void-black/80 backdrop-blur-xl border-b border-white/5 flex justify-between items-center px-3 sm:px-4 md:px-gutter-md h-16 md:h-20">
+      {/* ── Left: Hamburger (mobile) + System Status + Search ─────────────── */}
+      <div className="flex items-center gap-3 md:gap-6">
+        {/* Hamburger menu - mobile only */}
+        <button
+          onClick={onMenuToggle}
+          className="md:hidden p-2 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors -ml-1"
+        >
+          <span className="material-symbols-outlined text-2xl">menu</span>
+        </button>
+
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-performance-red animate-pulse box-glow-red" />
-          <span className="font-label-caps text-[10px] tracking-widest text-on-surface-variant/60 uppercase">
+          <span className="font-label-caps text-[10px] tracking-widest text-on-surface-variant/60 uppercase hidden sm:inline">
             System Live
           </span>
         </div>
@@ -84,7 +98,7 @@ export default function Topbar() {
       </div>
 
       {/* ── Right: Actions ────────────────────────────── */}
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-3 sm:gap-4 md:gap-6">
         {/* Notifications */}
         <div className="relative">
           <button
@@ -100,8 +114,8 @@ export default function Topbar() {
           {notifOpen && (
             <>
               <div className="fixed inset-0 z-50" onClick={() => setNotifOpen(false)} />
-              <div className="absolute top-[calc(100%+12px)] right-0 w-[380px] deep-glass rounded-xl shadow-[0_16px_48px_rgba(0,0,0,0.8)] z-[60] overflow-hidden">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-white/[0.02]">
+              <div className="absolute top-[calc(100%+12px)] right-0 w-[320px] sm:w-[380px] deep-glass rounded-xl shadow-[0_16px_48px_rgba(0,0,0,0.8)] z-[60] overflow-hidden">
+                <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-white/5 bg-white/[0.02]">
                   <div className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-performance-red" />
                     <span className="font-label-caps text-[10px] text-white tracking-widest font-bold">NOTIFICATIONS</span>
@@ -130,7 +144,7 @@ export default function Topbar() {
                         <div
                           key={n.id}
                           onClick={() => handleNotificationClick(n.id, n.reference_type, n.reference_id)}
-                          className={`flex items-start gap-4 px-6 py-4 border-b border-white/5 cursor-pointer hover:bg-performance-red/5 transition-all ${
+                          className={`flex items-start gap-4 px-4 sm:px-6 py-4 border-b border-white/5 cursor-pointer hover:bg-performance-red/5 transition-all ${
                             !n.is_read ? 'bg-performance-red/[0.02]' : ''
                           }`}
                         >
@@ -154,12 +168,12 @@ export default function Topbar() {
 
 
 
-        <button className="text-on-surface-variant hover:text-performance-red transition-all">
+        <button className="text-on-surface-variant hover:text-performance-red transition-all hidden sm:block">
           <span className="material-symbols-outlined">diamond</span>
         </button>
 
         {/* Separator */}
-        <div className="h-6 w-[1px] bg-white/5" />
+        <div className="h-6 w-[1px] bg-white/5 hidden sm:block" />
 
         {/* Profile */}
         <div className="relative">

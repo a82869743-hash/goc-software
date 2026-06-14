@@ -130,123 +130,358 @@ export async function generateInvoicePDF(invoiceId: number): Promise<string> {
   const inv = invoiceRows[0];
 
   const [items] = await pool.query<RowDataPacket[]>('SELECT * FROM invoice_items WHERE invoice_id = ?', [invoiceId]);
+  const [payments] = await pool.query<RowDataPacket[]>('SELECT * FROM payments WHERE job_card_id = ?', [inv.job_card_id]);
+  const advancePaid = payments.filter((p: any) => p.payment_type === 'advance').reduce((sum: number, p: any) => sum + Number(p.amount), 0);
+  const otherPaid = payments.filter((p: any) => p.payment_type !== 'advance').reduce((sum: number, p: any) => sum + Number(p.amount), 0);
 
-  const studioName = process.env.STUDIO_NAME || 'God of Ceramic';
-  const studioAddress = process.env.STUDIO_ADDRESS || 'Near Akshar Chowk, Alkapuri, Vadodara, Gujarat 390007';
-  const studioPhone = process.env.STUDIO_PHONE || '+919999999999';
-  const studioGstin = process.env.STUDIO_GSTIN || '24XXXXX1234X1ZX';
+  const studioName = process.env.STUDIO_NAME || 'Pack Wolf Pvt Ltd';
+  const studioAddress = process.env.STUDIO_ADDRESS || 'G-7, B.I.D.C Estate, Gorwa, Vadodara, Gujarat';
+  const studioPhone = process.env.STUDIO_PHONE || '+91 9925566886';
+  const studioGstin = process.env.STUDIO_GSTIN || '24AANCP8548A1ZB';
+
+  let logoBase64 = '';
+  try {
+    const logoPath = path.resolve(__dirname, '../../../uploads/logo.png');
+    if (fs.existsSync(logoPath)) {
+      logoBase64 = fs.readFileSync(logoPath, 'base64');
+    }
+  } catch (e) {
+    console.error('Error reading GOC logo:', e);
+  }
 
   const html = `
     <!DOCTYPE html>
-    <html><head><meta charset="utf-8"><style>${sharedStyles}</style></head>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        \${sharedStyles}
+        body { font-family: system-ui, -apple-system, sans-serif; color: #000; font-size: 10px; line-height: 1.3; background: #fff; }
+        .tally-invoice { width: 100%; border: 1px solid #000; box-sizing: border-box; }
+        .tally-header { text-align: center; border-bottom: 1px solid #000; padding: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+        .tally-row { display: flex; border-bottom: 1px solid #000; }
+        .tally-col-6 { width: 50%; border-right: 1px solid #000; padding: 6px; box-sizing: border-box; }
+        .tally-col-6:last-child { border-right: none; }
+        .tally-right-panel { width: 50%; display: flex; flex-direction: column; }
+        .tally-sub-row { display: flex; border-bottom: 1px solid #000; flex: 1; }
+        .tally-sub-row:last-child { border-bottom: none; }
+        .tally-cell { width: 50%; border-right: 1px solid #000; padding: 4px 6px; box-sizing: border-box; }
+        .tally-cell:last-child { border-right: none; }
+        .tally-single-row { padding: 4px 6px; box-sizing: border-box; flex: 1; }
+        .tally-table { width: 100%; border-collapse: collapse; border-bottom: 1px solid #000; }
+        .tally-table th, .tally-table td { border-right: 1px solid #000; padding: 5px 6px; box-sizing: border-box; font-size: 10px; }
+        .tally-table th:last-child, .tally-table td:last-child { border-right: none; }
+        .tally-table th { border-right: 1px solid #ffffff; border-bottom: 1px solid #000; font-weight: bold; background: #CC0000; color: #ffffff; text-align: left; }
+        .tally-table tr.item-row td { vertical-align: top; }
+        .tally-table tr.blank-row td { height: 140px; }
+        .tally-table tr.discount-row td { border-top: 1px solid #000; padding: 4px 6px; }
+        .tally-table tr.total-row td { border-top: 1px double #000; border-bottom: 1px double #000; font-weight: bold; }
+        .tally-words-row { border-bottom: 1px solid #000; padding: 6px 8px; box-sizing: border-box; }
+        .tally-tax-table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+        .tally-tax-table th, .tally-tax-table td { border: 1px solid #000; padding: 4px; font-size: 8px; text-align: left; }
+        .tally-tax-table th { font-weight: bold; background: #CC0000; color: #ffffff; }
+        .label { color: #444; font-size: 8px; font-weight: bold; text-transform: uppercase; }
+      </style>
+    </head>
     <body>
       <div class="page">
-        <div class="header">
-          <div class="brand">
-            <div class="brand-mark">G</div>
-            <div class="brand-text">
-              <h1>${studioName.toUpperCase()}</h1>
-              <p>${studioAddress}</p>
-              <p>Phone: ${studioPhone} | GSTIN: ${studioGstin}</p>
+        <div class="tally-invoice">
+          <div style="display: flex; align-items: center; border-bottom: 1px solid #000; padding: 4px 8px; box-sizing: border-box;">
+            <div style="width: 20%;"></div>
+            <div style="width: 60%; text-align: center;">
+              <strong style="font-size: 12px; letter-spacing: 1px;">${inv.invoice_type === 'tax_invoice' ? 'TAX INVOICE' : inv.invoice_type === 'proforma' ? 'PROFORMA INVOICE' : 'BILL OF SUPPLY'}</strong>
+              ${inv.invoice_type !== 'tax_invoice' ? '<br/><span style="font-size: 8px; font-style: italic; font-weight: normal;">Composition taxableperson. Not eligible to collect tax on supplies</span>' : ''}
+            </div>
+            <div style="width: 20%; text-align: right;">
+              ${logoBase64 ? '<img src="data:image/png;base64,' + logoBase64 + '" style="height: 40px; vertical-align: middle;" />' : ''}
             </div>
           </div>
-          <div class="doc-type">
-            <h2>${inv.invoice_type === 'tax_invoice' ? 'Tax Invoice' : inv.invoice_type === 'proforma' ? 'Proforma Invoice' : 'Estimate'}</h2>
-            <div class="doc-number">${inv.invoice_code}</div>
-            <div class="doc-date">Date: ${formatDate(inv.invoice_date)}</div>
-            ${inv.due_date ? `<div class="doc-date">Due: ${formatDate(inv.due_date)}</div>` : ''}
+          
+          <div class="tally-row">
+            <div class="tally-col-6">
+              <strong>${studioName.toUpperCase()}</strong><br/>
+              ${studioAddress}<br/>
+              <strong>GSTIN/UIN:</strong> ${studioGstin}<br/>
+              State Name: Gujarat, Code: 24<br/>
+              Contact: ${studioPhone}<br/>
+              E-Mail: info@packwolfservices.com
+            </div>
+            <div class="tally-right-panel">
+              <div class="tally-sub-row">
+                <div class="tally-cell">
+                  <span class="label">Invoice No.</span><br/>
+                  <strong>${inv.invoice_code}</strong>
+                </div>
+                <div class="tally-cell">
+                  <span class="label">Dated</span><br/>
+                  <strong>${formatDate(inv.invoice_date)}</strong>
+                </div>
+              </div>
+              <div class="tally-sub-row">
+                <div class="tally-cell">
+                  <span class="label">Delivery Note</span><br/>
+                  <span>—</span>
+                </div>
+                <div class="tally-cell">
+                  <span class="label">Mode/Terms of Payment</span><br/>
+                  <strong>${(inv.payment_mode || 'UPI/CASH').toUpperCase()}</strong>
+                </div>
+              </div>
+              <div class="tally-sub-row">
+                <div class="tally-cell">
+                  <span class="label">Reference No. & Date</span><br/>
+                  <span>—</span>
+                </div>
+                <div class="tally-cell">
+                  <span class="label">Other References</span><br/>
+                  <span>—</span>
+                </div>
+              </div>
+              <div class="tally-sub-row">
+                <div class="tally-cell">
+                  <span class="label">Buyer's Order No.</span><br/>
+                  <span>—</span>
+                </div>
+                <div class="tally-cell">
+                  <span class="label">Dated</span><br/>
+                  <span>—</span>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
 
-        <div class="info-grid">
-          <div class="info-box">
-            <h3>Bill To</h3>
-            <div class="info-row"><span class="info-label">Name</span><span class="info-value">${inv.customer_name || '-'}</span></div>
-            <div class="info-row"><span class="info-label">Phone</span><span class="info-value">${inv.customer_phone || '-'}</span></div>
-            <div class="info-row"><span class="info-label">Email</span><span class="info-value">${inv.customer_email || '-'}</span></div>
-            <div class="info-row"><span class="info-label">Address</span><span class="info-value">${inv.customer_address || '-'}, ${inv.customer_city || ''}</span></div>
-            ${inv.customer_gstin ? `<div class="info-row"><span class="info-label">GSTIN</span><span class="info-value">${inv.customer_gstin}</span></div>` : ''}
+          <div class="tally-row">
+            <div class="tally-col-6">
+              <span class="label">Buyer (Bill to)</span><br/>
+              <strong>${inv.customer_name || '-'}</strong><br/>
+              ${inv.customer_address || 'BARODA'}${inv.customer_city ? `, ${inv.customer_city}` : ''}<br/>
+              M: ${inv.customer_phone || '-'}<br/>
+              State Name: Gujarat, Code: 24<br/>
+              Place of Supply: Gujarat<br/>
+              ${inv.customer_gstin ? `<strong>GST NO:</strong> ${inv.customer_gstin}` : '<strong>GST NO:</strong> —'}
+            </div>
+            <div class="tally-right-panel">
+              <div class="tally-sub-row">
+                <div class="tally-cell">
+                  <span class="label">Dispatch Doc No.</span><br/>
+                  <span>—</span>
+                </div>
+                <div class="tally-cell">
+                  <span class="label">Delivery Note Date</span><br/>
+                  <span>—</span>
+                </div>
+              </div>
+              <div class="tally-sub-row">
+                <div class="tally-cell">
+                  <span class="label">Dispatched through</span><br/>
+                  <span>—</span>
+                </div>
+                <div class="tally-cell">
+                  <span class="label">Destination</span><br/>
+                  <span>—</span>
+                </div>
+              </div>
+              <div class="tally-single-row">
+                <span class="label">Terms of Delivery</span><br/>
+                <span>—</span>
+              </div>
+            </div>
           </div>
-          <div class="info-box">
-            <h3>Job Details</h3>
-            <div class="info-row"><span class="info-label">Job Card</span><span class="info-value">${inv.job_code || '-'}</span></div>
-            <div class="info-row"><span class="info-label">Vehicle</span><span class="info-value">${inv.vehicle_name || '-'}</span></div>
-            <div class="info-row"><span class="info-label">Reg No.</span><span class="info-value">${inv.reg_number || '-'}</span></div>
-            <div class="info-row"><span class="info-label">Color</span><span class="info-value">${inv.vehicle_color || '-'}</span></div>
-            <div class="info-row"><span class="info-label">Status</span><span class="info-value" style="text-transform:uppercase">${inv.status}</span></div>
-          </div>
-        </div>
 
-        <table>
-          <thead>
-            <tr>
-              <th style="width:5%">#</th>
-              <th style="width:35%">Description</th>
-              <th style="width:12%">HSN/SAC</th>
-              <th style="width:10%">Qty</th>
-              <th style="width:8%">Unit</th>
-              <th style="width:15%">Rate</th>
-              <th style="width:15%">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${items.map((item: any, idx: number) => `
+          <table class="tally-table">
+            <thead>
               <tr>
-                <td>${idx + 1}</td>
-                <td>${item.description}</td>
-                <td>${item.hsn_sac}</td>
-                <td>${item.qty}</td>
-                <td>${item.unit}</td>
-                <td>${formatCurrency(item.rate)}</td>
-                <td>${formatCurrency(item.amount)}</td>
+                <th style="width: 5%; text-align: center;">Sl No.</th>
+                <th style="width: 45%;">Description of Services</th>
+                <th style="width: 15%; text-align: center;">HSN/SAC</th>
+                <th style="width: 10%; text-align: center;">Quantity</th>
+                <th style="width: 10%; text-align: right;">Rate</th>
+                <th style="width: 5%; text-align: center;">per</th>
+                <th style="width: 10%; text-align: right;">Amount</th>
               </tr>
-            `).join('')}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              ${items.map((item: any, idx: number) => {
+                const name = item.description.toLowerCase();
+                const unit = (name.includes('ppf') || name.includes('film')) ? 'sqt' : 
+                             ((name.includes('ceramic') || name.includes('coating') || name.includes('graphene')) ? 'ml' : 'job');
+                return `
+                  <tr class="item-row">
+                    <td style="text-align: center;">${idx + 1}</td>
+                    <td><strong>${item.description}</strong></td>
+                    <td style="text-align: center;">${item.hsn_sac || '998714'}</td>
+                    <td style="text-align: center;">${item.qty}</td>
+                    <td style="text-align: right;">${Number(item.rate).toFixed(2)}</td>
+                    <td style="text-align: center;">${unit}</td>
+                    <td style="text-align: right;"><strong>${Number(item.amount).toFixed(2)}</strong></td>
+                  </tr>
+                `;
+              }).join('')}
+              <tr class="blank-row">
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+              ${inv.discount_amount > 0 ? `
+                <tr class="discount-row">
+                  <td></td>
+                  <td style="text-align: right;"><strong>DISCOUNT</strong></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td style="text-align: right; color: red;"><strong>-${Number(inv.discount_amount).toFixed(2)}</strong></td>
+                </tr>
+              ` : ''}
+              ${inv.apply_gst ? `
+                <tr class="discount-row">
+                  <td></td>
+                  <td style="text-align: right;"><strong>TAXABLE VALUE</strong></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td style="text-align: right;"><strong>${formatCurrency(inv.taxable_amount)}</strong></td>
+                </tr>
+                <tr class="discount-row">
+                  <td></td>
+                  <td style="text-align: right;"><strong>CGST @ ${inv.cgst_rate}%</strong></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td style="text-align: right;"><strong>${formatCurrency(inv.cgst_amount)}</strong></td>
+                </tr>
+                <tr class="discount-row">
+                  <td></td>
+                  <td style="text-align: right;"><strong>SGST @ ${inv.sgst_rate}%</strong></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td style="text-align: right;"><strong>${formatCurrency(inv.sgst_amount)}</strong></td>
+                </tr>
+              ` : ''}
+              <tr class="total-row">
+                <td></td>
+                <td>Total</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td style="text-align: right;"><strong>${formatCurrency(inv.total_amount)}</strong></td>
+              </tr>
+              ${advancePaid > 0 ? `
+                <tr class="discount-row">
+                  <td></td>
+                  <td style="text-align: right;"><strong>ADVANCE PAID</strong></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td style="text-align: right; color: green;"><strong>-${Number(advancePaid).toFixed(2)}</strong></td>
+                </tr>
+              ` : ''}
+              ${otherPaid > 0 ? `
+                <tr class="discount-row">
+                  <td></td>
+                  <td style="text-align: right;"><strong>AMOUNT PAID</strong></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td style="text-align: right; color: green;"><strong>-${Number(otherPaid).toFixed(2)}</strong></td>
+                </tr>
+              ` : ''}
+              <tr class="total-row">
+                <td></td>
+                <td style="text-align: right;"><strong>Balance Due / Payable</strong></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td style="text-align: right;"><strong>${formatCurrency(inv.total_amount - inv.amount_paid)}</strong></td>
+              </tr>
+            </tbody>
+          </table>
 
-        <div class="totals-section">
-          <div class="totals-box">
-            <div class="totals-row"><span>Subtotal</span><span>${formatCurrency(inv.subtotal)}</span></div>
-            ${inv.discount_amount > 0 ? `<div class="totals-row"><span>Discount</span><span>- ${formatCurrency(inv.discount_amount)}</span></div>` : ''}
-            <div class="totals-row"><span>Taxable Amount</span><span>${formatCurrency(inv.taxable_amount)}</span></div>
-            ${inv.apply_gst ? `
-              <div class="totals-row"><span>CGST @ ${inv.cgst_rate}%</span><span>${formatCurrency(inv.cgst_amount)}</span></div>
-              <div class="totals-row"><span>SGST @ ${inv.sgst_rate}%</span><span>${formatCurrency(inv.sgst_amount)}</span></div>
-            ` : ''}
-            <div class="totals-row grand"><span>Grand Total</span><span>${formatCurrency(inv.total_amount)}</span></div>
+          <div class="tally-words-row">
+            <div style="float: left; width: 80%;">
+              Amount Chargeable (in words)<br/>
+              <strong>INR ${numberToWords((inv.total_amount - inv.amount_paid) > 0 ? (inv.total_amount - inv.amount_paid) : inv.total_amount)} Only</strong>
+            </div>
+            <div style="float: right; text-align: right; width: 20%;">
+              E. & O.E.
+            </div>
+            <div style="clear: both;"></div>
           </div>
-        </div>
 
-        <p style="font-size:10px; color:#666; font-style:italic; margin-bottom: 16px;">
-          Amount in words: <strong>${numberToWords(inv.total_amount)} Rupees Only</strong>
-        </p>
+          <div class="tally-row" style="border-bottom: none;">
+            <div class="tally-col-6">
+              <table class="tally-tax-table">
+                <thead>
+                  <tr>
+                    <th>HSN/SAC</th>
+                    <th style="text-align: right;">Taxable Value</th>
+                    ${inv.apply_gst ? `
+                      <th style="text-align: right;">Central Tax (9%)</th>
+                      <th style="text-align: right;">State Tax (9%)</th>
+                    ` : ''}
+                    <th style="text-align: right;">Total Tax Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>998714</td>
+                    <td style="text-align: right;">${Number(inv.taxable_amount).toFixed(2)}</td>
+                    ${inv.apply_gst ? `
+                      <td style="text-align: right;">${Number(inv.cgst_amount).toFixed(2)}</td>
+                      <td style="text-align: right;">${Number(inv.sgst_amount).toFixed(2)}</td>
+                    ` : ''}
+                    <td style="text-align: right;">${Number(inv.gst_amount || 0).toFixed(2)}</td>
+                  </tr>
+                  <tr style="font-weight: bold; background: #fafafa;">
+                    <td>Total</td>
+                    <td style="text-align: right;">${Number(inv.taxable_amount).toFixed(2)}</td>
+                    ${inv.apply_gst ? `
+                      <td style="text-align: right;">${Number(inv.cgst_amount).toFixed(2)}</td>
+                      <td style="text-align: right;">${Number(inv.sgst_amount).toFixed(2)}</td>
+                    ` : ''}
+                    <td style="text-align: right;">${Number(inv.gst_amount || 0).toFixed(2)}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div style="margin-top: 5px; font-size: 8px;">
+                Tax Amount (in words): <strong>${inv.gst_amount > 0 ? 'INR ' + numberToWords(inv.gst_amount) : 'NIL'}</strong>
+              </div>
+            </div>
+            <div class="tally-col-6" style="font-size: 9px; line-height: 1.4;">
+              <strong>Company's Bank Details</strong><br/>
+              Bank Name : <strong>HDFC BANK LTD</strong><br/>
+              A/c No.   : <strong>50200104786162</strong><br/>
+              Branch    : <strong>SUN PHARMA</strong><br/>
+              IFSC Code : <strong>HDFC0003688</strong>
+            </div>
+          </div>
 
-        ${inv.amount_paid > 0 ? `
-        <div style="background:#eafbea; border:1px solid #4caf50; border-radius:6px; padding:8px 14px; margin-bottom:16px; font-size:11px;">
-          <strong>Payment Received:</strong> ${formatCurrency(inv.amount_paid)} | 
-          <strong>Balance Due:</strong> ${formatCurrency(inv.balance_due)}
-        </div>` : ''}
-
-        <div class="terms-section">
-          <h3>Terms & Conditions</h3>
-          <ul>
-            <li>Payment is due within 7 days from the invoice date.</li>
-            <li>All services are covered under our standard warranty policy.</li>
-            <li>For queries, contact us at ${studioPhone}.</li>
-            ${inv.notes ? `<li>${inv.notes}</li>` : ''}
-          </ul>
-        </div>
-
-        <div class="stamp-area">
-          <div class="stamp-label">Authorized Signatory<br/>${studioName}</div>
-        </div>
-
-        <div class="footer">
-          <span>This is a computer-generated document. No signature is required.</span>
-          <span>${studioName} | ${studioPhone}</span>
+          <div class="tally-row tally-footer-row" style="border-top: 1px solid #000; border-bottom: none;">
+            <div class="tally-col-6" style="font-size: 8px; line-height: 1.4;">
+              <strong>Declaration:</strong><br/>
+              We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.
+            </div>
+            <div class="tally-col-6" style="text-align: center; border-left: 1px solid #000; height: 70px; position: relative; padding-top: 24px;">
+              <div style="margin: 0 auto; width: 60%; border-bottom: 1px solid #000;"></div>
+              <div style="margin-top: 4px; font-size: 9px; text-align: center; font-weight: bold; text-transform: uppercase;">Authorized Signatory</div>
+            </div>
+          </div>
         </div>
       </div>
-    </body></html>
+    </body>
+    </html>
   `;
 
   // Write HTML and generate PDF using puppeteer
@@ -298,9 +533,9 @@ export async function generateQuotationPDF(quotationId: number): Promise<string>
 
   const [zones] = await pool.query<RowDataPacket[]>('SELECT * FROM quotation_zones WHERE quotation_id = ?', [quotationId]);
 
-  const studioName = process.env.STUDIO_NAME || 'God of Ceramic';
+  const studioName = process.env.STUDIO_NAME || 'Pack Wolf Pvt Ltd';
   const studioAddress = process.env.STUDIO_ADDRESS || 'Near Akshar Chowk, Alkapuri, Vadodara, Gujarat 390007';
-  const studioPhone = process.env.STUDIO_PHONE || '+919999999999';
+  const studioPhone = process.env.STUDIO_PHONE || '+91 9925566886';
 
   const html = `
     <!DOCTYPE html>

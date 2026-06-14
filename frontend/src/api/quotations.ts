@@ -26,6 +26,8 @@ export interface WhiteboardQuotation {
   customer_name?: string;
   customer_phone?: string;
   vehicle_name?: string;
+  vehicle_make?: string;
+  vehicle_model?: string;
   reg_number?: string;
   created_at: string;
 }
@@ -51,7 +53,7 @@ export interface CreateQuotationPayload {
 }
 
 export const quotationsAPI = {
-  list: async (filters: { status?: string; search?: string; page?: number; limit?: number } = {}): Promise<ApiResponse<WhiteboardQuotation[]>> => {
+  list: async (filters: { status?: string; search?: string; page?: number; limit?: number; trash?: boolean } = {}): Promise<ApiResponse<WhiteboardQuotation[]>> => {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([k, v]) => { if (v !== undefined && v !== '') params.append(k, String(v)); });
     const { data } = await apiClient.get(`/quotations?${params.toString()}`);
@@ -78,13 +80,23 @@ export const quotationsAPI = {
     return data;
   },
 
+  restore: async (id: number): Promise<ApiResponse<{ message: string }>> => {
+    const { data } = await apiClient.put(`/quotations/${id}/restore`);
+    return data;
+  },
+
+  deletePermanent: async (id: number): Promise<ApiResponse<{ message: string }>> => {
+    const { data } = await apiClient.delete(`/quotations/${id}/permanent`);
+    return data;
+  },
+
   sendWhatsApp: async (id: number): Promise<ApiResponse<{ message: string; phone: string }>> => {
     const { data } = await apiClient.post(`/quotations/${id}/send-whatsapp`);
     return data;
   },
 
   generatePDF: async (id: number): Promise<ApiResponse<{ pdf_url: string; quotation_code: string }>> => {
-    const { data } = await apiClient.post(`/quotations/${id}/generate-pdf`, null, { timeout: 60000 });
+    const { data } = await apiClient.post(`/quotations/${id}/generate-pdf`, {}, { timeout: 60000 });
     return data;
   },
 };

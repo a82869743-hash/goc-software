@@ -16,6 +16,7 @@ export interface InventoryItem {
   is_low_stock?: boolean;
   notes?: string | null;
   usage?: InventoryUsage[];
+  created_at?: string;
 }
 
 export interface InventoryUsage {
@@ -67,6 +68,10 @@ export const inventoryAPI = {
   },
   recordPurchase: async (payload: any): Promise<ApiResponse<InventoryItem>> => {
     const { data } = await apiClient.post('/inventory/purchase', payload);
+    return data;
+  },
+  usages: async (): Promise<ApiResponse<InventoryUsage[]>> => {
+    const { data } = await apiClient.get('/inventory/usages');
     return data;
   },
 };

@@ -445,7 +445,7 @@ export default function LeadsPage() {
           /* Ledger List View */
           <div className="bg-[#111111] border border-white/5 rounded-2xl overflow-hidden shadow-2xl flex flex-col h-full">
             <div className="overflow-x-auto flex-1 custom-scrollbar">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full min-w-[800px] text-left border-collapse">
                 <thead>
                   <tr className="bg-black/35 border-b border-white/5 text-[9px] font-label-caps uppercase tracking-widest text-on-surface-variant/60">
                     <th className="px-6 py-4 w-12 text-center">
@@ -527,17 +527,18 @@ export default function LeadsPage() {
         )}
       </div>
 
-      {/* ── Lead Detail Drawer Panel ───────────────────────── */}
+      {/* ── Lead Detail Modal Panel ───────────────────────── */}
       {selectedLeadId && leadDetailRes?.data && (
-        <>
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto"
+          id="drawer-overlay"
+          onClick={() => setSelectedLeadId(null)}
+        >
+          <div className="absolute inset-0 z-0 bg-transparent" />
           <div
-            className="fixed inset-0 bg-black/80 backdrop-blur-md z-[60] transition-opacity"
-            id="drawer-overlay"
-            onClick={() => setSelectedLeadId(null)}
-          ></div>
-          <div
-            className="fixed right-0 top-0 h-full w-full max-w-md bg-[#0a0a0c]/98 border-l border-carbon-border z-[70] flex flex-col shadow-[-40px_0_100px_rgba(0,0,0,0.9)] animate-slide-in"
+            className="w-full max-w-lg bg-[#0a0a0c] border border-white/10 rounded-2xl z-[70] flex flex-col p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto custom-scrollbar"
             id="lead-drawer"
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Drawer Header */}
             <div className="p-6 border-b border-carbon-border bg-white/[0.01] flex justify-between items-center shrink-0">
@@ -697,7 +698,7 @@ export default function LeadsPage() {
               </button>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {/* ── Lost Reason Prompt Modal ───────────────────────── */}
@@ -707,7 +708,7 @@ export default function LeadsPage() {
           onClick={() => setShowLostModal(false)}
         >
           <div
-            className="bg-[#111111] border border-white/10 rounded-2xl w-full max-w-md shadow-2xl p-6"
+            className="bg-[#111111] border border-white/10 rounded-2xl w-[95vw] sm:max-w-md shadow-2xl p-6 mx-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-base font-label-caps font-bold text-white flex items-center gap-2">
@@ -752,7 +753,7 @@ export default function LeadsPage() {
           onClick={() => setShowBulkReassignModal(false)}
         >
           <div
-            className="bg-[#111111] border border-white/10 rounded-2xl w-full max-w-md shadow-2xl p-6"
+            className="bg-[#111111] border border-white/10 rounded-2xl w-[95vw] sm:max-w-md shadow-2xl p-6 mx-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-base font-label-caps font-bold text-white uppercase tracking-wider">
@@ -804,7 +805,7 @@ export default function LeadsPage() {
           onClick={() => setShowAddModal(false)}
         >
           <div
-            className="bg-[#111111] border border-white/10 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
+            className="bg-[#111111] border border-white/10 rounded-2xl w-[95vw] sm:max-w-md shadow-2xl overflow-hidden mx-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-black/20">

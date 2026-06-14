@@ -88,7 +88,8 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const {
       customer_name, mobile, car_number, booking_date, booking_time,
-      car_make, car_model, concerns, notes, status = 'pending'
+      car_make, car_model, concerns, notes, status = 'pending',
+      advance_amount, advance_mode
     } = req.body;
 
     if (!customer_name || !mobile || !car_number || !booking_date || !booking_time) {
@@ -118,9 +119,9 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 
     const [result] = await pool.query<ResultSetHeader>(
       `INSERT INTO advance_bookings
-       (booking_ref, customer_name, mobile, car_number, car_make, car_model, concerns, booking_date, booking_time, status, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [booking_ref, customer_name, mobile, car_number, car_make || null, car_model || null, concerns || null, booking_date, booking_time, status, notes || null]
+       (booking_ref, customer_name, mobile, car_number, car_make, car_model, concerns, booking_date, booking_time, status, notes, advance_amount, advance_mode)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [booking_ref, customer_name, mobile, car_number, car_make || null, car_model || null, concerns || null, booking_date, booking_time, status, notes || null, advance_amount || 0.00, advance_mode || null]
     );
 
     // Send confirmation SMS
@@ -155,7 +156,8 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
     const params: any[] = [];
     const allowed = [
       'customer_name', 'mobile', 'car_number', 'car_make', 'car_model',
-      'concerns', 'booking_date', 'booking_time', 'status', 'notes'
+      'concerns', 'booking_date', 'booking_time', 'status', 'notes',
+      'advance_amount', 'advance_mode'
     ];
 
     for (const f of allowed) {

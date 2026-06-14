@@ -17,7 +17,8 @@ import {
   getAttendanceHistory,
   getStaffAdvances,
   createStaffAdvance,
-  settleStaffAdvance
+  settleStaffAdvance,
+  kioskAttendance
 } from '../controllers/staffController';
 import { authMiddleware } from '../middleware/auth';
 import { rbac } from '../middleware/rbac';
@@ -57,5 +58,8 @@ router.delete('/:id', rbac('admin'), deleteStaff);
 
 // Attendance manual marking
 router.post('/attendance', rbac('admin', 'manager'), validate(markAttendanceSchema), markAttendance);
+
+// Kiosk Attendance route (snaps webcam photo, checks in/out)
+router.post('/kiosk-attendance', kioskAttendance);
 
 export default router;

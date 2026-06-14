@@ -89,7 +89,7 @@ router.post('/', rbac('admin', 'manager', 'receptionist'), async (req: Request, 
 
     // Insert payment
     const [result] = await pool.query<ResultSetHeader>(
-      `INSERT INTO payments (invoice_id, amount, payment_mode, reference_number, notes, received_by)
+      `INSERT INTO payments (invoice_id, amount, payment_mode, reference_no, notes, received_by)
        VALUES (?, ?, ?, ?, ?, ?)`,
       [invoice_id, amount, payment_mode || 'cash', reference_number || null, notes || null, staffId]
     );

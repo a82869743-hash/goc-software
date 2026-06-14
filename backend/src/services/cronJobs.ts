@@ -3,7 +3,6 @@ import { WhatsAppTemplates, getTodayBirthdays, getLeadsForFollowUp } from './wha
 import { createNotification } from './notificationService';
 import pool from '../utils/db';
 import { RowDataPacket } from 'mysql2';
-import { smsBookingReminder } from './events/bookingEvents';
 import { smsServiceFollowup30Days } from './events/marketingEvents';
 import { processPendingSMS } from './smsService';
 
@@ -115,40 +114,6 @@ export function initCronJobs(): void {
     }
   }, { timezone: 'Asia/Kolkata' });
 
-  // ─── SMS Booking Reminder — 8:00 AM IST (day before) ──
-  cron.schedule('0 8 * * *', async () => {
-    console.log('📅 Running SMS booking reminder cron...');
-    try {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const tomorrowStr = tomorrow.toISOString().split('T')[0]; // YYYY-MM-DD
-
-      const [bookings] = await pool.query<RowDataPacket[]>(
-        `SELECT b.*, c.full_name as customer_name, c.phone as customer_phone,
-                CONCAT(v.make, ' ', v.model) as vehicle_name
-         FROM bookings b
-         LEFT JOIN customers c ON b.customer_id = c.id
-         LEFT JOIN vehicles v ON b.vehicle_id = v.id
-         WHERE DATE(b.booking_date) = ?
-           AND b.status NOT IN ('cancelled', 'completed')
-           AND b.deleted_at IS NULL
-           AND c.phone IS NOT NULL`,
-        [tomorrowStr]
-      );
-
-      for (const booking of bookings) {
-        await smsBookingReminder({
-          phone: booking.customer_phone,
-          customer_name: booking.customer_name || 'Customer',
-          booking_date: new Date(booking.booking_date).toLocaleDateString('en-IN'),
-          time_slot: booking.time_slot || '',
-        });
-      }
-      console.log(`📅 Booking reminders queued: ${bookings.length}`);
-    } catch (error) {
-      console.error('❌ Booking reminder SMS cron error:', error);
-    }
-  }, { timezone: 'Asia/Kolkata' });
 
   // ─── SMS 30-Day Service Follow-up — 10:30 AM IST ──────
   cron.schedule('30 10 * * *', async () => {

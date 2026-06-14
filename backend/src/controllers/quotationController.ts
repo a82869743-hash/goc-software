@@ -8,8 +8,13 @@ import { sendQuickWhatsApp } from '../services/whatsappService';
 // ─── LIST ────────────────────────────────────────────────
 export const getQuotations = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { status, search, page = 1, limit = 20 } = req.query as any;
-    const conds: string[] = ['q.deleted_at IS NULL'];
+    const { status, search, page = 1, limit = 20, trash } = req.query as any;
+    const conds: string[] = [];
+    if (trash === 'true') {
+      conds.push('q.deleted_at IS NOT NULL');
+    } else {
+      conds.push('q.deleted_at IS NULL');
+    }
     const params: any[] = [];
 
     if (status && status !== 'all') { conds.push('q.status = ?'); params.push(status); }
@@ -32,7 +37,8 @@ export const getQuotations = async (req: Request, res: Response): Promise<void> 
               q.canvas_snapshot, q.customer_name_override, q.customer_phone_override,
               q.vehicle_description, q.notes, q.created_at,
               c.full_name as customer_name, c.phone as customer_phone,
-              CONCAT(v.make, ' ', v.model) as vehicle_name, v.reg_number,
+              v.make as vehicle_make, v.model as vehicle_model, v.reg_number,
+              CONCAT(v.make, ' ', v.model) as vehicle_name,
               s.full_name as created_by_name
        FROM quotations q
        LEFT JOIN customers c ON q.customer_id = c.id
@@ -65,7 +71,8 @@ export const getQuotationById = async (req: Request, res: Response): Promise<voi
   try {
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT q.*, c.full_name as customer_name, c.phone as customer_phone,
-              CONCAT(v.make, ' ', v.model) as vehicle_name, v.reg_number
+              v.make as vehicle_make, v.model as vehicle_model, v.reg_number,
+              CONCAT(v.make, ' ', v.model) as vehicle_name
        FROM quotations q
        LEFT JOIN customers c ON q.customer_id = c.id
        LEFT JOIN vehicles v ON q.vehicle_id = v.id
@@ -213,6 +220,40 @@ export const deleteQuotation = async (req: Request, res: Response): Promise<void
   }
 };
 
+export const restoreQuotation = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const [existing] = await pool.query<RowDataPacket[]>(
+      'SELECT id FROM quotations WHERE id = ? AND deleted_at IS NOT NULL', [req.params.id]
+    );
+    if (existing.length === 0) {
+      res.status(404).json({ success: false, error: { code: ERROR_CODES.NOT_FOUND, message: 'Quotation not found or not in trash.' } });
+      return;
+    }
+    await pool.query('UPDATE quotations SET deleted_at = NULL WHERE id = ?', [req.params.id]);
+    res.json({ success: true, data: { message: 'Quotation restored.' } });
+  } catch (error) {
+    console.error('Restore quotation error:', error);
+    res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed to restore quotation.' } });
+  }
+};
+
+export const permanentlyDeleteQuotation = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const [existing] = await pool.query<RowDataPacket[]>(
+      'SELECT id FROM quotations WHERE id = ? AND deleted_at IS NOT NULL', [req.params.id]
+    );
+    if (existing.length === 0) {
+      res.status(404).json({ success: false, error: { code: ERROR_CODES.NOT_FOUND, message: 'Quotation not found in trash.' } });
+      return;
+    }
+    await pool.query('DELETE FROM quotations WHERE id = ?', [req.params.id]);
+    res.json({ success: true, data: { message: 'Quotation permanently deleted.' } });
+  } catch (error) {
+    console.error('Permanent delete quotation error:', error);
+    res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed to permanently delete quotation.' } });
+  }
+};
+
 // ─── SEND VIA WHATSAPP ───────────────────────────────────
 export const sendQuotationWhatsApp = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -257,7 +298,8 @@ export const generateQuotationPDF = async (req: Request, res: Response): Promise
   try {
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT q.*, c.full_name as customer_name, c.phone as customer_phone,
-              CONCAT(v.make, ' ', v.model) as vehicle_name, v.reg_number
+              v.make as vehicle_make, v.model as vehicle_model, v.reg_number,
+              CONCAT(v.make, ' ', v.model) as vehicle_name
        FROM quotations q
        LEFT JOIN customers c ON q.customer_id = c.id
        LEFT JOIN vehicles v ON q.vehicle_id = v.id
@@ -272,8 +314,25 @@ export const generateQuotationPDF = async (req: Request, res: Response): Promise
 
     const customerName = qt.customer_name || qt.customer_name_override || 'Customer';
     const customerPhone = qt.customer_phone || qt.customer_phone_override || '';
-    const vehicleName = qt.vehicle_name || qt.vehicle_description || 'Vehicle';
-    const regNumber = qt.reg_number || '';
+    
+    let brand = qt.vehicle_make || '';
+    let model = qt.vehicle_model || '';
+    let regNumber = qt.reg_number || '';
+
+    if (!qt.vehicle_id && qt.vehicle_description) {
+      try {
+        if (qt.vehicle_description.trim().startsWith('{')) {
+          const parsed = JSON.parse(qt.vehicle_description);
+          brand = parsed.brand || '';
+          model = parsed.model || '';
+          regNumber = parsed.reg_number || '';
+        } else {
+          brand = qt.vehicle_description;
+        }
+      } catch (e) {
+        brand = qt.vehicle_description;
+      }
+    }
 
     // Build the canvas snapshot image src (base64 PNG stored in DB)
     const snapshotSrc = qt.canvas_snapshot
@@ -294,7 +353,7 @@ export const generateQuotationPDF = async (req: Request, res: Response): Promise
   .qt-badge { text-align: right; }
   .qt-badge .code { font-size: 18px; font-weight: 700; color: #CC0000; }
   .qt-badge .date { font-size: 11px; color: #aaa; margin-top: 4px; }
-  .customer-bar { background: #f4f4f4; border-left: 4px solid #CC0000; padding: 16px 32px; display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+  .customer-bar { background: #f4f4f4; border-left: 4px solid #CC0000; padding: 16px 32px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
   .info-item label { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #888; display: block; margin-bottom: 3px; }
   .info-item span { font-size: 14px; font-weight: 600; color: #111; }
   .canvas-section { padding: 24px 32px; }
@@ -317,8 +376,9 @@ export const generateQuotationPDF = async (req: Request, res: Response): Promise
 <div class="customer-bar">
   <div class="info-item"><label>Customer</label><span>${customerName}</span></div>
   <div class="info-item"><label>Phone</label><span>${customerPhone || '—'}</span></div>
-  <div class="info-item"><label>Vehicle</label><span>${vehicleName}</span></div>
-  <div class="info-item"><label>Reg. No.</label><span>${regNumber || '—'}</span></div>
+  <div class="info-item"><label>Car Brand</label><span>${brand || '—'}</span></div>
+  <div class="info-item"><label>Car Model</label><span>${model || '—'}</span></div>
+  <div class="info-item"><label>Car Number</label><span>${regNumber || '—'}</span></div>
 </div>
 
 <div class="canvas-section">

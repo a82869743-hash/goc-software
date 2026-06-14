@@ -396,7 +396,7 @@ export default function SMSSettingsPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-tertiary">
+            <table className="w-full min-w-[800px] text-left text-xs text-tertiary">
               <thead className="bg-white/[0.02] text-white/50 uppercase tracking-widest text-[9px] font-bold border-b border-white/5">
                 <tr>
                   <th className="py-3 px-4">Mobile</th>

@@ -4,6 +4,7 @@ import pool from '../utils/db';
 import { signToken } from '../utils/jwt';
 import { ERROR_CODES } from '../utils/constants';
 import { RowDataPacket } from 'mysql2';
+import { logActivity } from '../utils/auditLogger';
 
 interface StaffRow extends RowDataPacket {
   id: number;
@@ -14,6 +15,7 @@ interface StaffRow extends RowDataPacket {
   role: 'admin' | 'technician' | 'receptionist' | 'manager' | 'staff';
   status: string;
   password_hash: string;
+  token_version: number;
 }
 
 /**
@@ -26,13 +28,22 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     // Find staff by phone
     const [rows] = await pool.query<StaffRow[]>(
-      `SELECT id, staff_code, full_name, phone, email, role, status, password_hash 
+      `SELECT id, staff_code, full_name, phone, email, role, status, password_hash, token_version 
        FROM staff 
        WHERE phone = ? AND deleted_at IS NULL`,
       [phone]
     );
 
     if (rows.length === 0) {
+      await logActivity(
+        null,
+        'login_failed',
+        'staff',
+        null,
+        `Failed login attempt: phone number ${phone} not registered.`,
+        req.ip,
+        req.headers['user-agent']
+      );
       res.status(401).json({
         success: false,
         error: {
@@ -60,6 +71,15 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     // Verify password
     const isValidPassword = await bcrypt.compare(password, staff.password_hash);
     if (!isValidPassword) {
+      await logActivity(
+        null,
+        'login_failed',
+        'staff',
+        staff.id,
+        `Failed login attempt for registered staff ${staff.full_name} (phone: ${phone}): invalid password.`,
+        req.ip,
+        req.headers['user-agent']
+      );
       res.status(401).json({
         success: false,
         error: {
@@ -76,7 +96,18 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       staff_code: staff.staff_code,
       role: staff.role,
       full_name: staff.full_name,
+      token_version: staff.token_version || 1,
     });
+
+    await logActivity(
+      staff.id,
+      'login',
+      'staff',
+      staff.id,
+      `Staff member ${staff.full_name} logged in successfully`,
+      req.ip,
+      req.headers['user-agent']
+    );
 
     res.json({
       success: true,
@@ -108,9 +139,21 @@ export const login = async (req: Request, res: Response): Promise<void> => {
  * POST /auth/logout
  * Logs out the current user (client-side token removal)
  */
-export const logout = async (_req: Request, res: Response): Promise<void> => {
+export const logout = async (req: Request, res: Response): Promise<void> => {
   // DECISION: Server-side token blacklisting not implemented in v2.0
   // Client is responsible for removing the token from storage
+  if (req.staff) {
+    await logActivity(
+      req.staff.id,
+      'logout',
+      'staff',
+      req.staff.id,
+      `Staff member ${req.staff.full_name} logged out`,
+      req.ip,
+      req.headers['user-agent']
+    );
+  }
+  
   res.json({
     success: true,
     data: { message: 'Logged out successfully.' },

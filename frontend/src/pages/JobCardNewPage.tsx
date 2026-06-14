@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { customersAPI, vehiclesAPI } from '../api/customers';
 import { jobsAPI } from '../api/jobs';
+import { advanceBookingsAPI } from '../api/advanceBookings';
+import { inventoryAPI } from '../api/inventory';
 import type { Customer, Vehicle } from '../types';
 import toast from 'react-hot-toast';
 import { carDataset, basicColors } from '../utils/carDataset';
@@ -17,11 +19,13 @@ interface ServiceLine {
   service_name: string;
   service_type: string;
   package_tier: string;
-  unit_price: number;
-  quantity: number;
-  sqft_used: number;
-  ml_used: number;
+  unit_price: number | '';
+  quantity: number | '';
+  sqft_used: number | '';
+  ml_used: number | '';
   description: string;
+  item_type?: 'labor' | 'part';
+  inventory_item_id?: number | null;
 }
 
 export default function JobCardNewPage() {
@@ -50,6 +54,7 @@ export default function JobCardNewPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [lookupQuery, setLookupQuery] = useState('');
+  const [activeField, setActiveField] = useState<'full_name' | 'phone' | 'reg_number' | null>(null);
 
   // Step 2: Services
   const [services, setServices] = useState<ServiceLine[]>([]);
@@ -64,6 +69,50 @@ export default function JobCardNewPage() {
   const [concernInput, setConcernInput] = useState('');
 
   const bookingId = searchParams.get('booking_id') ? Number(searchParams.get('booking_id')) : null;
+  const advanceBookingId = searchParams.get('advance_booking_id') ? Number(searchParams.get('advance_booking_id')) : null;
+
+  // Fetch advance booking details if advance_booking_id is provided
+  const { data: advBookingRes } = useQuery({
+    queryKey: ['advance-booking-detail', advanceBookingId],
+    queryFn: () => advanceBookingsAPI.getById(advanceBookingId!),
+    enabled: !!advanceBookingId,
+  });
+  const advBooking = advBookingRes?.data;
+
+  const [prefilled, setPrefilled] = useState(false);
+  const [advanceAmount, setAdvanceAmount] = useState<number | ''>('');
+  const [advanceMode, setAdvanceMode] = useState<string>('cash');
+  const [advanceRef, setAdvanceRef] = useState<string>('');
+
+  // Fetch active inventory items
+  const { data: inventoryRes } = useQuery({
+    queryKey: ['active-inventory-new'],
+    queryFn: () => inventoryAPI.list({ limit: 100 }),
+  });
+  const inventoryItems = inventoryRes?.data || [];
+
+  useEffect(() => {
+    if (advBooking && !prefilled) {
+      setDetailsForm({
+        full_name: advBooking.customer_name || '',
+        phone: advBooking.mobile || '',
+        reg_number: advBooking.car_number || '',
+        make: advBooking.car_make || '',
+        model: advBooking.car_model || '',
+        color: '',
+      });
+      if (advBooking.concerns) {
+        setConcerns([advBooking.concerns]);
+      }
+      if (advBooking.advance_amount) {
+        setAdvanceAmount(Number(advBooking.advance_amount));
+      }
+      if (advBooking.advance_mode) {
+        setAdvanceMode(advBooking.advance_mode);
+      }
+      setPrefilled(true);
+    }
+  }, [advBooking, prefilled]);
 
   // Autocomplete search
   const { data: lookupRes } = useQuery({
@@ -72,6 +121,44 @@ export default function JobCardNewPage() {
     enabled: lookupQuery.length >= 2,
   });
   const lookupResults = lookupRes?.data || [];
+
+  const renderAutocomplete = (fieldName: 'full_name' | 'phone' | 'reg_number') => {
+    if (activeField !== fieldName || lookupQuery.length < 2 || lookupResults.length === 0) return null;
+    return (
+      <div className="absolute left-0 right-0 top-full mt-1 bg-[#111111] border border-white/10 rounded-xl overflow-hidden max-h-48 overflow-y-auto z-50 shadow-2xl font-data-sm text-left">
+        {lookupResults.map((c: any) => (
+          <div
+            key={`${c.id}-${c.vehicle_id}`}
+            onMouseDown={(e) => {
+              e.preventDefault(); // prevents blur
+              setDetailsForm({
+                full_name: c.full_name,
+                phone: c.phone || '',
+                reg_number: c.car_number || '',
+                make: c.car_make || '',
+                model: c.car_model || '',
+                color: c.car_color || '',
+              });
+              setSelectedCustomer({ id: c.id, full_name: c.full_name, phone: c.phone } as any);
+              if (c.vehicle_id) {
+                setSelectedVehicle({ id: c.vehicle_id, make: c.car_make, model: c.car_model, reg_number: c.car_number } as any);
+              } else {
+                setSelectedVehicle(null);
+              }
+              setLookupQuery('');
+              setActiveField(null);
+            }}
+            className="w-full text-left px-4 py-2.5 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 text-xs text-white cursor-pointer flex flex-col"
+          >
+            <span className="font-bold text-white">{c.full_name} ({c.phone})</span>
+            {c.car_number && (
+              <span className="text-[10px] text-performance-red mt-0.5 font-mono">{c.car_number} • {c.car_make} {c.car_model}</span>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   // Service catalog search
   const { data: svcCatalogRes } = useQuery({
@@ -135,7 +222,7 @@ export default function JobCardNewPage() {
         throw new Error('Failed to resolve customer or vehicle details.');
       }
 
-      // 3. Create Job Card
+      // 3. Create Job Card with Services atomically
       const jobRes = await jobsAPI.create({
         customer_id: customerId,
         vehicle_id: vehicleId,
@@ -143,16 +230,26 @@ export default function JobCardNewPage() {
         expected_out: expectedOut || null,
         internal_notes: internalNotes || null,
         booking_id: bookingId,
+        advance_booking_id: advanceBookingId,
+        advance_amount: advanceAmount === '' ? 0 : Number(advanceAmount),
+        advance_payment_mode: advanceMode,
+        advance_payment_ref: advanceRef || null,
         concerns,
+        services: services.map(svc => ({
+          service_name: svc.service_name,
+          service_type: svc.service_type || 'other',
+          package_tier: svc.package_tier || 'basic',
+          description: svc.description || null,
+          unit_price: Number(svc.unit_price) || 0,
+          quantity: Number(svc.quantity) || 1,
+          sqft_used: svc.sqft_used === '' ? 0 : Number(svc.sqft_used),
+          ml_used: svc.ml_used === '' ? 0 : Number(svc.ml_used),
+          item_type: svc.item_type || 'labor',
+          inventory_item_id: svc.inventory_item_id || null,
+        })),
       } as any);
 
-      const newJob = jobRes.data;
-
-      // 4. Add Services
-      for (const svc of services) {
-        await jobsAPI.addService(newJob.id, svc as any);
-      }
-      return newJob;
+      return jobRes.data;
     },
     onSuccess: (job) => {
       toast.success(`Job card ${job.job_code} created successfully!`);
@@ -165,7 +262,9 @@ export default function JobCardNewPage() {
     },
   });
 
-  const totalAmount = services.reduce((s, sv) => s + sv.unit_price * sv.quantity, 0);
+  const subtotal = services.reduce((s, sv) => s + (Number(sv.unit_price) || 0) * (Number(sv.quantity) || 0), 0);
+  const gstAmount = subtotal * 0.18;
+  const totalAmount = subtotal + gstAmount;
 
   const addServiceFromCatalog = (item: any) => {
     setServices(prev => [...prev, {
@@ -174,9 +273,11 @@ export default function JobCardNewPage() {
       package_tier: 'premium',
       unit_price: item.default_rate,
       quantity: 1,
-      sqft_used: 0,
-      ml_used: 0,
+      sqft_used: '',
+      ml_used: '',
       description: '',
+      item_type: 'labor',
+      inventory_item_id: null,
     }]);
     setSvcSearch('');
     setShowSvcResults(false);
@@ -188,11 +289,13 @@ export default function JobCardNewPage() {
       service_name: '',
       service_type: 'other',
       package_tier: 'basic',
-      unit_price: 0,
+      unit_price: '',
       quantity: 1,
-      sqft_used: 0,
-      ml_used: 0,
+      sqft_used: '',
+      ml_used: '',
       description: '',
+      item_type: 'labor',
+      inventory_item_id: null,
     }]);
   };
 
@@ -206,7 +309,7 @@ export default function JobCardNewPage() {
 
   const canProceed = () => {
     if (step === 1) return !!(detailsForm.full_name && detailsForm.phone && detailsForm.reg_number && detailsForm.make && detailsForm.model);
-    if (step === 2) return services.length > 0 && services.every(s => s.service_name && s.unit_price > 0);
+    if (step === 2) return services.length > 0 && services.every(s => s.service_name && s.unit_price !== '' && Number(s.unit_price) >= 0);
     return true;
   };
 
@@ -263,7 +366,7 @@ export default function JobCardNewPage() {
             <h2 className="font-label-caps text-label-caps text-on-surface tracking-widest">STEP 1 — CUSTOMER &amp; VEHICLE DETAILS</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+              <div className="relative">
                 <label className="font-label-caps text-[9px] text-on-surface-variant/50 tracking-widest block mb-1">Customer Name *</label>
                 <input
                   type="text"
@@ -275,11 +378,17 @@ export default function JobCardNewPage() {
                     setLookupQuery(e.target.value);
                     setSelectedCustomer(null);
                   }}
+                  onFocus={() => {
+                    setActiveField('full_name');
+                    setLookupQuery(detailsForm.full_name);
+                  }}
+                  onBlur={() => setActiveField(null)}
                   className="w-full bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-2.5 text-sm text-white outline-none focus:border-performance-red/40 font-data-sm"
                 />
+                {renderAutocomplete('full_name')}
               </div>
 
-              <div>
+              <div className="relative">
                 <label className="font-label-caps text-[9px] text-on-surface-variant/50 tracking-widest block mb-1">Mobile Contact *</label>
                 <input
                   type="tel"
@@ -291,11 +400,17 @@ export default function JobCardNewPage() {
                     setLookupQuery(e.target.value);
                     setSelectedCustomer(null);
                   }}
+                  onFocus={() => {
+                    setActiveField('phone');
+                    setLookupQuery(detailsForm.phone);
+                  }}
+                  onBlur={() => setActiveField(null)}
                   className="w-full bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-2.5 text-sm text-white outline-none focus:border-performance-red/40 font-data-sm"
                 />
+                {renderAutocomplete('phone')}
               </div>
 
-              <div>
+              <div className="relative">
                 <label className="font-label-caps text-[9px] text-on-surface-variant/50 tracking-widest block mb-1">License Plate (Car Number) *</label>
                 <input
                   type="text"
@@ -307,8 +422,14 @@ export default function JobCardNewPage() {
                     setLookupQuery(e.target.value);
                     setSelectedVehicle(null);
                   }}
+                  onFocus={() => {
+                    setActiveField('reg_number');
+                    setLookupQuery(detailsForm.reg_number);
+                  }}
+                  onBlur={() => setActiveField(null)}
                   className="w-full bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-2.5 text-sm text-white outline-none focus:border-performance-red/40 font-mono"
                 />
+                {renderAutocomplete('reg_number')}
               </div>
 
               <div>
@@ -349,40 +470,6 @@ export default function JobCardNewPage() {
                 />
               </div>
             </div>
-
-            {lookupQuery.length >= 2 && lookupResults.length > 0 && (
-              <div className="bg-[#0a0a0a] border border-white/10 rounded-xl overflow-hidden max-h-60 overflow-y-auto">
-                {lookupResults.map((c: any) => (
-                  <button
-                    key={`${c.id}-${c.vehicle_id}`}
-                    type="button"
-                    onClick={() => {
-                      setDetailsForm({
-                        full_name: c.full_name,
-                        phone: c.phone || '',
-                        reg_number: c.car_number || '',
-                        make: c.car_make || '',
-                        model: c.car_model || '',
-                        color: c.car_color || '',
-                      });
-                      setSelectedCustomer({ id: c.id, full_name: c.full_name, phone: c.phone } as any);
-                      if (c.vehicle_id) {
-                        setSelectedVehicle({ id: c.vehicle_id, make: c.car_make, model: c.car_model, reg_number: c.car_number } as any);
-                      } else {
-                        setSelectedVehicle(null);
-                      }
-                      setLookupQuery('');
-                    }}
-                    className="w-full text-left px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
-                  >
-                    <p className="text-sm text-white font-bold">{c.full_name} ({c.phone})</p>
-                    {c.car_number && (
-                      <p className="text-xs text-performance-red mt-0.5 font-mono">{c.car_number} • {c.car_make} {c.car_model}</p>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
         )}
 
@@ -431,22 +518,66 @@ export default function JobCardNewPage() {
             {services.length > 0 && (
               <div className="space-y-3">
                 {services.map((svc, idx) => (
-                  <div key={idx} className="bg-white/[0.02] border border-white/[0.07] rounded-xl p-4">
+                  <div key={idx} className="bg-white/[0.02] border border-white/[0.07] rounded-xl p-4 space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="font-label-caps text-[9px] text-on-surface-variant/40 tracking-widest block mb-1">Link Inventory Product (Optional)</label>
+                        <select
+                          value={svc.inventory_item_id || ''}
+                          onChange={e => {
+                            const val = e.target.value;
+                            if (!val) {
+                              updateService(idx, 'inventory_item_id', null);
+                            } else {
+                              const item = inventoryItems.find(i => i.id === Number(val));
+                              if (item) {
+                                updateService(idx, 'inventory_item_id', item.id);
+                                updateService(idx, 'service_name', item.name);
+                                updateService(idx, 'unit_price', item.selling_price || item.purchase_price || 0);
+                                updateService(idx, 'item_type', 'part');
+                                updateService(idx, 'service_type', item.category === 'ppf_roll' ? 'ppf' : item.category === 'ceramic' ? 'ceramic' : 'other');
+                                updateService(idx, 'sqft_used', item.category === 'ppf_roll' ? 50 : 0);
+                              }
+                            }
+                          }}
+                          className="w-full bg-black border border-white/[0.07] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-performance-red/40 font-data-sm"
+                        >
+                          <option value="">-- No linked product --</option>
+                          {inventoryItems.map(item => (
+                            <option key={item.id} value={item.id}>
+                              {item.name} ({item.category.replace('_', ' ')} • Stock: {item.current_stock})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="font-label-caps text-[9px] text-on-surface-variant/40 tracking-widest block mb-1">Type</label>
+                        <select
+                          value={svc.item_type || 'labor'}
+                          onChange={e => updateService(idx, 'item_type', e.target.value)}
+                          className="w-full bg-black border border-white/[0.07] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-performance-red/40 font-data-sm"
+                        >
+                          <option value="labor">Labor</option>
+                          <option value="part">Part</option>
+                        </select>
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
                       <div className="md:col-span-4">
-                        <label className="font-label-caps text-[9px] text-on-surface-variant/50 tracking-widest block mb-1">Service Name</label>
+                        <label className="font-label-caps text-[9px] text-on-surface-variant/50 tracking-widest block mb-1">Service Name / Part Description</label>
                         <input
                           value={svc.service_name}
                           onChange={e => updateService(idx, 'service_name', e.target.value)}
-                          className="w-full bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-performance-red/40"
+                          className="w-full bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-performance-red/40 font-data-sm"
                         />
                       </div>
                       <div className="md:col-span-2">
-                        <label className="font-label-caps text-[9px] text-on-surface-variant/50 tracking-widest block mb-1">Type</label>
+                        <label className="font-label-caps text-[9px] text-on-surface-variant/50 tracking-widest block mb-1">Category Type</label>
                         <select
                           value={svc.service_type}
                           onChange={e => updateService(idx, 'service_type', e.target.value)}
-                          className="w-full bg-black border border-white/[0.07] rounded-lg px-3 py-2 text-sm text-white outline-none"
+                          className="w-full bg-black border border-white/[0.07] rounded-lg px-3 py-2 text-sm text-white outline-none font-data-sm"
                         >
                           {['ppf', 'ceramic', 'polish', 'detailing', 'other'].map(t => <option key={t} value={t}>{t.toUpperCase()}</option>)}
                         </select>
@@ -456,8 +587,12 @@ export default function JobCardNewPage() {
                         <input
                           type="number"
                           value={svc.unit_price}
-                          onChange={e => updateService(idx, 'unit_price', Number(e.target.value))}
-                          className="w-full bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-performance-red/40"
+                          placeholder="Amount"
+                          onChange={e => {
+                            const val = e.target.value === '' ? '' : Number(e.target.value);
+                            updateService(idx, 'unit_price', val);
+                          }}
+                          className="w-full bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-performance-red/40 font-data-sm"
                         />
                       </div>
                       <div className="md:col-span-1">
@@ -466,22 +601,47 @@ export default function JobCardNewPage() {
                           type="number"
                           value={svc.quantity}
                           min={1}
-                          onChange={e => updateService(idx, 'quantity', Number(e.target.value))}
-                          className="w-full bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-performance-red/40"
+                          onChange={e => updateService(idx, 'quantity', e.target.value === '' ? '' : Number(e.target.value))}
+                          className="w-full bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-performance-red/40 font-data-sm"
                         />
                       </div>
-                      <div className="md:col-span-2 text-right">
-                        <p className="font-data-lg text-white font-bold">₹{(svc.unit_price * svc.quantity).toLocaleString('en-IN')}</p>
+                      <div className="md:col-span-2 text-left md:text-right font-data-sm text-[11px] text-on-surface-variant/60">
+                        <p>Sub: ₹{((Number(svc.unit_price) || 0) * (Number(svc.quantity) || 0)).toLocaleString('en-IN')}</p>
+                        <p>GST (18%): ₹{(((Number(svc.unit_price) || 0) * (Number(svc.quantity) || 0)) * 0.18).toLocaleString('en-IN')}</p>
+                        <p className="font-data-lg text-white font-bold text-sm">Total: ₹{(((Number(svc.unit_price) || 0) * (Number(svc.quantity) || 0)) * 1.18).toLocaleString('en-IN')}</p>
                       </div>
-                      <div className="md:col-span-1 text-right">
+                      <div className="md:col-span-1 text-left md:text-right">
                         <button onClick={() => removeService(idx)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-on-surface-variant/30 hover:text-red-400 transition-colors">
                           <span className="material-symbols-outlined text-[18px]">close</span>
                         </button>
                       </div>
                     </div>
+
+                    {/* Conditionally show manual PPF square feet entry */}
+                    {(svc.service_type === 'ppf' || svc.service_name.toLowerCase().includes('ppf') || inventoryItems.find(i => i.id === svc.inventory_item_id)?.category === 'ppf_roll') && (
+                      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+                        <div className="col-span-3">
+                          <label className="font-label-caps text-[9px] text-orange-400 tracking-widest block mb-1">Manual PPF Sq feet to Deduct *</label>
+                          <input
+                            type="number"
+                            value={svc.sqft_used}
+                            onChange={e => updateService(idx, 'sqft_used', e.target.value === '' ? '' : Number(e.target.value))}
+                            placeholder="Enter square feet (e.g. 25)"
+                            className="w-full bg-black border border-orange-500/30 rounded-lg px-3 py-2 text-sm text-orange-400 outline-none focus:border-orange-500/50 font-bold"
+                          />
+                          <p className="text-[9px] text-on-surface-variant/40 mt-1">This square feet amount will deduct from the matched PPF roll automatically on completion/delivery (+5% wastage).</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
-                <div className="flex justify-end border-t border-white/10 pt-4">
+                <div className="flex flex-col items-end border-t border-white/10 pt-4 space-y-1">
+                  <p className="font-data-sm text-sm text-on-surface-variant/70">
+                    Subtotal: <span>₹{subtotal.toLocaleString('en-IN')}</span>
+                  </p>
+                  <p className="font-data-sm text-sm text-on-surface-variant/70">
+                    GST (18%): <span>₹{gstAmount.toLocaleString('en-IN')}</span>
+                  </p>
                   <p className="font-data-lg text-xl text-white font-bold">
                     Total: <span className="text-performance-red">₹{totalAmount.toLocaleString('en-IN')}</span>
                   </p>
@@ -511,15 +671,29 @@ export default function JobCardNewPage() {
                 </div>
                 <div className="bg-white/[0.02] border border-white/5 rounded-xl p-4 space-y-3">
                   <h3 className="font-label-caps text-[9px] text-on-surface-variant/50 tracking-widest">SERVICES ({services.length})</h3>
-                  {services.map((s, i) => (
-                    <div key={i} className="flex justify-between text-sm">
-                      <span className="text-on-surface-variant">{s.service_name}</span>
-                      <span className="text-white font-bold">₹{(s.unit_price * s.quantity).toLocaleString('en-IN')}</span>
+                  {services.map((s, i) => {
+                    const price = Number(s.unit_price) || 0;
+                    const lineSub = price * (Number(s.quantity) || 0);
+                    return (
+                      <div key={i} className="flex justify-between text-sm">
+                        <span className="text-on-surface-variant">{s.service_name} (x{s.quantity})</span>
+                        <span className="text-white font-bold">₹{lineSub.toLocaleString('en-IN')}</span>
+                      </div>
+                    );
+                  })}
+                  <div className="border-t border-white/10 pt-2 space-y-1">
+                    <div className="flex justify-between text-xs text-on-surface-variant/60">
+                      <span>Subtotal</span>
+                      <span>₹{subtotal.toLocaleString('en-IN')}</span>
                     </div>
-                  ))}
-                  <div className="border-t border-white/10 pt-2 flex justify-between">
-                    <span className="font-label-caps text-xs text-on-surface-variant/60">Total</span>
-                    <span className="text-performance-red font-bold text-lg">₹{totalAmount.toLocaleString('en-IN')}</span>
+                    <div className="flex justify-between text-xs text-on-surface-variant/60">
+                      <span>GST (18%)</span>
+                      <span>₹{gstAmount.toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-lg border-t border-white/5 pt-1">
+                      <span className="text-on-surface-variant/80">Total</span>
+                      <span className="text-performance-red">₹{totalAmount.toLocaleString('en-IN')}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -537,6 +711,42 @@ export default function JobCardNewPage() {
                     <option value="booked">Booked</option>
                   </select>
                 </div>
+                <div>
+                  <label className="font-label-caps text-[9px] text-on-surface-variant/50 tracking-widest block mb-1">Advance Payment Amount (Optional)</label>
+                  <input
+                    type="number"
+                    value={advanceAmount}
+                    onChange={e => setAdvanceAmount(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="e.g. 1000"
+                    className="w-full bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-2.5 text-sm text-white outline-none focus:border-performance-red/40 font-data-sm"
+                  />
+                </div>
+                {Number(advanceAmount) > 0 && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="font-label-caps text-[9px] text-on-surface-variant/50 tracking-widest block mb-1">Payment Mode</label>
+                      <select
+                        value={advanceMode}
+                        onChange={e => setAdvanceMode(e.target.value)}
+                        className="w-full bg-black border border-white/[0.07] rounded-lg px-3 py-2.5 text-sm text-white outline-none"
+                      >
+                        {['cash', 'upi', 'card', 'bank_transfer', 'cheque'].map(m => (
+                          <option key={m} value={m}>{m.toUpperCase()}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="font-label-caps text-[9px] text-on-surface-variant/50 tracking-widest block mb-1">Reference No.</label>
+                      <input
+                        type="text"
+                        value={advanceRef}
+                        onChange={e => setAdvanceRef(e.target.value)}
+                        placeholder="Txn ID / Ref"
+                        className="w-full bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-2.5 text-sm text-white outline-none focus:border-performance-red/40 font-data-sm"
+                      />
+                    </div>
+                  </div>
+                )}
                 <div>
                   <label className="font-label-caps text-[9px] text-on-surface-variant/50 tracking-widest block mb-1">Expected Completion</label>
                   <input

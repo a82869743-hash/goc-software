@@ -48,6 +48,8 @@ export interface QuickServiceLineItem {
   amount: number;
   tax_pct: number;
   hsn_sac?: string | null;
+  inventory_item_id?: number | null;
+  sqft_used?: number | null;
 }
 
 export interface QuickConcern {

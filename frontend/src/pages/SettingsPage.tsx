@@ -74,14 +74,14 @@ function IntegrationStatusPanel() {
           {[
             { label: 'WhatsApp (MSG91)', url: `${window.location.origin.replace('5173', '4000')}/api/v1/webhooks/whatsapp` },
           ].map(({ label, url }) => (
-            <div key={label} className="flex items-center justify-between gap-3 bg-black/30 rounded-lg px-3 py-2">
-              <div>
+            <div key={label} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-black/30 rounded-lg px-3 py-2">
+              <div className="min-w-0 flex-1">
                 <p className="text-xs text-tertiary">{label}</p>
                 <p className="text-xs font-mono text-white mt-0.5 break-all">{url}</p>
               </div>
               <button
                 onClick={() => { navigator.clipboard.writeText(url); toast.success('URL copied!'); }}
-                className="flex-shrink-0 w-8 h-8 rounded flex items-center justify-center text-tertiary hover:text-white hover:bg-white/10 transition-all"
+                className="flex-shrink-0 w-8 h-8 rounded flex items-center justify-center text-tertiary hover:text-white hover:bg-white/10 transition-all self-end sm:self-auto"
               >
                 <span className="material-symbols-outlined text-[16px]">content_copy</span>
               </button>
@@ -100,13 +100,13 @@ function IntegrationStatusPanel() {
 
           return (
             <div key={config.platform} className="bg-[#0c0c0c]/45 backdrop-blur-2xl rounded-xl border border-white/[0.06] overflow-hidden">
-              <div className="p-5 flex items-start justify-between gap-4">
+              <div className="p-5 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div className="flex items-start gap-4">
-                  <div className={`w-10 h-10 rounded-xl bg-white/[0.04] border border-white/[0.07] flex items-center justify-center ${info.color}`}>
+                  <div className={`w-10 h-10 rounded-xl bg-white/[0.04] border border-white/[0.07] flex items-center justify-center ${info.color} shrink-0`}>
                     <span className="material-symbols-outlined text-[20px]">{info.icon}</span>
                   </div>
                   <div>
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
                       <h4 className="text-white font-bold text-sm">{info.label}</h4>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
                         config.is_active
@@ -124,7 +124,7 @@ function IntegrationStatusPanel() {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-2 flex-shrink-0 sm:self-start w-full sm:w-auto justify-end">
                   <a
                     href={info.setupUrl}
                     target="_blank"
@@ -199,7 +199,7 @@ function IntegrationStatusPanel() {
                       </button>
                     </div>
                   </div>
-                  <div className="flex gap-3">
+                  <div className="flex flex-col sm:flex-row gap-3">
                     <button
                       onClick={() => setEditingPlatform(null)}
                       className="flex-1 py-2 rounded-lg border border-white/10 text-tertiary text-sm hover:border-white/20 transition-all"
@@ -254,6 +254,7 @@ const SettingsPage: React.FC = () => {
       if (!initial['contact_phone']) initial['contact_phone'] = '';
       if (!initial['contact_email']) initial['contact_email'] = '';
       if (!initial['invoice_prefix']) initial['invoice_prefix'] = 'GOC-INV';
+      if (!initial['attendance_kiosk_passcode']) initial['attendance_kiosk_passcode'] = '1234';
       
       setForm(initial);
     }
@@ -316,7 +317,7 @@ const SettingsPage: React.FC = () => {
       )}
 
       {/* TABS CONTAINER */}
-      <div className="flex border-b border-white/5 pb-1">
+      <div className="flex border-b border-white/5 pb-1 overflow-x-auto custom-scrollbar whitespace-nowrap min-w-full">
         <div className="flex items-center gap-1.5 p-1 bg-black/30 border border-white/5 rounded-xl">
           {([
             { id: 'studio', icon: 'storefront', label: 'Studio Profile' },
@@ -326,7 +327,7 @@ const SettingsPage: React.FC = () => {
           ] as const).map((tab) => (
             <button
               key={tab.id}
-              className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all hover:cursor-pointer ${
+              className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all hover:cursor-pointer shrink-0 ${
                 activeTab === tab.id 
                   ? 'bg-performance-red/10 text-performance-red border border-performance-red/20 shadow-[0_0_15px_rgba(255,43,43,0.15)]' 
                   : 'text-tertiary/60 hover:text-white'
@@ -459,6 +460,23 @@ const SettingsPage: React.FC = () => {
                 <span>STATUS: DRAFT</span>
                 <span>TOTAL: ₹0.00</span>
               </div>
+            </div>
+
+            {/* Attendance Kiosk Passcode */}
+            <div className="flex flex-col gap-2 md:col-span-2 mt-4">
+              <label className="font-label-caps text-xs text-tertiary/75 uppercase tracking-widest">
+                Attendance Kiosk Passcode
+              </label>
+              <input 
+                type="text" 
+                className="input-glass px-4 py-3 rounded-lg border border-white/10 bg-white/2 focus:border-performance-red focus:bg-white/4 focus:ring-1 focus:ring-performance-red/30 transition-all font-data-sm text-white w-full"
+                value={form['attendance_kiosk_passcode'] || ''} 
+                onChange={(e) => handleChange('attendance_kiosk_passcode', e.target.value)} 
+                placeholder="e.g. 1234"
+              />
+              <span className="font-data-sm text-[10px] text-tertiary/50 mt-1 block">
+                Used to exit Kiosk Mode on the Attendance Device. Must contain numbers. Default is <code className="text-performance-red bg-performance-red/5 px-1.5 py-0.5 rounded font-mono">1234</code>
+              </span>
             </div>
           </div>
 

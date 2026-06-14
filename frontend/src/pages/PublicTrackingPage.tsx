@@ -45,7 +45,9 @@ export default function PublicTrackingPage() {
     const fetchTracking = async () => {
       try {
         setLoading(true);
-        const baseApiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api/v1';
+        const baseApiUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+          ? 'http://localhost:4000/api/v1'
+          : `${window.location.origin}/api/v1`;
         const backendBase = baseApiUrl.replace('/api/v1', '');
         const res = await axios.get(`${backendBase}/public/job-card/${token}`);
         if (res.data && res.data.success) {
@@ -190,8 +192,8 @@ export default function PublicTrackingPage() {
                 <span className="material-symbols-outlined text-sm text-performance-red">view_list</span>
                 SERVICE LEDGER RECORD
               </h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs font-data-sm border-collapse">
+              <div className="overflow-x-auto custom-scrollbar">
+                <table className="w-full text-left text-xs font-data-sm border-collapse min-w-[500px]">
                   <thead>
                     <tr className="border-b border-white/5 text-gray-500 font-label-caps text-[8px] tracking-widest">
                       <th className="pb-2">LOGGED SERVICE</th>

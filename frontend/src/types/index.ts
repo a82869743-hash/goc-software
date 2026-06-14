@@ -200,6 +200,8 @@ export interface JobCard {
   id: number;
   job_code: string;
   booking_id: number | null;
+  advance_booking_id?: number | null;
+  advance_amount?: number;
   customer_id: number;
   customer_name?: string;
   customer_phone?: string;
@@ -512,3 +514,69 @@ export interface AppSettings {
   financial_year_start: string;
   [key: string]: string;
 }
+
+// Staff Management Module
+export interface StaffMember {
+  id: number;
+  staff_code: string;
+  full_name: string;
+  phone: string;
+  email?: string;
+  role: 'admin' | 'manager' | 'technician' | 'receptionist' | 'staff';
+  status: 'active' | 'inactive';
+  salary: number;
+  salary_type: 'monthly' | 'daily';
+  created_at: string;
+}
+
+export interface StaffPermissions {
+  id: number;
+  staff_id: number;
+  perm_dashboard: number;
+  perm_leads: number;
+  perm_customers: number;
+  perm_bookings: number;
+  perm_advance_bookings: number;
+  perm_job_cards: number;
+  perm_quick_jobs: number;
+  perm_quotations: number;
+  perm_invoices: number;
+  perm_payments: number;
+  perm_inventory: number;
+  perm_reports: number;
+  perm_marketing: number;
+  perm_commissions: number;
+  perm_settings: number;
+  perm_staff_management: number;
+  perm_job_cards_edit: number;
+  perm_job_cards_delete: number;
+  perm_job_cards_complete: number;
+  perm_invoices_create: number;
+  perm_payments_record: number;
+  perm_leads_delete: number;
+  perm_leads_assign: number;
+  perm_customers_delete: number;
+  perm_inventory_edit: number;
+  perm_reports_revenue: number;
+  perm_reports_accounts: number;
+  perm_reports_salary: number;
+  _isAdmin?: boolean;
+}
+
+export interface CreateStaffPayload {
+  full_name: string;
+  phone: string;
+  email?: string;
+  role: string;
+  salary: number;
+  salary_type: string;
+}
+
+export interface CreateStaffResponse {
+  staff_code: string;
+  full_name: string;
+  phone: string;
+  role: string;
+  plain_password: string;
+}
+

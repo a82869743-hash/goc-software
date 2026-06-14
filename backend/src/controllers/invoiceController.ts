@@ -8,22 +8,48 @@ import { smsInvoiceGenerated } from '../services/events/invoiceEvents';
 // ─── LIST ─────────────────────────────────────────
 export const getInvoices = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { status, search, page = 1, limit = 20 } = req.query as any;
+    const { status, search, invoice_type, date_from, date_to, page = 1, limit = 20 } = req.query as any;
     const conds: string[] = ['i.deleted_at IS NULL'];
     const params: any[] = [];
     if (status) { conds.push('i.status = ?'); params.push(status); }
-    if (search) { conds.push('(c.full_name LIKE ? OR i.invoice_code LIKE ?)'); const t = `%${search}%`; params.push(t, t); }
+    if (invoice_type) { conds.push('i.invoice_type = ?'); params.push(invoice_type); }
+    if (date_from) { conds.push('i.invoice_date >= ?'); params.push(date_from); }
+    if (date_to) { conds.push('i.invoice_date <= ?'); params.push(date_to); }
+    if (search) {
+      conds.push('(c.full_name LIKE ? OR c.phone LIKE ? OR v.reg_number LIKE ? OR i.invoice_code LIKE ? OR j.job_code LIKE ?)');
+      const t = `%${search}%`;
+      params.push(t, t, t, t, t);
+    }
     const where = conds.join(' AND ');
     const offset = (Number(page) - 1) * Number(limit);
 
-    const [countR] = await pool.query<RowDataPacket[]>(`SELECT COUNT(*) as total FROM invoices i LEFT JOIN customers c ON i.customer_id = c.id WHERE ${where}`, params);
-    const [rows] = await pool.query<RowDataPacket[]>(
-      `SELECT i.*, c.full_name as customer_name, c.phone as customer_phone, j.job_code
-       FROM invoices i LEFT JOIN customers c ON i.customer_id = c.id LEFT JOIN job_cards j ON i.job_card_id = j.id
-       WHERE ${where} ORDER BY i.id DESC LIMIT ? OFFSET ?`, [...params, Number(limit), offset]);
+    const countQuery = `
+      SELECT COUNT(*) as total 
+      FROM invoices i 
+      LEFT JOIN customers c ON i.customer_id = c.id 
+      LEFT JOIN job_cards j ON i.job_card_id = j.id
+      LEFT JOIN vehicles v ON j.vehicle_id = v.id
+      WHERE ${where}
+    `;
+    const [countR] = await pool.query<RowDataPacket[]>(countQuery, params);
+
+    const selectQuery = `
+      SELECT i.*, c.full_name as customer_name, c.phone as customer_phone, j.job_code, v.reg_number as vehicle_reg_number
+      FROM invoices i 
+      LEFT JOIN customers c ON i.customer_id = c.id 
+      LEFT JOIN job_cards j ON i.job_card_id = j.id
+      LEFT JOIN vehicles v ON j.vehicle_id = v.id
+      WHERE ${where} 
+      ORDER BY i.id DESC 
+      LIMIT ? OFFSET ?
+    `;
+    const [rows] = await pool.query<RowDataPacket[]>(selectQuery, [...params, Number(limit), offset]);
 
     res.json({ success: true, data: rows, meta: { total: countR[0].total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(countR[0].total / Number(limit)) } });
-  } catch (error) { console.error('Get invoices error:', error); res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed to fetch invoices.' } }); }
+  } catch (error) { 
+    console.error('Get invoices error:', error); 
+    res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed to fetch invoices.' } }); 
+  }
 };
 
 // ─── GET BY ID ────────────────────────────────────

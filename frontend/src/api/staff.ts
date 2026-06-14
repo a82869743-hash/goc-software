@@ -81,4 +81,8 @@ export const staffAPI = {
     const { data } = await apiClient.patch(`/staff/advances/${id}/settle`, { status });
     return data;
   },
+  kioskAttendance: async (payload: { staff_id: number; type: 'check-in' | 'check-out'; photo: string }): Promise<ApiResponse<{ message: string; status?: string; is_late?: boolean; working_hours?: number }>> => {
+    const { data } = await apiClient.post('/staff/kiosk-attendance', payload);
+    return data;
+  },
 };

@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { jobsAPI, JobCard, JobService } from '../api/jobs';
+import { inventoryAPI, InventoryItem } from '../api/inventory';
 import toast from 'react-hot-toast';
+import { getBackendURL } from '../utils/helpers';
+
 
 const STATUS_PIPELINE = ['in_progress', 'ready', 'estimate', 'delivered'] as const;
 
@@ -23,7 +26,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
 const JOB_STATUS_FLOW: Record<string, string[]> = {
   in_progress: ['ready', 'cancelled'],
   ready: ['estimate', 'cancelled'],
-  estimate: ['delivered', 'cancelled'],
+  estimate: ['delivered', 'cancelled', 'ready'],
   delivered: [],
   cancelled: [],
   // Keep transitions for older statuses to move them forward or cancel
@@ -40,21 +43,97 @@ export default function JobCardDetailPage() {
   const queryClient = useQueryClient();
   const [statusNotes, setStatusNotes] = useState('');
   const [showAddService, setShowAddService] = useState(false);
-  const [newSvc, setNewSvc] = useState({
+  const [newSvc, setNewSvc] = useState<{
+    service_name: string;
+    service_type: 'other' | 'ppf' | 'ceramic' | 'polish' | 'detailing';
+    package_tier: 'basic' | 'premium' | 'elite';
+    unit_price: number | '';
+    quantity: number | '';
+    sqft_used: number | '';
+    ml_used: number | '';
+    description: string;
+    item_type: 'labor' | 'part';
+    tax_pct: number | '';
+    inventory_item_id: number | null;
+  }>({
     service_name: '',
-    service_type: 'other' as 'other' | 'ppf' | 'ceramic' | 'polish' | 'detailing',
-    package_tier: 'premium' as 'basic' | 'premium' | 'elite',
-    unit_price: 0,
+    service_type: 'other',
+    package_tier: 'premium',
+    unit_price: '',
     quantity: 1,
-    sqft_used: 0,
-    ml_used: 0,
+    sqft_used: '',
+    ml_used: '',
     description: '',
-    item_type: 'labor' as 'labor' | 'part',
-    tax_pct: 18
+    item_type: 'labor',
+    tax_pct: 18,
+    inventory_item_id: null
   });
+  const [editingServiceId, setEditingServiceId] = useState<number | null>(null);
+  const [editSvcForm, setEditSvcForm] = useState<{
+    service_name: string;
+    service_type: 'other' | 'ppf' | 'ceramic' | 'polish' | 'detailing';
+    package_tier: 'basic' | 'premium' | 'elite';
+    unit_price: number | '';
+    quantity: number | '';
+    sqft_used: number | '';
+    ml_used: number | '';
+    description: string;
+    item_type: 'labor' | 'part';
+    tax_pct: number | '';
+    inventory_item_id: number | null;
+  }>({
+    service_name: '',
+    service_type: 'other',
+    package_tier: 'premium',
+    unit_price: '',
+    quantity: 1,
+    sqft_used: '',
+    ml_used: '',
+    description: '',
+    item_type: 'labor',
+    tax_pct: 18,
+    inventory_item_id: null
+  });
+
+  // Fetch active inventory items
+  const { data: inventoryRes } = useQuery({
+    queryKey: ['active-inventory'],
+    queryFn: () => inventoryAPI.list({ limit: 100 }),
+  });
+  const inventoryItems = inventoryRes?.data || [];
+
+  const startEditing = (svc: JobService) => {
+    setEditingServiceId(svc.id);
+    setEditSvcForm({
+      service_name: svc.service_name,
+      service_type: svc.service_type || 'other',
+      package_tier: svc.package_tier || 'premium',
+      unit_price: svc.unit_price,
+      quantity: svc.quantity || 1,
+      sqft_used: svc.sqft_used || '',
+      ml_used: svc.ml_used || '',
+      description: svc.description || '',
+      item_type: (svc.item_type as any) || 'labor',
+      tax_pct: svc.tax_pct !== undefined ? svc.tax_pct : 18,
+      inventory_item_id: svc.inventory_item_id || null
+    });
+  };
+
+  const [showDeliveredConfirm, setShowDeliveredConfirm] = useState(false);
+  const [pendingStatusChange, setPendingStatusChange] = useState<{ new_status: string; notes?: string } | null>(null);
+
+  const handleStatusTransition = (nextStatus: string) => {
+    if (nextStatus === 'delivered') {
+      setPendingStatusChange({ new_status: nextStatus, notes: statusNotes || undefined });
+      setShowDeliveredConfirm(true);
+    } else {
+      statusMutation.mutate({ new_status: nextStatus, notes: statusNotes || undefined });
+    }
+  };
+
   const [svcSearch, setSvcSearch] = useState('');
   const [showCompleteModal, setShowCompleteModal] = useState(false);
-  const [completeForm, setCompleteForm] = useState({ completion_type: 'invoice' as 'invoice' | 'estimate', gst_applicable: true, payment_mode: 'cash', notes: '' });
+  const [completeForm, setCompleteForm] = useState({ completion_type: 'invoice' as 'invoice' | 'estimate', gst_applicable: true, payment_mode: 'cash', notes: '', gst_pct: 18 as number | '' });
   const [downloadingInvoice, setDownloadingInvoice] = useState(false);
 
   const handleDownloadInvoice = async () => {
@@ -63,7 +142,7 @@ export default function JobCardDetailPage() {
       setDownloadingInvoice(true);
       const res = await jobsAPI.getInvoicePdf(Number(id));
       if (res.data?.pdf_url) {
-        window.open(`http://localhost:4000${res.data.pdf_url}`, '_blank');
+        window.open(getBackendURL(res.data.pdf_url), '_blank');
         toast.success('Document downloaded successfully!');
       } else {
         toast.error('Failed to obtain invoice URL.');
@@ -102,7 +181,10 @@ export default function JobCardDetailPage() {
   });
 
   const addServiceMutation = useMutation({
-    mutationFn: (svc: Partial<JobService>) => jobsAPI.addService(Number(id), svc),
+    mutationFn: (svc: Partial<JobService>) => jobsAPI.addService(Number(id), {
+      ...svc,
+      unit_price: Number(svc.unit_price) || 0
+    }),
     onSuccess: () => {
       toast.success('Service added.');
       setShowAddService(false);
@@ -110,13 +192,14 @@ export default function JobCardDetailPage() {
         service_name: '',
         service_type: 'other' as 'other' | 'ppf' | 'ceramic' | 'polish' | 'detailing',
         package_tier: 'premium' as 'basic' | 'premium' | 'elite',
-        unit_price: 0,
+        unit_price: '',
         quantity: 1,
         sqft_used: 0,
         ml_used: 0,
         description: '',
         item_type: 'labor' as 'labor' | 'part',
-        tax_pct: 18
+        tax_pct: 18,
+        inventory_item_id: null
       });
       queryClient.invalidateQueries({ queryKey: ['job-detail', id] });
     },
@@ -132,12 +215,36 @@ export default function JobCardDetailPage() {
     onError: () => toast.error('Failed to remove service.'),
   });
 
+  const updateServiceMutation = useMutation({
+    mutationFn: ({ serviceId, payload }: { serviceId: number; payload: Partial<JobService> }) =>
+      jobsAPI.updateService(Number(id), serviceId, {
+        ...payload,
+        unit_price: Number(payload.unit_price) || 0
+      }),
+    onSuccess: () => {
+      toast.success('Service updated.');
+      setEditingServiceId(null);
+      queryClient.invalidateQueries({ queryKey: ['job-detail', id] });
+    },
+    onError: () => toast.error('Failed to update service.'),
+  });
+
   const completeMutation = useMutation({
     mutationFn: () => jobsAPI.completeJob(Number(id), completeForm),
-    onSuccess: (res) => {
+    onSuccess: async (res) => {
       toast.success(res.data?.message || 'Job completed!');
       setShowCompleteModal(false);
       queryClient.invalidateQueries({ queryKey: ['job-detail', id] });
+      if (id) {
+        try {
+          const pdfRes = await jobsAPI.getInvoicePdf(Number(id));
+          if (pdfRes.data?.pdf_url) {
+            window.open(getBackendURL(pdfRes.data.pdf_url), '_blank');
+          }
+        } catch (pdfErr) {
+          console.error('Auto open PDF error:', pdfErr);
+        }
+      }
     },
     onError: (err: any) => toast.error(err.response?.data?.error?.message || 'Failed to complete job.'),
   });
@@ -264,20 +371,41 @@ export default function JobCardDetailPage() {
                 placeholder="Notes for status change (optional)…"
                 className="flex-1 min-w-[200px] bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-performance-red/40 font-data-sm"
               />
-              {allowedNext.map(nextStatus => {
-                const nCfg = STATUS_CONFIG[nextStatus];
+              {(() => {
+                let nextStatus: string | null = null;
+                if (currentIdx !== -1 && currentIdx < STATUS_PIPELINE.length - 1) {
+                  nextStatus = STATUS_PIPELINE[currentIdx + 1];
+                } else if (currentIdx === -1) {
+                  nextStatus = allowedNext.find(s => (STATUS_PIPELINE as readonly string[]).includes(s)) || (allowedNext.length > 0 ? allowedNext[0] : null);
+                }
+                const nCfg = nextStatus ? STATUS_CONFIG[nextStatus] : null;
+                const canGoBack = job.status === 'estimate' && allowedNext.includes('ready');
+
                 return (
-                  <button
-                    key={nextStatus}
-                    onClick={() => statusMutation.mutate({ new_status: nextStatus, notes: statusNotes || undefined })}
-                    disabled={statusMutation.isPending}
-                    className={`px-4 py-2 rounded-lg border ${nCfg.border} ${nCfg.color} hover:${nCfg.bg} font-label-caps text-xs tracking-widest transition-all flex items-center gap-2 disabled:opacity-50`}
-                  >
-                    <span className="material-symbols-outlined text-[16px]">{nCfg.icon}</span>
-                    → {nCfg.label}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {nextStatus && nCfg && allowedNext.includes(nextStatus) && (
+                      <button
+                        onClick={() => handleStatusTransition(nextStatus!)}
+                        disabled={statusMutation.isPending}
+                        className={`px-4 py-2 rounded-lg border ${nCfg.border} ${nCfg.color} hover:${nCfg.bg} font-label-caps text-xs tracking-widest transition-all flex items-center gap-2 disabled:opacity-50`}
+                      >
+                        <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                        Next: {nCfg.label}
+                      </button>
+                    )}
+                    {canGoBack && (
+                      <button
+                        onClick={() => handleStatusTransition('ready')}
+                        disabled={statusMutation.isPending}
+                        className="px-4 py-2 rounded-lg border border-orange-500/20 text-orange-400 hover:bg-orange-500/10 font-label-caps text-xs tracking-widest transition-all flex items-center gap-2 disabled:opacity-50"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+                        Back to Ready
+                      </button>
+                    )}
+                  </div>
                 );
-              })}
+              })()}
             </div>
           </div>
         )}
@@ -300,36 +428,72 @@ export default function JobCardDetailPage() {
 
             {showAddService && (
               <div className="mb-4 p-4 bg-white/[0.02] border border-white/[0.07] rounded-xl space-y-4">
-                <div className="relative">
-                  <input
-                    value={svcSearch}
-                    onChange={e => setSvcSearch(e.target.value)}
-                    placeholder="Search catalog or type service name…"
-                    className="w-full bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-performance-red/40"
-                  />
-                  {svcSearch.length >= 1 && svcCatalogRes?.data && svcCatalogRes.data.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-[#0a0a0a] border border-white/10 rounded-xl overflow-hidden max-h-40 overflow-y-auto z-20">
-                      {svcCatalogRes.data.map((item: any) => (
-                        <button
-                          key={item.id}
-                          onClick={() => {
-                            setNewSvc(prev => ({
-                              ...prev,
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="relative">
+                    <label className="font-label-caps text-[9px] text-on-surface-variant/40 tracking-widest block mb-1">Catalog Search</label>
+                    <input
+                      value={svcSearch}
+                      onChange={e => setSvcSearch(e.target.value)}
+                      placeholder="Search catalog or type service name…"
+                      className="w-full bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-performance-red/40"
+                    />
+                    {svcSearch.length >= 1 && svcCatalogRes?.data && svcCatalogRes.data.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-[#0a0a0a] border border-white/10 rounded-xl overflow-hidden max-h-40 overflow-y-auto z-20">
+                        {svcCatalogRes.data.map((item: any) => (
+                          <button
+                            key={item.id}
+                            onClick={() => {
+                              setNewSvc(prev => ({
+                                ...prev,
+                                service_name: item.name,
+                                service_type: item.service_type,
+                                unit_price: item.default_rate,
+                                tax_pct: item.tax_pct !== undefined ? Number(item.tax_pct) : 18
+                              }));
+                              setSvcSearch('');
+                            }}
+                            className="w-full text-left px-3 py-2 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 text-sm text-white flex justify-between"
+                          >
+                            <span>{item.name}</span>
+                            <span className="text-performance-red">₹{Number(item.default_rate).toLocaleString('en-IN')}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="font-label-caps text-[9px] text-on-surface-variant/40 tracking-widest block mb-1">Link Inventory Product</label>
+                    <select
+                      value={newSvc.inventory_item_id || ''}
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (!val) {
+                          setNewSvc(p => ({ ...p, inventory_item_id: null }));
+                        } else {
+                          const item = inventoryItems.find(i => i.id === Number(val));
+                          if (item) {
+                            setNewSvc(p => ({
+                              ...p,
+                              inventory_item_id: item.id,
                               service_name: item.name,
-                              service_type: item.service_type,
-                              unit_price: item.default_rate,
-                              tax_pct: item.tax_pct !== undefined ? Number(item.tax_pct) : 18
+                              unit_price: item.selling_price || item.purchase_price || 0,
+                              item_type: 'part',
+                              service_type: item.category === 'ppf_roll' ? 'ppf' : item.category === 'ceramic' ? 'ceramic' : 'other',
+                              sqft_used: item.category === 'ppf_roll' ? 50 : 0
                             }));
-                            setSvcSearch('');
-                          }}
-                          className="w-full text-left px-3 py-2 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 text-sm text-white flex justify-between"
-                        >
-                          <span>{item.name}</span>
-                          <span className="text-performance-red">₹{Number(item.default_rate).toLocaleString('en-IN')}</span>
-                        </button>
+                          }
+                        }
+                      }}
+                      className="w-full bg-black border border-white/[0.07] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-performance-red/40"
+                    >
+                      <option value="">-- No linked product --</option>
+                      {inventoryItems.map(item => (
+                        <option key={item.id} value={item.id}>
+                          {item.name} ({item.category.replace('_', ' ')} • Stock: {item.current_stock})
+                        </option>
                       ))}
-                    </div>
-                  )}
+                    </select>
+                  </div>
                 </div>
                 
                 <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
@@ -357,8 +521,8 @@ export default function JobCardDetailPage() {
                     <label className="font-label-caps text-[9px] text-on-surface-variant/40 tracking-widest block mb-1">Price</label>
                     <input
                       type="number"
-                      value={newSvc.unit_price === 0 ? '' : newSvc.unit_price}
-                      onChange={e => setNewSvc(p => ({ ...p, unit_price: e.target.value === '' ? 0 : Number(e.target.value) }))}
+                      value={newSvc.unit_price}
+                      onChange={e => setNewSvc(p => ({ ...p, unit_price: e.target.value === '' ? '' : Number(e.target.value) }))}
                       placeholder="Price"
                       className="w-full bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-performance-red/40"
                     />
@@ -367,8 +531,8 @@ export default function JobCardDetailPage() {
                     <label className="font-label-caps text-[9px] text-on-surface-variant/40 tracking-widest block mb-1">GST (%)</label>
                     <input
                       type="number"
-                      value={newSvc.tax_pct === 0 ? '' : newSvc.tax_pct}
-                      onChange={e => setNewSvc(p => ({ ...p, tax_pct: e.target.value === '' ? 0 : Number(e.target.value) }))}
+                      value={newSvc.tax_pct}
+                      onChange={e => setNewSvc(p => ({ ...p, tax_pct: e.target.value === '' ? '' : Number(e.target.value) }))}
                       placeholder="18"
                       className="w-full bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-performance-red/40"
                     />
@@ -377,20 +541,37 @@ export default function JobCardDetailPage() {
                     <label className="font-label-caps text-[9px] text-on-surface-variant/40 tracking-widest block mb-1">Qty</label>
                     <input
                       type="number"
-                      value={newSvc.quantity === 0 ? '' : newSvc.quantity}
+                      value={newSvc.quantity}
                       min={1}
-                      onChange={e => setNewSvc(p => ({ ...p, quantity: e.target.value === '' ? 0 : Number(e.target.value) }))}
+                      onChange={e => setNewSvc(p => ({ ...p, quantity: e.target.value === '' ? '' : Number(e.target.value) }))}
                       placeholder="Qty"
                       className="w-full bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-performance-red/40"
                     />
                   </div>
                 </div>
 
+                {/* Conditionally show manual PPF square feet entry */}
+                {(newSvc.service_type === 'ppf' || newSvc.service_name.toLowerCase().includes('ppf') || inventoryItems.find(i => i.id === newSvc.inventory_item_id)?.category === 'ppf_roll') && (
+                  <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+                    <div className="col-span-3">
+                      <label className="font-label-caps text-[9px] text-orange-400 tracking-widest block mb-1">Manual PPF Sq feet to Deduct *</label>
+                      <input
+                        type="number"
+                        value={newSvc.sqft_used}
+                        onChange={e => setNewSvc(p => ({ ...p, sqft_used: e.target.value === '' ? '' : Number(e.target.value) }))}
+                        placeholder="Enter square feet (e.g. 25)"
+                        className="w-full bg-white/[0.03] border border-orange-500/30 rounded-lg px-3 py-2 text-sm text-orange-400 outline-none focus:border-orange-500/50 font-bold"
+                      />
+                      <p className="text-[9px] text-on-surface-variant/40 mt-1">This square feet amount will deduct from the matched PPF roll automatically on completion/delivery (+5% wastage).</p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex justify-end gap-2">
                   <button onClick={() => setShowAddService(false)} className="px-3 py-1.5 text-xs text-on-surface-variant/50 hover:text-white transition-colors font-label-caps">Cancel</button>
                   <button
-                    onClick={() => addServiceMutation.mutate(newSvc)}
-                    disabled={!newSvc.service_name || newSvc.unit_price <= 0 || addServiceMutation.isPending}
+                    onClick={() => addServiceMutation.mutate(newSvc as any)}
+                    disabled={!newSvc.service_name || newSvc.unit_price === '' || Number(newSvc.unit_price) <= 0 || addServiceMutation.isPending}
                     className="performance-gradient text-white font-label-caps text-xs px-4 py-1.5 rounded-lg border border-white/10 disabled:opacity-50"
                   >
                     Add
@@ -402,25 +583,165 @@ export default function JobCardDetailPage() {
             {(job.services && job.services.length > 0) ? (
               <div className="space-y-2">
                 {job.services.map((svc) => (
-                  <div key={svc.id} className="flex items-center justify-between p-3 bg-white/[0.02] border border-white/5 rounded-xl group">
-                    <div className="flex-1">
-                      <p className="text-sm text-white font-bold">{svc.service_name}</p>
-                      <p className="text-[10px] text-on-surface-variant/50 mt-0.5">
-                        {svc.item_type?.toUpperCase() || 'LABOR'} • GST: {svc.tax_pct !== undefined ? svc.tax_pct : 18}% • Qty: {svc.quantity}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <p className="font-data-sm text-white font-bold">₹{Number(svc.line_total).toLocaleString('en-IN')}</p>
-                      {!['delivered', 'cancelled'].includes(job.status) && (
-                        <button
-                          onClick={() => { if (window.confirm('Remove this service?')) deleteServiceMutation.mutate(svc.id); }}
-                          className="p-1 rounded hover:bg-red-500/10 text-on-surface-variant/20 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
-                        >
-                          <span className="material-symbols-outlined text-[16px]">close</span>
-                        </button>
+                  editingServiceId === svc.id ? (
+                    <div key={svc.id} className="p-4 bg-white/[0.03] border border-performance-red/30 rounded-xl space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="font-label-caps text-[9px] text-on-surface-variant/40 tracking-widest block mb-1">Link Inventory Product</label>
+                          <select
+                            value={editSvcForm.inventory_item_id || ''}
+                            onChange={e => {
+                              const val = e.target.value;
+                              if (!val) {
+                                setEditSvcForm(p => ({ ...p, inventory_item_id: null }));
+                              } else {
+                                const item = inventoryItems.find(i => i.id === Number(val));
+                                if (item) {
+                                  setEditSvcForm(p => ({
+                                    ...p,
+                                    inventory_item_id: item.id,
+                                    service_name: item.name,
+                                    unit_price: item.selling_price || item.purchase_price || '',
+                                    item_type: 'part',
+                                    service_type: item.category === 'ppf_roll' ? 'ppf' : item.category === 'ceramic' ? 'ceramic' : 'other',
+                                    sqft_used: item.category === 'ppf_roll' ? 50 : ''
+                                  }));
+                                }
+                              }
+                            }}
+                            className="w-full bg-black border border-white/[0.07] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-performance-red/40"
+                          >
+                            <option value="">-- No linked product --</option>
+                            {inventoryItems.map(item => (
+                              <option key={item.id} value={item.id}>
+                                {item.name} ({item.category.replace('_', ' ')} • Stock: {item.current_stock})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+                        <div className="md:col-span-2">
+                          <label className="font-label-caps text-[9px] text-on-surface-variant/40 block mb-1">Service Name</label>
+                          <input
+                            value={editSvcForm.service_name}
+                            onChange={e => setEditSvcForm(p => ({ ...p, service_name: e.target.value }))}
+                            className="w-full bg-black border border-white/[0.07] rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-performance-red/40"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-label-caps text-[9px] text-on-surface-variant/40 block mb-1">Type</label>
+                          <select
+                            value={editSvcForm.item_type}
+                            onChange={e => setEditSvcForm(p => ({ ...p, item_type: e.target.value as 'labor' | 'part' }))}
+                            className="w-full bg-black border border-white/[0.07] rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-performance-red/40"
+                          >
+                            <option value="labor">Labor</option>
+                            <option value="part">Part</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="font-label-caps text-[9px] text-on-surface-variant/40 block mb-1">Price</label>
+                          <input
+                            type="number"
+                            value={editSvcForm.unit_price}
+                            onChange={e => setEditSvcForm(p => ({ ...p, unit_price: e.target.value === '' ? '' : Number(e.target.value) }))}
+                            className="w-full bg-black border border-white/[0.07] rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-performance-red/40"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-label-caps text-[9px] text-on-surface-variant/40 block mb-1">GST (%)</label>
+                          <input
+                            type="number"
+                            value={editSvcForm.tax_pct}
+                            onChange={e => setEditSvcForm(p => ({ ...p, tax_pct: e.target.value === '' ? '' : Number(e.target.value) }))}
+                            className="w-full bg-black border border-white/[0.07] rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-performance-red/40"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-label-caps text-[9px] text-on-surface-variant/40 block mb-1">Qty</label>
+                          <input
+                            type="number"
+                            value={editSvcForm.quantity}
+                            min={1}
+                            onChange={e => setEditSvcForm(p => ({ ...p, quantity: e.target.value === '' ? '' : Number(e.target.value) }))}
+                            className="w-full bg-black border border-white/[0.07] rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-performance-red/40"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Conditionally show manual PPF square feet entry for editing */}
+                      {(editSvcForm.service_type === 'ppf' || editSvcForm.service_name.toLowerCase().includes('ppf') || inventoryItems.find(i => i.id === editSvcForm.inventory_item_id)?.category === 'ppf_roll') && (
+                        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+                          <div className="col-span-3">
+                            <label className="font-label-caps text-[9px] text-orange-400 tracking-widest block mb-1">Manual PPF Sq feet to Deduct *</label>
+                            <input
+                              type="number"
+                              value={editSvcForm.sqft_used}
+                              onChange={e => setEditSvcForm(p => ({ ...p, sqft_used: e.target.value === '' ? '' : Number(e.target.value) }))}
+                              placeholder="Enter square feet (e.g. 25)"
+                              className="w-full bg-black border border-orange-500/30 rounded-lg px-3 py-2 text-sm text-orange-400 outline-none focus:border-orange-500/50 font-bold"
+                            />
+                            <p className="text-[9px] text-on-surface-variant/40 mt-1">This square feet amount will deduct from the matched PPF roll automatically on completion/delivery (+5% wastage).</p>
+                          </div>
+                        </div>
                       )}
+
+                      <div className="flex justify-end gap-2">
+                        <button onClick={() => setEditingServiceId(null)} className="px-3 py-1 text-xs text-on-surface-variant/50 hover:text-white transition-colors font-label-caps">Cancel</button>
+                        <button
+                          onClick={() => updateServiceMutation.mutate({ serviceId: svc.id, payload: editSvcForm as any })}
+                          disabled={!editSvcForm.service_name || editSvcForm.unit_price === '' || Number(editSvcForm.unit_price) < 0 || updateServiceMutation.isPending}
+                          className="performance-gradient text-white font-label-caps text-[10px] px-3 py-1.5 rounded-lg border border-white/10 disabled:opacity-50"
+                        >
+                          Save
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div key={svc.id} className="flex items-center justify-between p-3 bg-white/[0.02] border border-white/5 rounded-xl group">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm text-white font-bold">{svc.service_name}</p>
+                          {svc.inventory_item_id && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[8px] font-label-caps uppercase tracking-wider font-bold">
+                              <span className="material-symbols-outlined text-[10px]">inventory_2</span>
+                              Linked Stock
+                            </span>
+                          )}
+                          {svc.sqft_used > 0 && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-orange-500/10 border border-orange-500/20 text-orange-400 text-[8px] font-label-caps uppercase tracking-wider font-bold">
+                              <span className="material-symbols-outlined text-[10px]">square_foot</span>
+                              {svc.sqft_used} Sq feet
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-on-surface-variant/50 mt-0.5">
+                          {svc.item_type?.toUpperCase() || 'LABOR'} • GST: {svc.tax_pct !== undefined ? svc.tax_pct : 18}% • Qty: {svc.quantity}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <p className="font-data-sm text-white font-bold">₹{Number(svc.line_total).toLocaleString('en-IN')}</p>
+                        {!['delivered', 'cancelled'].includes(job.status) && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => startEditing(svc)}
+                              className="p-1 rounded hover:bg-white/5 text-on-surface-variant/30 hover:text-white opacity-0 group-hover:opacity-100 transition-all"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">edit</span>
+                            </button>
+                            <button
+                              onClick={() => { if (window.confirm('Remove this service?')) deleteServiceMutation.mutate(svc.id); }}
+                              className="p-1 rounded hover:bg-red-500/10 text-on-surface-variant/20 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">close</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
                 ))}
                 <div className="flex justify-between pt-3 border-t border-white/10">
                   <span className="font-label-caps text-xs text-on-surface-variant/50">Total Amount</span>
@@ -553,7 +874,7 @@ export default function JobCardDetailPage() {
       {/* ── Complete Job Modal ── */}
       {showCompleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="bg-[#111] border border-white/10 rounded-2xl p-8 w-full max-w-md space-y-6">
+          <div className="bg-[#111] border border-white/10 rounded-2xl p-6 sm:p-8 w-[95vw] sm:max-w-md space-y-6 mx-auto">
             <h2 className="font-display-hero text-lg text-on-surface">Complete Job — Generate Document</h2>
             <div>
               <label className="font-label-caps text-[9px] text-on-surface-variant/50 tracking-widest block mb-1">Document Type</label>
@@ -566,15 +887,31 @@ export default function JobCardDetailPage() {
                 <option value="estimate">Estimate</option>
               </select>
             </div>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={completeForm.gst_applicable}
-                onChange={e => setCompleteForm(p => ({ ...p, gst_applicable: e.target.checked }))}
-                className="w-4 h-4 accent-performance-red"
-              />
-              <span className="text-sm text-white">Apply GST (18%)</span>
-            </label>
+            {completeForm.completion_type === 'invoice' && (
+              <div className="space-y-4">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={completeForm.gst_applicable}
+                    onChange={e => setCompleteForm(p => ({ ...p, gst_applicable: e.target.checked }))}
+                    className="w-4 h-4 accent-performance-red"
+                  />
+                  <span className="text-sm text-white">Apply GST</span>
+                </label>
+
+                {completeForm.gst_applicable && (
+                  <div>
+                    <label className="font-label-caps text-[9px] text-on-surface-variant/50 tracking-widest block mb-1">GST Rate Percentage (%)</label>
+                    <input
+                      type="number"
+                      value={completeForm.gst_pct}
+                      onChange={e => setCompleteForm(p => ({ ...p, gst_pct: e.target.value === '' ? '' : Number(e.target.value) }))}
+                      className="w-full bg-black border border-white/[0.07] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-performance-red/40"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
             <div>
               <label className="font-label-caps text-[9px] text-on-surface-variant/50 tracking-widest block mb-1">Payment Mode</label>
               <select
@@ -593,6 +930,44 @@ export default function JobCardDetailPage() {
                 className="performance-gradient text-white font-label-caps text-xs px-5 py-2.5 rounded-lg border border-white/10 disabled:opacity-50"
               >
                 {completeMutation.isPending ? 'Generating...' : 'Generate'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delivered Confirmation Modal ── */}
+      {showDeliveredConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-[#111] border border-white/10 rounded-2xl p-6 sm:p-8 w-[95vw] sm:max-w-sm space-y-6 mx-auto">
+            <div className="text-center space-y-3">
+              <span className="material-symbols-outlined text-4xl text-amber-400">warning</span>
+              <h2 className="font-display-hero text-lg text-on-surface">Confirm Final Delivery</h2>
+              <p className="text-sm text-on-surface-variant/70">
+                You will not be able to edit or make changes to services after setting the status to Final Delivered. Do you want to proceed?
+              </p>
+            </div>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => {
+                  setShowDeliveredConfirm(false);
+                  setPendingStatusChange(null);
+                }}
+                className="px-4 py-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white text-xs font-label-caps rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (pendingStatusChange) {
+                    statusMutation.mutate(pendingStatusChange);
+                  }
+                  setShowDeliveredConfirm(false);
+                  setPendingStatusChange(null);
+                }}
+                className="performance-gradient text-white font-label-caps text-xs px-5 py-2.5 rounded-lg border border-white/10"
+              >
+                OK
               </button>
             </div>
           </div>

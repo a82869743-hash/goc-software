@@ -136,18 +136,18 @@ const MarketingPage: React.FC = () => {
             WhatsApp campaign parameters, quick outreach templates, and analytics pipelines.
           </p>
         </div>
-        <div className="flex gap-3">
-          <button className="btn-secondary px-5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:cursor-pointer" onClick={() => setShowQuickSend(true)}>
+        <div className="flex flex-wrap sm:flex-nowrap gap-3 w-full md:w-auto">
+          <button className="btn-secondary px-5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:cursor-pointer flex-1 sm:flex-none justify-center" onClick={() => setShowQuickSend(true)}>
             <span className="material-symbols-outlined text-[18px]">send</span>Quick Send
           </button>
-          <button className="btn-primary px-5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:cursor-pointer" onClick={() => setShowCampaignModal(true)}>
+          <button className="btn-primary px-5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:cursor-pointer flex-1 sm:flex-none justify-center" onClick={() => setShowCampaignModal(true)}>
             <span className="material-symbols-outlined text-[18px]">campaign</span>New Campaign
           </button>
         </div>
       </div>
 
       {/* TABS CONTAINER */}
-      <div className="flex border-b border-white/5 pb-1">
+      <div className="flex border-b border-white/5 pb-1 overflow-x-auto custom-scrollbar whitespace-nowrap min-w-full">
         <div className="flex items-center gap-1.5 p-1 bg-black/30 border border-white/5 rounded-xl">
           {([
             { id: 'overview', icon: 'monitoring', label: 'Overview' },
@@ -156,7 +156,7 @@ const MarketingPage: React.FC = () => {
           ] as const).map((tab) => (
             <button
               key={tab.id}
-              className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all hover:cursor-pointer ${
+              className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all hover:cursor-pointer shrink-0 ${
                 activeTab === tab.id 
                   ? 'bg-performance-red/10 text-performance-red border border-performance-red/20 shadow-[0_0_15px_rgba(255,43,43,0.15)]' 
                   : 'text-tertiary/60 hover:text-white'
@@ -174,7 +174,7 @@ const MarketingPage: React.FC = () => {
       {activeTab === 'overview' && (
         <div className="space-y-8">
           {/* Stats Grid */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
               { label:'Sent Today', value: stats.today, icon:'chat', color:'text-white', glowColor: 'rgba(255,255,255,0.03)' },
               { label:'Sent This Week', value: stats.this_week, icon:'query_stats', color:'text-cyan-400', glowColor: 'rgba(6,182,212,0.03)' },
@@ -281,7 +281,7 @@ const MarketingPage: React.FC = () => {
                 onChange={(e) => setLogFilter({ ...logFilter, search: e.target.value, page: 1 })}
               />
               <select
-                className="input-glass px-4 py-2 rounded-lg border border-white/10 bg-black focus:border-performance-red focus:bg-white/4 focus:ring-1 focus:ring-performance-red/30 transition-all font-label-caps text-tertiary text-xs"
+                className="input-glass px-4 py-2 rounded-lg border border-white/10 bg-black focus:border-performance-red focus:bg-white/4 focus:ring-1 focus:ring-performance-red/30 transition-all font-label-caps text-tertiary text-xs w-full sm:w-auto"
                 value={logFilter.status || ''}
                 onChange={(e) => setLogFilter({ ...logFilter, status: e.target.value || undefined, page: 1 })}
               >
@@ -298,7 +298,7 @@ const MarketingPage: React.FC = () => {
           </div>
 
           <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse min-w-[800px]">
               <thead>
                 <tr className="bg-black/25 text-tertiary text-[10px] font-label-caps uppercase tracking-wider border-b border-white/5">
                   <th className="py-4 px-6 font-normal">Time</th>
@@ -434,7 +434,7 @@ const MarketingPage: React.FC = () => {
       {/* ── QUICK SEND MODAL ── */}
       {showQuickSend && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={() => setShowQuickSend(false)}>
-          <div className="bg-[#0c0c0c]/90 backdrop-blur-2xl border border-white/10 rounded-2xl w-full max-w-md overflow-hidden relative shadow-2xl animate-fade-in flex flex-col p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-[#0c0c0c]/90 backdrop-blur-2xl border border-white/10 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto relative shadow-2xl animate-fade-in flex flex-col p-6" onClick={(e) => e.stopPropagation()}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-performance-red/[0.03] blur-[50px] rounded-full pointer-events-none" />
             
             <div className="flex justify-between items-center border-b border-white/5 pb-4 mb-6">
@@ -469,7 +469,7 @@ const MarketingPage: React.FC = () => {
       {/* ── NEW CAMPAIGN MODAL ── */}
       {showCampaignModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={() => setShowCampaignModal(false)}>
-          <div className="bg-[#0c0c0c]/90 backdrop-blur-2xl border border-white/10 rounded-2xl w-full max-w-md overflow-hidden relative shadow-2xl animate-fade-in flex flex-col p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-[#0c0c0c]/90 backdrop-blur-2xl border border-white/10 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto relative shadow-2xl animate-fade-in flex flex-col p-6" onClick={(e) => e.stopPropagation()}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-performance-red/[0.03] blur-[50px] rounded-full pointer-events-none" />
             
             <div className="flex justify-between items-center border-b border-white/5 pb-4 mb-6">

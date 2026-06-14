@@ -785,6 +785,15 @@ input:-webkit-autofill:active {
   transition: background-color 5000s ease-in-out 0s;
 }
 
+html:not(.dark) input:-webkit-autofill,
+html:not(.dark) input:-webkit-autofill:hover,
+html:not(.dark) input:-webkit-autofill:focus,
+html:not(.dark) input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px #f3f3f5 inset !important;
+  -webkit-text-fill-color: #050505 !important;
+}
+
+
 /* ═══════════════════════════════════════════════════════════
    NAVIGATION STYLES
    ═══════════════════════════════════════════════════════════ */

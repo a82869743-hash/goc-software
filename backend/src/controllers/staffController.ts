@@ -4,6 +4,8 @@ import { generateCode } from '../utils/codes';
 import { ERROR_CODES } from '../utils/constants';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import bcrypt from 'bcryptjs';
+import fs from 'fs';
+import path from 'path';
 
 // ─── LIST STAFF ───────────────────────────────────
 export const getStaff = async (req: Request, res: Response): Promise<void> => {
@@ -533,5 +535,167 @@ export const settleStaffAdvance = async (req: Request, res: Response): Promise<v
   } catch (error) {
     console.error('Settle staff advance error:', error);
     res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed to settle advance payment.' } });
+  }
+};
+
+// Helper to save base64 image from kiosk camera
+const saveBase64Image = (base64Data: string, staffId: number, prefix: string): string => {
+  const matches = base64Data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+  if (!matches || matches.length !== 3) {
+    throw new Error('Invalid base64 image data');
+  }
+
+  const mimeType = matches[1];
+  const buffer = Buffer.from(matches[2], 'base64');
+
+  let extension = 'jpg';
+  if (mimeType === 'image/png') extension = 'png';
+  else if (mimeType === 'image/webp') extension = 'webp';
+
+  const dirPath = path.resolve(__dirname, '../../../uploads/attendance');
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
+
+  const filename = `${prefix}_${staffId}_${Date.now()}.${extension}`;
+  const filePath = path.join(dirPath, filename);
+  fs.writeFileSync(filePath, buffer);
+
+  return `/uploads/attendance/${filename}`;
+};
+
+// Timezone-independent IST helper functions
+const getISTDateTime = (): string => {
+  const now = new Date();
+  const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const istDate = new Date(utcTime + 19800000); // UTC + 5.5 hours
+  const yyyy = istDate.getFullYear();
+  const mm = String(istDate.getMonth() + 1).padStart(2, '0');
+  const dd = String(istDate.getDate()).padStart(2, '0');
+  const hh = String(istDate.getHours()).padStart(2, '0');
+  const min = String(istDate.getMinutes()).padStart(2, '0');
+  const ss = String(istDate.getSeconds()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
+};
+
+const getISTDate = (): string => {
+  const now = new Date();
+  const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const istDate = new Date(utcTime + 19800000); // UTC + 5.5 hours
+  const yyyy = istDate.getFullYear();
+  const mm = String(istDate.getMonth() + 1).padStart(2, '0');
+  const dd = String(istDate.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+/** POST /staff/kiosk-attendance — Check-in/out with photo capture */
+export const kioskAttendance = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { staff_id, type, photo } = req.body;
+
+    if (!staff_id || !type || !photo) {
+      res.status(400).json({ success: false, error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'staff_id, type (check-in/check-out), and photo (base64) are required.' } });
+      return;
+    }
+
+    const today = getISTDate();
+
+    // Check if staff member exists and is active
+    const [staffRows] = await pool.query<RowDataPacket[]>(
+      'SELECT id, full_name, status FROM staff WHERE id = ? AND deleted_at IS NULL',
+      [staff_id]
+    );
+    if (staffRows.length === 0) {
+      res.status(404).json({ success: false, error: { code: ERROR_CODES.NOT_FOUND, message: 'Staff member not found.' } });
+      return;
+    }
+    if (staffRows[0].status !== 'active') {
+      res.status(400).json({ success: false, error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'Staff member is not active.' } });
+      return;
+    }
+
+    const staffName = staffRows[0].full_name;
+
+    // Save base64 photo to file
+    let photoUrl: string;
+    try {
+      photoUrl = saveBase64Image(photo, staff_id, type);
+    } catch (e: any) {
+      res.status(400).json({ success: false, error: { code: ERROR_CODES.VALIDATION_ERROR, message: e.message || 'Failed to process base64 photo.' } });
+      return;
+    }
+
+    if (type === 'check-in') {
+      const [existing] = await pool.query<RowDataPacket[]>(
+        'SELECT id FROM attendance WHERE staff_id = ? AND date = ?',
+        [staff_id, today]
+      );
+      if (existing.length > 0) {
+        res.status(400).json({ success: false, error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'Staff member already checked in today.' } });
+        return;
+      }
+
+      const nowIST = new Date(new Date().getTime() + (new Date().getTimezoneOffset() * 60000) + 19800000);
+      const cutoffHour = 9;
+      const cutoffMinute = 30;
+      let status = 'present';
+      let isLate = 0;
+
+      if (nowIST.getHours() > cutoffHour || (nowIST.getHours() === cutoffHour && nowIST.getMinutes() > cutoffMinute)) {
+        status = 'late';
+        isLate = 1;
+      }
+
+      const checkInTime = getISTDateTime();
+
+      await pool.query(
+        `INSERT INTO attendance (staff_id, date, check_in_time, check_in_photo, status, is_late, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [staff_id, today, checkInTime, photoUrl, status, isLate, 'Kiosk Check-In']
+      );
+
+      res.json({
+        success: true,
+        data: { message: `Checked in ${staffName} successfully.`, status, is_late: !!isLate },
+      });
+    } else if (type === 'check-out') {
+      const [existing] = await pool.query<RowDataPacket[]>(
+        'SELECT id, check_in_time, check_out_time FROM attendance WHERE staff_id = ? AND date = ?',
+        [staff_id, today]
+      );
+
+      if (existing.length === 0) {
+        res.status(400).json({ success: false, error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'No check-in record found for today.' } });
+        return;
+      }
+
+      const att = existing[0];
+      if (att.check_out_time) {
+        res.status(400).json({ success: false, error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'Already checked out today.' } });
+        return;
+      }
+
+      const checkIn = new Date(att.check_in_time.replace(' ', 'T') + '+05:30');
+      const nowISTTime = new Date().getTime() + (new Date().getTimezoneOffset() * 60000) + 19800000;
+      const workingHours = +((nowISTTime - checkIn.getTime()) / (1000 * 60 * 60)).toFixed(2);
+      const checkOutTime = getISTDateTime();
+
+      await pool.query(
+        `UPDATE attendance
+         SET check_out_time = ?, check_out_photo = ?, working_hours = ?, notes = COALESCE(notes, 'Kiosk Check-Out')
+         WHERE id = ?`,
+        [checkOutTime, photoUrl, workingHours, att.id]
+      );
+
+      res.json({
+        success: true,
+        data: { message: `Checked out ${staffName} successfully.`, working_hours: workingHours },
+      });
+    } else {
+      res.status(400).json({ success: false, error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'Invalid type. Use check-in or check-out.' } });
+    }
+  } catch (error) {
+    console.error('Kiosk attendance error:', error);
+    res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed to record kiosk attendance.' } });
   }
 };

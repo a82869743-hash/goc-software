@@ -152,3 +152,16 @@ export const truncate = (str: string, maxLen: number = 50): string => {
   if (str.length <= maxLen) return str;
   return str.slice(0, maxLen) + '…';
 };
+
+/**
+ * Helper to construct URLs to backend resources.
+ * In development (localhost or 127.0.0.1) it uses localhost:4000.
+ * In production it uses window.location.origin.
+ */
+export const getBackendURL = (path: string): string => {
+  if (!path) return '';
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const base = isLocal ? 'http://localhost:4000' : window.location.origin;
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  return `${base}${cleanPath}`;
+};

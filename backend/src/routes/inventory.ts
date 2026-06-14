@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getInventoryItems, getInventoryItemById, createInventoryItem, updateInventoryItem, deleteInventoryItem, logUsage, getInventorySummary, getReorderSuggestions, recordPurchase, getPurchaseHistory } from '../controllers/inventoryController';
+import { getInventoryItems, getInventoryItemById, createInventoryItem, updateInventoryItem, deleteInventoryItem, logUsage, getInventorySummary, getReorderSuggestions, recordPurchase, getPurchaseHistory, getInventoryUsage } from '../controllers/inventoryController';
 import { authMiddleware } from '../middleware/auth';
 import { rbac } from '../middleware/rbac';
 import { validate, validateQuery } from '../middleware/validate';
@@ -11,8 +11,10 @@ router.use(authMiddleware);
 router.get('/summary', getInventorySummary);
 router.get('/reorder-suggestions', getReorderSuggestions);
 router.get('/purchases', getPurchaseHistory);
+router.get('/usages', getInventoryUsage);
 router.post('/purchase', rbac('admin', 'manager'), recordPurchase);
 router.post('/usage', validate(logUsageSchema), logUsage);
+
 
 router.get('/', validateQuery(inventoryFiltersSchema), getInventoryItems);
 router.get('/:id', getInventoryItemById);

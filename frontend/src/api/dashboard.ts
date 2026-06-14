@@ -10,7 +10,6 @@ export interface DashboardKPIs {
   total_staff: number;
   month_revenue: number;
   total_outstanding: number;
-  today_bookings: number;
 }
 
 export interface ExtendedStats {
@@ -38,10 +37,6 @@ export const dashboardApi = {
   },
   getRecentJobs: async () => {
     const res = await apiClient.get('/dashboard/recent-jobs');
-    return res.data.data;
-  },
-  getTodayBookings: async () => {
-    const res = await apiClient.get('/dashboard/today-bookings');
     return res.data.data;
   },
   getExtendedStats: async () => {

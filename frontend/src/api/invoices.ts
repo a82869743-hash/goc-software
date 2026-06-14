@@ -34,6 +34,7 @@ export interface Invoice {
   customer_name?: string;
   customer_phone?: string;
   job_code?: string;
+  vehicle_reg_number?: string;
   items?: InvoiceItem[];
   created_at: string;
 }
@@ -72,7 +73,7 @@ export const invoicesAPI = {
     return data;
   },
   generatePdf: async (id: number): Promise<ApiResponse<{ pdf_url: string }>> => {
-    const { data } = await apiClient.post(`/invoices/${id}/generate-pdf`, null, { timeout: 60000 });
+    const { data } = await apiClient.post(`/invoices/${id}/generate-pdf`, {}, { timeout: 60000 });
     return data;
   },
   sendWhatsApp: async (id: number): Promise<ApiResponse<any>> => {

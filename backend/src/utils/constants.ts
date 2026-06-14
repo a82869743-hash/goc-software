@@ -17,7 +17,7 @@ export const JOB_STATUS = {
 export const JOB_STATUS_FLOW: Record<string, string[]> = {
   in_progress: ['ready', 'cancelled'],
   ready: ['estimate', 'cancelled'],
-  estimate: ['delivered', 'cancelled'],
+  estimate: ['delivered', 'cancelled', 'ready'],
   delivered: [],
   cancelled: [],
   // Keep transitions for older statuses to move them forward or cancel

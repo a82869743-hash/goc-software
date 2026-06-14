@@ -1,13 +1,42 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Tldraw, useEditor, getSnapshot } from '@tldraw/tldraw';
-import '@tldraw/tldraw/tldraw.css';
+import { Excalidraw, exportToBlob } from '@excalidraw/excalidraw';
+import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
+import '@excalidraw/excalidraw/index.css';
 import { quotationsAPI, WhiteboardQuotation, CreateQuotationPayload } from '../api/quotations';
 import { customersAPI, vehiclesAPI } from '../api/customers';
 import type { Customer, Vehicle } from '../types';
 import toast from 'react-hot-toast';
-import { formatINR, formatDate } from '../utils/helpers';
+import { formatINR, formatDate, getBackendURL } from '../utils/helpers';
 import { useAuthStore } from '../stores/authStore';
+import { carDataset } from '../utils/carDataset';
+
+const getVehicleDetails = (qt: WhiteboardQuotation) => {
+  if (qt.vehicle_name) {
+    return {
+      description: qt.vehicle_name,
+      regNumber: qt.reg_number || ''
+    };
+  }
+  if (!qt.vehicle_description) {
+    return { description: 'Other Vehicle', regNumber: '' };
+  }
+  try {
+    if (qt.vehicle_description.trim().startsWith('{')) {
+      const parsed = JSON.parse(qt.vehicle_description);
+      return {
+        description: `${parsed.brand || ''} ${parsed.model || ''}`.trim() || 'Other Vehicle',
+        regNumber: parsed.reg_number || ''
+      };
+    }
+  } catch (e) {
+    // ignore
+  }
+  return {
+    description: qt.vehicle_description,
+    regNumber: ''
+  };
+};
 
 // ── Status badge config ───────────────────────────────────
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string; dot: string }> = {
@@ -18,80 +47,96 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
   expired:  { label: 'Expired',  color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/20', dot: 'bg-orange-400' },
 };
 
-// ── Inner canvas toolbar — inside Tldraw context ──────────
+// ── Inner canvas toolbar — uses Excalidraw API ref ──────────
 function CanvasToolbar({
+  excalidrawAPI,
   onSave,
+  onUndo,
+  onRedo,
+  onClear,
+  onExit,
   isSaving,
 }: {
+  excalidrawAPI: ExcalidrawImperativeAPI | null;
   onSave: (canvasData: string, snapshotBase64: string) => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  onClear: () => void;
+  onExit: () => void;
   isSaving: boolean;
 }) {
-  const editor = useEditor();
-
   const handleSave = useCallback(async () => {
-    if (!editor) return;
-    const snapshot = getSnapshot(editor.store);
-    const canvasData = JSON.stringify(snapshot);
+    if (!excalidrawAPI) return;
+    const elements = excalidrawAPI.getSceneElements();
+    const appState = excalidrawAPI.getAppState();
+    const files = excalidrawAPI.getFiles();
+    const canvasData = JSON.stringify({ elements, appState: { viewBackgroundColor: appState.viewBackgroundColor }, files });
     try {
-      const shapeIds = Array.from(editor.getCurrentPageShapeIds());
       let snapshotBase64 = '';
-      if (shapeIds.length > 0) {
-        const result = await editor.toImageDataUrl(shapeIds, {
-          format: 'png',
-          background: true,
-          scale: 1.5,
+      if (elements.length > 0) {
+        const blob = await exportToBlob({
+          elements,
+          appState: { ...appState, exportWithDarkMode: false },
+          files,
+          mimeType: 'image/png',
+          exportPadding: 20,
         });
-        snapshotBase64 = typeof result === 'string' ? result : (result as any).url || '';
+        snapshotBase64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
       }
       onSave(canvasData, snapshotBase64);
     } catch (err) {
       console.error('Canvas export error:', err);
       onSave(canvasData, '');
     }
-  }, [editor, onSave]);
+  }, [excalidrawAPI, onSave]);
 
   return (
-    <div className="absolute bottom-4 right-4 z-50 flex gap-2">
+    <div className="absolute bottom-3 sm:bottom-4 right-3 sm:right-4 z-50 flex flex-wrap gap-1.5 sm:gap-2 max-w-[calc(100%-1.5rem)]">
       <button
-        onClick={() => editor?.selectAll()}
-        className="px-3 py-2 bg-black/80 border border-white/20 rounded-lg text-xs text-white font-label-caps hover:bg-white/10 transition-all flex items-center gap-1.5"
-        title="Select All"
+        type="button"
+        onClick={onExit}
+        className="p-2 sm:px-3 sm:py-2 bg-[#222222] hover:bg-[#333333] border border-red-500/30 rounded-lg text-xs font-label-caps transition-all shadow-sm flex items-center justify-center cursor-pointer gap-1.5 hover:shadow-[0_0_10px_rgba(255,43,43,0.2)]"
+        title="Exit / Go Back"
+        style={{ color: '#ff2b2b' }}
       >
-        <span className="material-symbols-outlined text-sm">select_all</span>
+        <span className="material-symbols-outlined text-sm" style={{ color: '#ff2b2b' }}>arrow_back</span>
+        <span style={{ color: '#ff2b2b' }}>Exit</span>
       </button>
       <button
-        onClick={() => editor?.undo()}
-        className="px-3 py-2 bg-black/80 border border-white/20 rounded-lg text-xs text-white font-label-caps hover:bg-white/10 transition-all"
-        title="Undo"
-      >
-        <span className="material-symbols-outlined text-sm">undo</span>
-      </button>
-      <button
-        onClick={() => editor?.redo()}
-        className="px-3 py-2 bg-black/80 border border-white/20 rounded-lg text-xs text-white font-label-caps hover:bg-white/10 transition-all"
-        title="Redo"
-      >
-        <span className="material-symbols-outlined text-sm">redo</span>
-      </button>
-      <button
-        onClick={() => {
-          if (window.confirm('Are you sure you want to clear the canvas?')) {
-            const shapes = editor?.getCurrentPageShapes() || [];
-            editor?.deleteShapes(shapes.map(s => s.id));
-          }
-        }}
-        className="px-3 py-2 bg-red-500/20 border border-red-500/30 rounded-lg text-xs text-red-400 font-label-caps hover:bg-red-500/30 transition-all"
+        type="button"
+        onClick={onClear}
+        className="p-2 sm:px-3 sm:py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600 font-label-caps hover:bg-red-100 transition-all shadow-sm flex items-center justify-center cursor-pointer"
         title="Clear Canvas"
       >
         <span className="material-symbols-outlined text-sm">delete_sweep</span>
       </button>
       <button
+        type="button"
+        onClick={onUndo}
+        className="p-2 sm:px-3 sm:py-2 bg-white/10 hover:bg-white/20 border border-white/10 rounded-lg text-xs text-white font-label-caps transition-all shadow-sm flex items-center justify-center cursor-pointer"
+        title="Undo (Ctrl+Z)"
+      >
+        <span className="material-symbols-outlined text-sm">undo</span>
+      </button>
+      <button
+        type="button"
+        onClick={onRedo}
+        className="p-2 sm:px-3 sm:py-2 bg-white/10 hover:bg-white/20 border border-white/10 rounded-lg text-xs text-white font-label-caps transition-all shadow-sm flex items-center justify-center cursor-pointer"
+        title="Redo (Ctrl+Y)"
+      >
+        <span className="material-symbols-outlined text-sm">redo</span>
+      </button>
+      <button
         onClick={handleSave}
         disabled={isSaving}
-        className="px-4 py-2 performance-gradient border border-white/10 rounded-lg text-xs text-white font-label-caps hover:shadow-[0_0_15px_rgba(255,43,43,0.3)] transition-all flex items-center gap-1.5 disabled:opacity-50"
+        className="px-3 sm:px-4 py-2 performance-gradient border border-red-600/30 rounded-lg text-xs text-white font-label-caps hover:shadow-[0_0_15px_rgba(255,43,43,0.3)] transition-all flex items-center gap-1.5 disabled:opacity-50 shadow-sm"
       >
         <span className="material-symbols-outlined text-sm">{isSaving ? 'hourglass_top' : 'save'}</span>
-        {isSaving ? 'Saving…' : 'Save Canvas'}
+        <span className="hidden sm:inline">{isSaving ? 'Saving…' : 'Save Canvas'}</span>
       </button>
     </div>
   );
@@ -125,31 +170,79 @@ function WhiteboardModal({
   isSaving,
 }: WhiteboardModalProps) {
   const [showConfirmClose, setShowConfirmClose] = useState(false);
-  const editorRef = useRef<any>(null);
+  const [showConfirmClear, setShowConfirmClear] = useState(false);
+  const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawImperativeAPI | null>(null);
 
-  let initialSnapshot: any = undefined;
-  if (initialCanvasData) {
-    try { initialSnapshot = JSON.parse(initialCanvasData); } catch { /* ignore */ }
-  }
+  const handleExcalidrawAPI = useCallback((api: ExcalidrawImperativeAPI) => {
+    setExcalidrawAPI(api);
+  }, []);
+
+  const dispatchKeyCombination = useCallback((key: string, code: string) => {
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+    const event = new KeyboardEvent('keydown', {
+      key,
+      code,
+      ctrlKey: !isMac,
+      metaKey: isMac,
+      bubbles: true,
+      cancelable: true,
+    });
+    const target = document.querySelector('.excalidraw') || document.querySelector('.excalidraw-canvas') || window;
+    target.dispatchEvent(event);
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    dispatchKeyCombination('z', 'KeyZ');
+  }, [dispatchKeyCombination]);
+
+  const handleRedo = useCallback(() => {
+    dispatchKeyCombination('y', 'KeyY');
+  }, [dispatchKeyCombination]);
+
+  // Parse initial data for Excalidraw initialData prop
+  const parsedInitialData = useMemo(() => {
+    if (!initialCanvasData) return undefined;
+    try {
+      const parsed = JSON.parse(initialCanvasData);
+      if (parsed && Array.isArray(parsed.elements)) {
+        return {
+          elements: parsed.elements,
+          appState: parsed.appState || {},
+          files: parsed.files || undefined,
+        };
+      }
+      console.warn('Initial canvas data is not in Excalidraw format, starting with empty canvas');
+      return undefined;
+    } catch (err) {
+      console.error('Failed to parse initial canvas data:', err);
+      return undefined;
+    }
+  }, [initialCanvasData]);
 
   const handleConfirmSave = async () => {
-    const editor = editorRef.current;
-    if (!editor) {
+    if (!excalidrawAPI) {
       onClose();
       return;
     }
-    const snapshot = getSnapshot(editor.store);
-    const canvasData = JSON.stringify(snapshot);
+    const elements = excalidrawAPI.getSceneElements();
+    const appState = excalidrawAPI.getAppState();
+    const files = excalidrawAPI.getFiles();
+    const canvasData = JSON.stringify({ elements, appState: { viewBackgroundColor: appState.viewBackgroundColor }, files });
     try {
-      const shapeIds = Array.from(editor.getCurrentPageShapeIds());
       let snapshotBase64 = '';
-      if (shapeIds.length > 0) {
-        const result = await editor.toImageDataUrl(shapeIds, {
-          format: 'png',
-          background: true,
-          scale: 1.5,
+      if (elements.length > 0) {
+        const blob = await exportToBlob({
+          elements,
+          appState: { ...appState, exportWithDarkMode: false },
+          files,
+          mimeType: 'image/png',
+          exportPadding: 20,
         });
-        snapshotBase64 = typeof result === 'string' ? result : (result as any).url || '';
+        snapshotBase64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
       }
       onCanvasSaved(canvasData, snapshotBase64);
     } catch (err) {
@@ -164,80 +257,124 @@ function WhiteboardModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#050505]">
+    <div className="fixed inset-0 z-[60] flex flex-col bg-white">
       {/* Modal Header Bar */}
-      <div className="flex items-center justify-between px-6 py-3 bg-black/80 border-b border-white/10 shrink-0">
-        <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between px-3 sm:px-6 py-2 sm:py-3 bg-white border-b border-gray-200 shrink-0 shadow-sm relative z-50">
+        <div className="flex items-center gap-2 sm:gap-4">
           <button
             onClick={() => setShowConfirmClose(true)}
-            className="p-1.5 rounded-lg hover:bg-white/10 text-on-surface-variant/60 hover:text-white transition-colors flex items-center gap-1"
+            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-black transition-colors flex items-center gap-1"
           >
             <span className="material-symbols-outlined">arrow_back</span>
-            <span className="font-label-caps text-xs text-white/80 hidden sm:inline">Back</span>
+            <span className="font-label-caps text-xs text-gray-800">Back</span>
           </button>
           <div>
-            <h2 className="font-display-hero text-base text-white font-bold tracking-tight italic">
+            <h2 className="font-display-hero text-sm sm:text-base text-gray-900 font-bold tracking-tight italic">
               WHITEBOARD <span className="text-performance-red not-italic font-light">QUOTATION</span>
             </h2>
-            <p className="font-label-caps text-[9px] text-on-surface-variant/50 tracking-widest">
+            <p className="font-label-caps text-[8px] sm:text-[9px] text-gray-500 tracking-widest mt-0.5 truncate max-w-[150px] sm:max-w-none">
               {customerHeader.customerName || 'New Quotation'} · {customerHeader.vehicleDescription || 'Vehicle N/A'}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-3 text-xs font-data-sm text-on-surface-variant/50">
+        <div className="hidden sm:flex items-center gap-4 text-xs font-data-sm text-gray-500">
           <span className="flex items-center gap-1.5">
             <span className="material-symbols-outlined text-sm text-performance-red">stylus</span>
             Use stylus or touch to draw details
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
             Auto-saves on "Save Canvas"
           </span>
         </div>
       </div>
 
-      {/* Tldraw Canvas */}
-      <div className="flex-1 relative overflow-hidden bg-white">
-        <Tldraw
-          snapshot={initialSnapshot}
-          onMount={(editor) => {
-            editorRef.current = editor;
-            editor.updateInstanceState({ isDebugMode: false });
-            editor.setCurrentTool('draw');
+      {/* Excalidraw Canvas */}
+      <div className="flex-1 relative overflow-hidden bg-white" style={{ touchAction: 'none' }}>
+        <Excalidraw
+          key={editingId ?? 'new'}
+          excalidrawAPI={handleExcalidrawAPI}
+          initialData={parsedInitialData}
+          handleKeyboardGlobally={true}
+          UIOptions={{
+            canvasActions: {
+              saveToActiveFile: false,
+              loadScene: false,
+              export: false,
+            },
           }}
-        >
-          <CanvasToolbar onSave={onCanvasSaved} isSaving={isSaving} />
-        </Tldraw>
+        />
+        <CanvasToolbar
+          excalidrawAPI={excalidrawAPI}
+          onSave={onCanvasSaved}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          onClear={() => setShowConfirmClear(true)}
+          onExit={() => setShowConfirmClose(true)}
+          isSaving={isSaving}
+        />
       </div>
 
       {/* ── Save or Discard Confirmation Overlay ── */}
       {showConfirmClose && (
-        <div className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#111111] border border-white/10 rounded-2xl p-6 w-full max-w-sm shadow-2xl space-y-4 text-center">
-            <span className="material-symbols-outlined text-amber-400 text-4xl">warning</span>
+            <span className="material-symbols-outlined text-amber-500 text-4xl">warning</span>
             <div>
-              <h3 className="font-label-caps text-sm text-white tracking-widest">SAVE OR DISCARD CHANGES?</h3>
-              <p className="text-xs text-on-surface-variant/60 font-data-sm mt-1.5">
-                Do you want to save your drawings to this quotation docket, or discard and delete the quotation?
+              <h3 className="font-label-caps text-sm text-white font-bold tracking-widest">SAVE AND EXIT DRAWING?</h3>
+              <p className="text-xs text-on-surface-variant/70 font-data-sm mt-1.5">
+                Do you want to save your drawings before exiting, or discard your unsaved edits?
               </p>
             </div>
             <div className="flex flex-col gap-2 pt-2">
               <button
                 onClick={handleConfirmSave}
                 disabled={isSaving}
-                className="w-full py-2.5 bg-performance-red hover:bg-performance-red/90 text-white rounded-xl text-xs font-label-caps tracking-widest transition-all uppercase"
+                className="w-full py-2.5 bg-performance-red hover:bg-performance-red/90 text-white rounded-xl text-xs font-label-caps tracking-widest transition-all uppercase cursor-pointer"
               >
-                Save Drawing
+                Save &amp; Exit
               </button>
               <button
                 onClick={handleConfirmDiscard}
-                className="w-full py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 hover:text-red-300 rounded-xl text-xs font-label-caps tracking-widest transition-colors uppercase"
+                className="w-full py-2.5 bg-red-500/10 border border-red-500/25 text-red-400 hover:bg-red-500/20 rounded-xl text-xs font-label-caps tracking-widest transition-colors uppercase cursor-pointer"
               >
-                Discard &amp; Delete
+                Discard &amp; Exit
               </button>
               <button
                 onClick={() => setShowConfirmClose(false)}
-                className="w-full py-2.5 border border-white/10 text-on-surface-variant/80 hover:text-white rounded-xl text-xs font-label-caps tracking-widest hover:bg-white/5 transition-colors uppercase"
+                className="w-full py-2.5 border border-white/10 text-on-surface hover:text-white rounded-xl text-xs font-label-caps tracking-widest hover:bg-white/5 transition-colors uppercase cursor-pointer"
+              >
+                Cancel / Keep Drawing
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Clear Canvas Confirmation Overlay ── */}
+      {showConfirmClear && (
+        <div className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#111111] border border-white/10 rounded-2xl p-6 w-full max-w-sm shadow-2xl space-y-4 text-center">
+            <span className="material-symbols-outlined text-red-500 text-4xl animate-bounce">delete_sweep</span>
+            <div>
+              <h3 className="font-label-caps text-sm text-white font-bold tracking-widest">CLEAR WHITEBOARD?</h3>
+              <p className="text-xs text-on-surface-variant/70 font-data-sm mt-1.5">
+                This will erase all drawings on the canvas. This action cannot be undone.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                onClick={() => {
+                  excalidrawAPI?.resetScene();
+                  setShowConfirmClear(false);
+                }}
+                className="w-full py-2.5 bg-performance-red hover:bg-performance-red/90 text-white rounded-xl text-xs font-label-caps tracking-widest transition-all uppercase cursor-pointer"
+              >
+                Yes, Clear All
+              </button>
+              <button
+                onClick={() => setShowConfirmClear(false)}
+                className="w-full py-2.5 border border-white/10 text-on-surface hover:text-white rounded-xl text-xs font-label-caps tracking-widest hover:bg-white/5 transition-colors uppercase cursor-pointer"
               >
                 Cancel / Keep Drawing
               </button>
@@ -259,6 +396,12 @@ export default function QuotationsPage() {
   const [activeTab, setActiveTab] = useState('all');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [showRecycleBin, setShowRecycleBin] = useState(false);
+
+  // Custom Delete target states
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+  const [deleteTargetCode, setDeleteTargetCode] = useState<string | null>(null);
+  const [isPermanentDelete, setIsPermanentDelete] = useState(false);
 
   // Form modals state
   const [showForm, setShowForm] = useState(false);
@@ -275,7 +418,9 @@ export default function QuotationsPage() {
   const [headerForm, setHeaderForm] = useState({
     customerName: '',
     customerPhone: '',
-    vehicleDescription: '',
+    carBrand: '',
+    carModel: '',
+    carNumber: '',
     validUntil: (() => { const d = new Date(); d.setDate(d.getDate() + 15); return d.toISOString().split('T')[0]; })(),
     notes: '',
     grandTotal: '',
@@ -287,12 +432,13 @@ export default function QuotationsPage() {
 
   // ── Queries ──
   const { data: quotationsRes, isLoading } = useQuery({
-    queryKey: ['quotations', activeTab, search, page],
+    queryKey: ['quotations', activeTab, search, page, showRecycleBin],
     queryFn: () => quotationsAPI.list({
-      status: activeTab === 'all' ? undefined : activeTab,
+      status: showRecycleBin ? undefined : (activeTab === 'all' ? undefined : activeTab),
       search: search || undefined,
       page,
       limit: 20,
+      trash: showRecycleBin,
     }),
   });
   const quotations = (quotationsRes?.data || []) as WhiteboardQuotation[];
@@ -327,9 +473,12 @@ export default function QuotationsPage() {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: any }) => quotationsAPI.update(id, payload),
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       toast.success('Whiteboard drawing saved successfully!');
       queryClient.invalidateQueries({ queryKey: ['quotations'] });
+      if (variables.id) {
+        generatePDFMutation.mutate(variables.id);
+      }
     },
     onError: () => toast.error('Failed to save whiteboard.'),
   });
@@ -343,11 +492,29 @@ export default function QuotationsPage() {
     onError: () => toast.error('Failed to delete.'),
   });
 
+  const restoreMutation = useMutation({
+    mutationFn: (id: number) => quotationsAPI.restore(id),
+    onSuccess: () => {
+      toast.success('Quotation restored successfully.');
+      queryClient.invalidateQueries({ queryKey: ['quotations'] });
+    },
+    onError: () => toast.error('Failed to restore quotation.'),
+  });
+
+  const deletePermanentMutation = useMutation({
+    mutationFn: (id: number) => quotationsAPI.deletePermanent(id),
+    onSuccess: () => {
+      toast.success('Quotation permanently deleted.');
+      queryClient.invalidateQueries({ queryKey: ['quotations'] });
+    },
+    onError: () => toast.error('Failed to delete permanently.'),
+  });
+
   const generatePDFMutation = useMutation({
     mutationFn: (id: number) => quotationsAPI.generatePDF(id),
     onSuccess: (res) => {
       toast.success('PDF generated successfully!');
-      window.open(`http://localhost:4000${res.data.pdf_url}`, '_blank');
+      window.open(getBackendURL(`${res.data.pdf_url}?t=${Date.now()}`), '_blank');
       queryClient.invalidateQueries({ queryKey: ['quotations'] });
     },
     onError: () => toast.error('Failed to generate PDF.'),
@@ -375,7 +542,9 @@ export default function QuotationsPage() {
     setHeaderForm({
       customerName: '',
       customerPhone: '',
-      vehicleDescription: '',
+      carBrand: '',
+      carModel: '',
+      carNumber: '',
       validUntil: (() => { const d = new Date(); d.setDate(d.getDate() + 15); return d.toISOString().split('T')[0]; })(),
       notes: '',
       grandTotal: '',
@@ -387,10 +556,32 @@ export default function QuotationsPage() {
     setEditingId(qt.id);
     setPendingQuotationId(qt.id);
     setEditingCanvasData(qt.canvas_data);
+
+    let brand = qt.vehicle_make || '';
+    let model = qt.vehicle_model || '';
+    let regNum = qt.reg_number || '';
+
+    if (!qt.vehicle_id && qt.vehicle_description) {
+      try {
+        if (qt.vehicle_description.trim().startsWith('{')) {
+          const parsed = JSON.parse(qt.vehicle_description);
+          brand = parsed.brand || '';
+          model = parsed.model || '';
+          regNum = parsed.reg_number || '';
+        } else {
+          brand = qt.vehicle_description;
+        }
+      } catch (e) {
+        brand = qt.vehicle_description;
+      }
+    }
+
     setHeaderForm({
       customerName: qt.customer_name || qt.customer_name_override || '',
       customerPhone: qt.customer_phone || qt.customer_phone_override || '',
-      vehicleDescription: qt.vehicle_name || qt.vehicle_description || '',
+      carBrand: brand,
+      carModel: model,
+      carNumber: regNum,
       validUntil: qt.valid_until?.split('T')[0] || '',
       notes: qt.notes || '',
       grandTotal: qt.grand_total ? String(qt.grand_total) : '',
@@ -404,12 +595,20 @@ export default function QuotationsPage() {
       toast.error('Please input customer name and phone contact details.');
       return;
     }
+    if (!headerForm.carBrand || !headerForm.carModel || !headerForm.carNumber) {
+      toast.error('Please input Car Brand, Car Model, and Car Number.');
+      return;
+    }
     const payload: CreateQuotationPayload = {
       customer_id: selectedCustomer?.id || undefined,
       vehicle_id: selectedVehicle?.id || undefined,
       customer_name_override: !selectedCustomer ? headerForm.customerName : undefined,
       customer_phone_override: !selectedCustomer ? headerForm.customerPhone : undefined,
-      vehicle_description: headerForm.vehicleDescription || 'Freetext Vehicle',
+      vehicle_description: JSON.stringify({
+        brand: headerForm.carBrand,
+        model: headerForm.carModel,
+        reg_number: headerForm.carNumber
+      }),
       valid_until: headerForm.validUntil,
       notes: headerForm.notes || undefined,
       grand_total: headerForm.grandTotal ? Number(headerForm.grandTotal) : 0,
@@ -446,11 +645,19 @@ export default function QuotationsPage() {
         <WhiteboardModal
           editingId={pendingQuotationId || editingId}
           initialCanvasData={editingCanvasData}
-          customerHeader={headerForm}
+          customerHeader={{
+            customerName: headerForm.customerName,
+            customerPhone: headerForm.customerPhone,
+            vehicleDescription: `${headerForm.carBrand} ${headerForm.carModel} ${headerForm.carNumber ? `[${headerForm.carNumber}]` : ''}`.trim(),
+            validUntil: headerForm.validUntil,
+            notes: headerForm.notes,
+            grandTotal: headerForm.grandTotal,
+          }}
           onCanvasSaved={handleCanvasSaved}
           onDiscard={() => {
+            const isNew = !editingId;
             const id = pendingQuotationId || editingId;
-            if (id) deleteMutation.mutate(id);
+            if (isNew && id) deleteMutation.mutate(id);
             handleCloseWhiteboard();
           }}
           onClose={handleCloseWhiteboard}
@@ -461,7 +668,7 @@ export default function QuotationsPage() {
       {/* ── New Quotation customer header modal ── */}
       {showForm && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[#111111] border border-white/10 rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-4">
+          <div className="bg-[#111111] border border-white/10 rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-4 max-h-[95vh] overflow-y-auto custom-scrollbar">
             <div className="flex justify-between items-center">
               <div>
                 <h3 className="font-label-caps text-sm text-white tracking-widest">NEW WHITEBOARD QUOTATION</h3>
@@ -510,13 +717,13 @@ export default function QuotationsPage() {
                             key={c.id}
                             type="button"
                             onClick={() => {
-                              setSelectedCustomer(c);
-                              setHeaderForm(prev => ({
-                                ...prev,
-                                customerName: c.full_name,
-                                customerPhone: c.phone || '',
-                              }));
-                              setShowCustResults(false);
+                                setSelectedCustomer(c);
+                                setHeaderForm(prev => ({
+                                  ...prev,
+                                  customerName: c.full_name,
+                                  customerPhone: c.phone || '',
+                                }));
+                                setShowCustResults(false);
                             }}
                             className="w-full text-left px-4 py-2.5 hover:bg-white/5 border-b border-white/5 last:border-0 transition-colors"
                           >
@@ -542,7 +749,9 @@ export default function QuotationsPage() {
                       if (v) {
                         setHeaderForm(prev => ({
                           ...prev,
-                          vehicleDescription: `${v.make} ${v.model} ${v.reg_number ? `[${v.reg_number}]` : ''}`.trim(),
+                          carBrand: v.make || '',
+                          carModel: v.model || '',
+                          carNumber: v.reg_number || '',
                         }));
                       }
                     }}
@@ -559,7 +768,7 @@ export default function QuotationsPage() {
               )}
 
               {/* Override / Manual fields */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {!selectedCustomer && (
                   <>
                     <div>
@@ -584,12 +793,50 @@ export default function QuotationsPage() {
                     </div>
                   </>
                 )}
-                <div className="col-span-2">
-                  <label className="block font-label-caps text-[10px] text-on-surface-variant/60 uppercase tracking-wider mb-1">Vehicle Description</label>
+                <div>
+                  <label className="block font-label-caps text-[10px] text-on-surface-variant/60 uppercase tracking-wider mb-1">Car Brand *</label>
                   <input
-                    value={headerForm.vehicleDescription}
-                    onChange={e => setHeaderForm(prev => ({ ...prev, vehicleDescription: e.target.value }))}
-                    placeholder="e.g. Fortuner Black GJ-06-XX-8888"
+                    required
+                    list="car-brands-list"
+                    value={headerForm.carBrand}
+                    onChange={e => setHeaderForm(prev => ({ ...prev, carBrand: e.target.value, carModel: '' }))}
+                    placeholder="e.g. Tata, Hyundai"
+                    className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-performance-red/40"
+                  />
+                  <datalist id="car-brands-list">
+                    {carDataset.map(item => (
+                      <option key={item.brand} value={item.brand} />
+                    ))}
+                  </datalist>
+                </div>
+                <div>
+                  <label className="block font-label-caps text-[10px] text-on-surface-variant/60 uppercase tracking-wider mb-1">Car Model *</label>
+                  <input
+                    required
+                    list="car-models-list"
+                    value={headerForm.carModel}
+                    onChange={e => setHeaderForm(prev => ({ ...prev, carModel: e.target.value }))}
+                    placeholder="e.g. Nexon, Creta"
+                    className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-performance-red/40"
+                  />
+                  <datalist id="car-models-list">
+                    {(() => {
+                      const brandData = carDataset.find(
+                        c => c.brand.toLowerCase() === headerForm.carBrand.toLowerCase()
+                      );
+                      return brandData ? brandData.models.map(m => (
+                        <option key={m} value={m} />
+                      )) : [];
+                    })()}
+                  </datalist>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block font-label-caps text-[10px] text-on-surface-variant/60 uppercase tracking-wider mb-1">Car Number *</label>
+                  <input
+                    required
+                    value={headerForm.carNumber}
+                    onChange={e => setHeaderForm(prev => ({ ...prev, carNumber: e.target.value }))}
+                    placeholder="e.g. GJ-06-XX-8888"
                     className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-performance-red/40"
                   />
                 </div>
@@ -646,43 +893,77 @@ export default function QuotationsPage() {
       )}
 
       {/* ── Header ── */}
-      <div className="flex justify-between items-center flex-wrap gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
         <div>
-          <h1 className="font-display-hero text-display-hero text-on-surface flex items-center gap-3">
-            <span className="material-symbols-outlined text-performance-red text-3xl">request_quote</span>
-            WHITEBOARD QUOTATIONS
+          <h1 className="font-display-hero text-lg sm:text-display-hero text-on-surface flex items-center gap-2 sm:gap-3">
+            <span className="material-symbols-outlined text-performance-red text-2xl sm:text-3xl">request_quote</span>
+            <span className="hidden sm:inline">WHITEBOARD QUOTATIONS</span>
+            <span className="sm:hidden">QUOTATIONS</span>
           </h1>
-          <p className="font-label-caps text-[10px] text-on-surface-variant/50 tracking-widest uppercase mt-1">
+          <p className="font-label-caps text-[9px] sm:text-[10px] text-on-surface-variant/50 tracking-widest uppercase mt-1 hidden sm:block">
             Handwritten Stylus Docket Tool — GOC Premium Auto Detailing
           </p>
         </div>
-        <button
-          onClick={handleCreateNew}
-          className="performance-gradient text-white font-label-caps text-label-caps px-6 py-3 rounded-xl flex items-center gap-2 hover:shadow-[0_0_25px_rgba(255,43,43,0.35)] transition-all border border-white/10 uppercase tracking-widest"
-        >
-          <span className="material-symbols-outlined text-[18px]">add</span>
-          New Whiteboard Quotation
-        </button>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <button
+            onClick={() => {
+              setShowRecycleBin(!showRecycleBin);
+              setPage(1);
+            }}
+            className={`px-4 py-2.5 sm:py-3 rounded-xl border flex items-center gap-2 font-label-caps text-[10px] sm:text-xs tracking-widest uppercase transition-all shrink-0 cursor-pointer ${
+              showRecycleBin
+                ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20'
+                : 'bg-white/5 border-white/10 text-white hover:bg-white/10'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[18px]">
+              {showRecycleBin ? 'assignment' : 'delete_outline'}
+            </span>
+            {showRecycleBin ? 'Active Quotes' : 'Recycle Bin'}
+          </button>
+          {!showRecycleBin && (
+            <button
+              onClick={handleCreateNew}
+              className="performance-gradient text-white font-label-caps text-label-caps px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl flex items-center gap-2 hover:shadow-[0_0_25px_rgba(255,43,43,0.35)] transition-all border border-white/10 uppercase tracking-widest text-[10px] sm:text-xs flex-grow sm:flex-grow-0 justify-center"
+            >
+              <span className="material-symbols-outlined text-[18px]">add</span>
+              New Quotation
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* ── Tabs & Search Filter ── */}
-      <div className="flex gap-4 items-center flex-wrap">
-        <div className="flex gap-1.5 bg-white/[0.02] border border-white/5 p-1 rounded-xl">
-          {['all', 'draft', 'sent', 'accepted', 'rejected'].map(tab => (
-            <button
-              key={tab}
-              onClick={() => { setActiveTab(tab); setPage(1); }}
-              className={`px-4 py-2 text-[10px] font-label-caps tracking-wider rounded-lg uppercase transition-all ${
-                activeTab === tab
-                  ? 'bg-performance-red text-white shadow-[0_0_10px_rgba(255,43,43,0.3)]'
-                  : 'text-on-surface-variant/50 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
+      {/* ── Recycle Bin Alert Banner ── */}
+      {showRecycleBin && (
+        <div className="glass-panel border-amber-500/20 bg-amber-500/5 p-4 rounded-xl flex items-center gap-3 text-amber-400">
+          <span className="material-symbols-outlined">delete_outline</span>
+          <div>
+            <p className="text-xs font-label-caps font-bold tracking-wider">Recycle Bin</p>
+            <p className="text-[11px] text-amber-400/70 font-data-sm mt-0.5">Showing deleted quotations. You can restore them or permanently delete them.</p>
+          </div>
         </div>
-        <div className="flex items-center gap-2 bg-white/[0.03] border border-white/[0.07] rounded-xl px-3 py-2 flex-grow max-w-sm">
+      )}
+
+      {/* ── Tabs & Search Filter ── */}
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center">
+        {!showRecycleBin && (
+          <div className="flex gap-1 sm:gap-1.5 bg-white/[0.02] border border-white/5 p-1 rounded-xl overflow-x-auto">
+            {['all', 'draft', 'sent', 'accepted', 'rejected'].map(tab => (
+              <button
+                key={tab}
+                onClick={() => { setActiveTab(tab); setPage(1); }}
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 text-[9px] sm:text-[10px] font-label-caps tracking-wider rounded-lg uppercase transition-all whitespace-nowrap ${
+                  activeTab === tab
+                    ? 'bg-performance-red text-white shadow-[0_0_10px_rgba(255,43,43,0.3)]'
+                    : 'text-on-surface-variant/50 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="flex items-center gap-2 bg-white/[0.03] border border-white/[0.07] rounded-xl px-3 py-2 flex-grow sm:max-w-sm">
           <span className="material-symbols-outlined text-on-surface-variant/40 text-[18px]">search</span>
           <input
             value={search}
@@ -695,24 +976,24 @@ export default function QuotationsPage() {
 
       {/* ── Quotation Grid List ── */}
       {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {[1, 2, 3].map(i => (
             <div key={i} className="glass-panel h-64 rounded-2xl animate-pulse bg-white/[0.01] border-white/5"></div>
           ))}
         </div>
       ) : quotations.length === 0 ? (
-        <div className="glass-panel py-16 text-center rounded-2xl flex flex-col items-center justify-center">
+        <div className="glass-panel py-12 sm:py-16 text-center rounded-2xl flex flex-col items-center justify-center">
           <span className="material-symbols-outlined text-4xl text-on-surface-variant/20 mb-3">draw_abstract</span>
           <p className="text-on-surface-variant/60 font-label-caps text-sm tracking-wider">No whiteboard dockets found</p>
           <p className="text-on-surface-variant/30 text-xs mt-1 font-data-sm">Create a new whiteboard quote to begin stylus illustration</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {quotations.map(qt => {
             const statusCfg = STATUS_CONFIG[qt.status] || STATUS_CONFIG.draft;
             const customerName = qt.customer_name || qt.customer_name_override || 'Walk-in Client';
             const customerPhone = qt.customer_phone || qt.customer_phone_override || '';
-            const vehicleDesc = qt.vehicle_name || qt.vehicle_description || 'Other Vehicle';
+            const { description: vehicleDesc, regNumber } = getVehicleDetails(qt);
 
             return (
               <div key={qt.id} className="glass-panel rounded-2xl flex flex-col overflow-hidden border border-white/5 bg-white/[0.01] hover:border-white/10 transition-all group">
@@ -762,7 +1043,7 @@ export default function QuotationsPage() {
                   <div className="flex items-center gap-2 text-xs text-on-surface-variant/70 border-t border-white/5 pt-3">
                     <span className="material-symbols-outlined text-sm shrink-0">directions_car</span>
                     <span className="truncate" title={vehicleDesc}>{vehicleDesc}</span>
-                    {qt.reg_number && <span className="font-mono text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-white shrink-0">{qt.reg_number}</span>}
+                    {regNumber && <span className="font-mono text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-white shrink-0">{regNumber}</span>}
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-[10px] text-on-surface-variant/40 font-label-caps tracking-wider border-t border-white/5 pt-3">
@@ -780,48 +1061,73 @@ export default function QuotationsPage() {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="p-3 bg-black/30 border-t border-white/5 flex gap-2">
-                  <button
-                    onClick={() => handleOpenWhiteboardForExisting(qt)}
-                    className="flex-grow flex items-center justify-center gap-1 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-xl text-xs text-white font-label-caps tracking-widest transition-all"
-                    title="Edit Whiteboard Drawing"
-                  >
-                    <span className="material-symbols-outlined text-sm">stylus</span>
-                    Draw
-                  </button>
-
-                  <button
-                    onClick={() => generatePDFMutation.mutate(qt.id)}
-                    disabled={generatePDFMutation.isPending}
-                    className="p-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-on-surface-variant/80 hover:text-white transition-colors"
-                    title="Generate PDF Report"
-                  >
-                    <span className="material-symbols-outlined text-base">receipt_long</span>
-                  </button>
-
-                  <button
-                    onClick={() => sendWhatsAppMutation.mutate(qt.id)}
-                    disabled={sendWhatsAppMutation.isPending}
-                    className="p-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-green-400 hover:text-green-300 transition-colors"
-                    title="Send Quote via WhatsApp"
-                  >
-                    <span className="material-symbols-outlined text-base">chat</span>
-                  </button>
-
-                  {isPowerUser && (
+                {showRecycleBin ? (
+                  <div className="p-3 bg-black/30 border-t border-white/5 flex gap-2">
+                    <button
+                      onClick={() => restoreMutation.mutate(qt.id)}
+                      disabled={restoreMutation.isPending}
+                      className="flex-grow flex items-center justify-center gap-1.5 px-3 py-2 bg-green-500/10 hover:bg-green-500/20 border border-green-500/25 rounded-xl text-xs text-green-400 font-label-caps tracking-widest transition-all cursor-pointer"
+                      title="Restore Quotation"
+                    >
+                      <span className="material-symbols-outlined text-sm">settings_backup_restore</span>
+                      Restore
+                    </button>
                     <button
                       onClick={() => {
-                        if (window.confirm(`Are you sure you want to delete quotation ${qt.quotation_code}?`)) {
-                          deleteMutation.mutate(qt.id);
-                        }
+                        setDeleteTargetId(qt.id);
+                        setDeleteTargetCode(qt.quotation_code);
+                        setIsPermanentDelete(true);
                       }}
-                      className="p-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-xl text-red-400 hover:text-red-300 transition-colors animate-all"
+                      disabled={deletePermanentMutation.isPending}
+                      className="p-2 bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 rounded-xl text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+                      title="Permanently Delete"
+                    >
+                      <span className="material-symbols-outlined text-base">delete_forever</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-black/30 border-t border-white/5 flex gap-2">
+                    <button
+                      onClick={() => handleOpenWhiteboardForExisting(qt)}
+                      className="flex-grow flex items-center justify-center gap-1 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-xl text-xs text-white font-label-caps tracking-widest transition-all cursor-pointer"
+                      title="Edit Whiteboard Drawing"
+                    >
+                      <span className="material-symbols-outlined text-sm">stylus</span>
+                      Draw
+                    </button>
+
+                    <button
+                      onClick={() => generatePDFMutation.mutate(qt.id)}
+                      disabled={generatePDFMutation.isPending}
+                      className="p-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-on-surface-variant/80 hover:text-white transition-colors cursor-pointer"
+                      title="Generate PDF Report"
+                    >
+                      <span className="material-symbols-outlined text-base">receipt_long</span>
+                    </button>
+
+                    <button
+                      onClick={() => sendWhatsAppMutation.mutate(qt.id)}
+                      disabled={sendWhatsAppMutation.isPending}
+                      className="p-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-green-400 hover:text-green-300 transition-colors cursor-pointer"
+                      title="Send Quote via WhatsApp"
+                    >
+                      <span className="material-symbols-outlined text-base">chat</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setDeleteTargetId(qt.id);
+                        setDeleteTargetCode(qt.quotation_code);
+                        setIsPermanentDelete(false);
+                      }}
+                      disabled={deleteMutation.isPending}
+                      className="p-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-xl text-red-400 hover:text-red-300 transition-colors cursor-pointer"
                       title="Delete Quotation"
                     >
                       <span className="material-symbols-outlined text-base">delete</span>
                     </button>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -848,6 +1154,51 @@ export default function QuotationsPage() {
           >
             Next
           </button>
+        </div>
+      )}
+      {/* ── Quotation Delete Confirmation Overlay ── */}
+      {deleteTargetId !== null && (
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#111111] border border-white/10 rounded-2xl p-6 w-full max-w-sm shadow-2xl space-y-4 text-center">
+            <span className="material-symbols-outlined text-red-500 text-4xl">
+              {isPermanentDelete ? 'delete_forever' : 'delete'}
+            </span>
+            <div>
+              <h3 className="font-label-caps text-sm text-white font-bold tracking-widest">
+                {isPermanentDelete ? 'PERMANENTLY DELETE QUOTE?' : 'DELETE QUOTATION?'}
+              </h3>
+              <p className="text-xs text-on-surface-variant/70 font-data-sm mt-1.5">
+                {isPermanentDelete
+                  ? `Are you sure you want to permanently delete quotation ${deleteTargetCode}? This action cannot be undone.`
+                  : `Are you sure you want to send quotation ${deleteTargetCode} to the Recycle Bin?`}
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                onClick={() => {
+                  if (isPermanentDelete) {
+                    deletePermanentMutation.mutate(deleteTargetId);
+                  } else {
+                    deleteMutation.mutate(deleteTargetId);
+                  }
+                  setDeleteTargetId(null);
+                  setDeleteTargetCode(null);
+                }}
+                className="w-full py-2.5 bg-performance-red hover:bg-performance-red/90 text-white rounded-xl text-xs font-label-caps tracking-widest transition-all uppercase cursor-pointer"
+              >
+                Yes, Delete
+              </button>
+              <button
+                onClick={() => {
+                  setDeleteTargetId(null);
+                  setDeleteTargetCode(null);
+                }}
+                className="w-full py-2.5 border border-white/10 text-on-surface hover:text-white rounded-xl text-xs font-label-caps tracking-widest hover:bg-white/5 transition-colors uppercase cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

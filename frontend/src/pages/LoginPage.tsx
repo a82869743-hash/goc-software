@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
+import { usePermissionsStore } from '../stores/permissionsStore';
 import apiClient from '../api/client';
 import toast from 'react-hot-toast';
 import type { ApiResponse, LoginResponse } from '../types';
@@ -31,6 +32,7 @@ const LoginPage: React.FC = () => {
 
       if (data.success) {
         setAuth(data.data.token, data.data.staff);
+        await usePermissionsStore.getState().fetchPermissions();
         toast.success(`Welcome back, ${data.data.staff.full_name}!`);
         navigate('/dashboard');
       }
@@ -63,9 +65,9 @@ const LoginPage: React.FC = () => {
           {/* Metallic Top Edge */}
           <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
-          <div className="p-10 sm:p-14">
+          <div className="p-6 sm:p-10">
             {/* Brand Header */}
-            <header className="text-center mb-12 flex flex-col items-center">
+            <header className="text-center mb-8 sm:mb-12 flex flex-col items-center">
               <div className="relative group mb-6">
                 <span
                   className="material-symbols-outlined text-performance-red text-[42px] drop-shadow-[0_0_12px_rgba(255,43,43,0.4)]"

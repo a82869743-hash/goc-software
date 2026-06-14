@@ -12,7 +12,9 @@ export interface AdvanceBooking {
   concerns?: string | null;
   booking_date: string;
   booking_time: string;
-  status: 'pending' | 'confirmed' | 'arrived' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'arrived' | 'cancelled' | 'converted';
+  advance_amount?: number | string;
+  advance_mode?: string | null;
   reminder_sent: number;
   notes?: string | null;
   created_at: string;

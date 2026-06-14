@@ -21,37 +21,35 @@ const queryClient = new QueryClient({
 });
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <App />
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            duration: 3000,
-            style: {
-              background: '#1A1C1C',
-              color: '#E2E2E2',
-              border: '1px solid rgba(255,255,255,0.05)',
-              borderRadius: '0.75rem',
-              fontFamily: 'Inter, sans-serif',
-              fontSize: '14px',
+  <QueryClientProvider client={queryClient}>
+    <BrowserRouter>
+      <App />
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#1A1C1C',
+            color: '#E2E2E2',
+            border: '1px solid rgba(255,255,255,0.05)',
+            borderRadius: '0.75rem',
+            fontFamily: 'Inter, sans-serif',
+            fontSize: '14px',
+          },
+          success: {
+            iconTheme: {
+              primary: '#22C55E',
+              secondary: '#1A1C1C',
             },
-            success: {
-              iconTheme: {
-                primary: '#22C55E',
-                secondary: '#1A1C1C',
-              },
+          },
+          error: {
+            iconTheme: {
+              primary: '#EF4444',
+              secondary: '#1A1C1C',
             },
-            error: {
-              iconTheme: {
-                primary: '#EF4444',
-                secondary: '#1A1C1C',
-              },
-            },
-          }}
-        />
-      </BrowserRouter>
-    </QueryClientProvider>
-  </React.StrictMode>
+          },
+        }}
+      />
+    </BrowserRouter>
+  </QueryClientProvider>
 );

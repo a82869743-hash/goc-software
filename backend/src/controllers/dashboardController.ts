@@ -90,24 +90,6 @@ export const getRecentJobs = async (_req: Request, res: Response): Promise<void>
 };
 
 /**
- * Today's bookings for dashboard widget
- */
-export const getTodayBookings = async (_req: Request, res: Response): Promise<void> => {
-  try {
-    const today = new Date().toISOString().split('T')[0];
-    const [rows] = await pool.query<RowDataPacket[]>(
-      `SELECT b.id, b.booking_code, b.time_slot, b.service_type, b.status,
-              c.full_name as customer_name, v.make, v.model
-       FROM bookings b
-       LEFT JOIN customers c ON b.customer_id = c.id
-       LEFT JOIN vehicles v ON b.vehicle_id = v.id
-       WHERE b.booking_date = ? AND b.status != 'cancelled'
-       ORDER BY b.time_slot ASC`, [today]);
-    res.json({ success: true, data: rows });
-  } catch (error) { console.error('Today bookings error:', error); res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed.' } }); }
-};
-
-/**
  * Revenue chart — daily revenue for the current month
  */
 export const getRevenueChart = async (_req: Request, res: Response): Promise<void> => {

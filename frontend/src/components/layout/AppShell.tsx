@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import { useAuthStore } from '../../stores/authStore';
@@ -8,9 +8,17 @@ import apiClient from '../../api/client';
 /**
  * AppShell — Obsidian Apex Elite Layout
  * Wraps all authenticated pages with Sidebar + Topbar
+ * Fully responsive: desktop sidebar always visible, mobile overlay sidebar
  */
 const AppShell: React.FC = () => {
   const { updateProfile } = useAuthStore();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const location = useLocation();
+
+  // Close sidebar on route change (mobile)
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     // Fetch latest user details on shell load to sync any name/profile changes immediately
@@ -22,6 +30,7 @@ const AppShell: React.FC = () => {
       })
       .catch(err => console.error('Failed to sync user profile:', err));
   }, [updateProfile]);
+
   return (
     <div className="min-h-screen bg-void-black text-on-background relative overflow-hidden">
       {/* Ambient Background Glow */}
@@ -30,12 +39,20 @@ const AppShell: React.FC = () => {
         <div className="absolute -bottom-40 -left-40 w-[400px] h-[400px] rounded-full bg-performance-red/[0.02] blur-[160px]" />
       </div>
 
-      <Sidebar />
-      <Topbar />
+      {/* Mobile overlay backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Topbar onMenuToggle={() => setSidebarOpen(prev => !prev)} />
 
       {/* Main Content Area */}
-      <main className="ml-64 pt-20 min-h-screen relative z-10">
-        <div className="p-6 lg:p-8">
+      <main className="md:ml-64 pt-16 md:pt-20 min-h-screen relative z-10">
+        <div className="p-3 sm:p-4 md:p-6 lg:p-8">
           <Outlet />
         </div>
       </main>

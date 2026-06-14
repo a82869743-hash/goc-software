@@ -4,7 +4,6 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import LeadsPage from './pages/LeadsPage';
 import CustomersPage from './pages/CustomersPage';
-import BookingsPage from './pages/BookingsPage';
 import JobCardsPage from './pages/JobCardsPage';
 import JobCardNewPage from './pages/JobCardNewPage';
 import JobCardDetailPage from './pages/JobCardDetailPage';
@@ -18,11 +17,14 @@ import SettingsPage from './pages/SettingsPage';
 import CommissionsPage from './pages/CommissionsPage';
 import MarketingPage from './pages/MarketingPage';
 import AppShell from './components/layout/AppShell';
-import NewBookingPage from './pages/NewBookingPage';
 import InvoicePrintPage from './pages/InvoicePrintPage';
 import QuickJobCards from './pages/QuickJobCards';
 import AdvanceBookings from './pages/AdvanceBookings';
 import PublicTrackingPage from './pages/PublicTrackingPage';
+import StaffManagementPage from './pages/admin/StaffManagementPage';
+import StaffPermissionsPage from './pages/admin/StaffPermissionsPage';
+import SystemLogsPage from './pages/admin/SystemLogsPage';
+import KioskAttendancePage from './pages/KioskAttendancePage';
 
 
 
@@ -66,8 +68,6 @@ function App() {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/leads" element={<LeadsPage />} />
         <Route path="/customers" element={<CustomersPage />} />
-        <Route path="/bookings" element={<BookingsPage />} />
-        <Route path="/bookings/new" element={<NewBookingPage />} />
 
         <Route path="/jobs" element={<JobCardsPage />} />
         <Route path="/jobs/new" element={<JobCardNewPage />} />
@@ -83,6 +83,9 @@ function App() {
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/marketing" element={<MarketingPage />} />
         <Route path="/commissions" element={<CommissionsPage />} />
+        <Route path="/admin/staff" element={<StaffManagementPage />} />
+        <Route path="/admin/staff/:id/permissions" element={<StaffPermissionsPage />} />
+        <Route path="/admin/logs" element={<SystemLogsPage />} />
       </Route>
 
       <Route
@@ -95,6 +98,15 @@ function App() {
       />
 
       <Route path="/track/:token" element={<PublicTrackingPage />} />
+
+      <Route
+        path="/kiosk-attendance"
+        element={
+          <ProtectedRoute>
+            <KioskAttendancePage />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Catch-all */}
       <Route path="*" element={<Navigate to="/login" replace />} />

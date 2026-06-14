@@ -1,4 +1,5 @@
 import mysql from 'mysql2/promise';
+import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
@@ -210,6 +211,14 @@ pool.getConnection()
         ('MSG91_BASE_URL',        'https://control.msg91.com',     'MSG91 API base URL');
     `).catch(err => console.error('❌ Failed to seed default SMS settings:', err));
 
+    // Seed default kiosk passcode into app_settings (only if keys do not exist)
+    await conn.query(`
+      INSERT INTO app_settings (setting_key, setting_value, description) VALUES
+        ('attendance_kiosk_passcode', '1234', 'Passcode to exit kiosk mode in the attendance module')
+      ON DUPLICATE KEY UPDATE 
+        setting_value = CASE WHEN setting_value = 'hiru@29' THEN '1234' ELSE setting_value END;
+    `).catch(err => console.error('❌ Failed to seed default kiosk passcode setting:', err));
+
 
     // Alter job_cards status column to include 'estimate' and change default to 'in_progress'
     await conn.query(`
@@ -263,7 +272,10 @@ pool.getConnection()
       "ALTER TABLE job_cards ADD COLUMN completion_type ENUM('invoice','estimate') NULL DEFAULT NULL",
       "ALTER TABLE job_cards ADD COLUMN gst_applicable TINYINT(1) NOT NULL DEFAULT 0",
       "ALTER TABLE job_cards ADD COLUMN dispatch_whatsapp TINYINT(1) NOT NULL DEFAULT 0",
-      "ALTER TABLE job_cards ADD COLUMN dispatch_sms TINYINT(1) NOT NULL DEFAULT 0"
+      "ALTER TABLE job_cards ADD COLUMN dispatch_sms TINYINT(1) NOT NULL DEFAULT 0",
+      "ALTER TABLE job_cards ADD COLUMN km_reading INT DEFAULT NULL",
+      "ALTER TABLE job_cards ADD COLUMN insurance_company VARCHAR(150) NULL DEFAULT NULL",
+      "ALTER TABLE job_cards ADD COLUMN insurance_expiry DATE NULL DEFAULT NULL"
     ];
     for (const sql of addJcCols) {
       await conn.query(sql).catch(err => {
@@ -292,6 +304,22 @@ pool.getConnection()
     await conn.query("ALTER TABLE job_services MODIFY COLUMN tax_pct DECIMAL(5,2) NOT NULL DEFAULT 18.00").catch(err => {
       console.error('❌ Failed to modify tax_pct default:', err.message);
     });
+
+    // Ensure job_cards / quick_job_cards have inventory_deducted columns, and services have inventory_item_id
+    const newStockDeductionCols = [
+      { table: 'job_cards', sql: "ALTER TABLE job_cards ADD COLUMN inventory_deducted TINYINT(1) NOT NULL DEFAULT 0" },
+      { table: 'quick_job_cards', sql: "ALTER TABLE quick_job_cards ADD COLUMN inventory_deducted TINYINT(1) NOT NULL DEFAULT 0" },
+      { table: 'job_services', sql: "ALTER TABLE job_services ADD COLUMN inventory_item_id INT UNSIGNED NULL" },
+      { table: 'quick_job_card_services', sql: "ALTER TABLE quick_job_card_services ADD COLUMN inventory_item_id INT NULL" },
+      { table: 'quick_job_card_services', sql: "ALTER TABLE quick_job_card_services ADD COLUMN sqft_used DECIMAL(10,2) NULL" }
+    ];
+    for (const m of newStockDeductionCols) {
+      await conn.query(m.sql).catch(err => {
+        if (err.code !== 'ER_DUP_FIELDNAME') {
+          console.error(`❌ Failed to run migration for ${m.table} (${m.sql}):`, err.message);
+        }
+      });
+    }
 
     // ── Whiteboard Quotation Migration ──
     // 1. Drop old quotation_zones table
@@ -433,12 +461,213 @@ pool.getConnection()
       console.error('❌ Failed to migrate Meta settings:', migErr.message);
     }
 
+    // Auto-migration: staff_permissions table
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS \`staff_permissions\` (
+        \`id\` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        \`staff_id\` INT UNSIGNED NOT NULL,
+        \`perm_dashboard\` TINYINT(1) NOT NULL DEFAULT 1,
+        \`perm_leads\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`perm_customers\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`perm_bookings\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`perm_advance_bookings\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`perm_job_cards\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`perm_quick_jobs\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`perm_quotations\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`perm_invoices\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`perm_payments\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`perm_inventory\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`perm_reports\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`perm_marketing\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`perm_commissions\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`perm_settings\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`perm_staff_management\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`perm_job_cards_edit\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`perm_job_cards_delete\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`perm_job_cards_complete\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`perm_invoices_create\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`perm_payments_record\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`perm_leads_delete\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`perm_leads_assign\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`perm_customers_delete\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`perm_inventory_edit\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`perm_reports_revenue\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`perm_reports_accounts\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`perm_reports_salary\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`created_at\` DATETIME DEFAULT CURRENT_TIMESTAMP,
+        \`updated_at\` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY \`unique_staff\` (\`staff_id\`),
+        FOREIGN KEY (\`staff_id\`) REFERENCES \`staff\`(\`id\`) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `).catch(err => console.error('❌ Failed to auto-migrate staff_permissions table:', err));
+
+    // Ensure advance_bookings has advance_amount, advance_mode and updated status enum
+    const alterBookingCols = [
+      "ALTER TABLE advance_bookings ADD COLUMN advance_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00",
+      "ALTER TABLE advance_bookings ADD COLUMN advance_mode VARCHAR(50) NULL DEFAULT NULL",
+      "ALTER TABLE advance_bookings MODIFY COLUMN status ENUM('pending','confirmed','arrived','cancelled','converted') DEFAULT 'pending'"
+    ];
+    for (const sql of alterBookingCols) {
+      await conn.query(sql).catch(err => {
+        if (err.code !== 'ER_DUP_FIELDNAME') {
+          console.error(`❌ Failed to run advance_bookings migration (${sql}):`, err.message);
+        }
+      });
+    }
+
+    // Ensure job_cards has advance_booking_id and advance_amount
+    const alterJcCols = [
+      "ALTER TABLE job_cards ADD COLUMN advance_booking_id INT UNSIGNED NULL DEFAULT NULL",
+      "ALTER TABLE job_cards ADD COLUMN advance_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00"
+    ];
+    for (const sql of alterJcCols) {
+      await conn.query(sql).catch(err => {
+        if (err.code !== 'ER_DUP_FIELDNAME') {
+          console.error(`❌ Failed to run job_cards advance migration (${sql}):`, err.message);
+        }
+      });
+    }
+
+    // Run quick job card migration
+    await migrateQuickJobCards(conn);
+
     conn.release();
   })
   .catch((err) => {
     console.error('❌ MySQL connection failed:', err.message);
     process.exit(1);
   });
+
+async function migrateQuickJobCards(conn: mysql.PoolConnection) {
+  try {
+    const [tables] = await conn.query<RowDataPacket[]>("SHOW TABLES LIKE 'quick_job_cards'");
+    if (tables.length === 0) return;
+
+    const [rows] = await conn.query<RowDataPacket[]>('SELECT * FROM quick_job_cards');
+    if (rows.length === 0) return;
+    
+    console.log(`🚀 Starting migration of ${rows.length} old quick job cards to standard job cards...`);
+    
+    for (const q of rows) {
+      const res = await saveCustomerAndVehicleFromJobDetails(conn, {
+        customer_name: q.owner_name,
+        mobile: q.mobile,
+        car_number: q.reg_no,
+        car_make: q.car_make,
+        car_model: q.car_model,
+      });
+      if (!res) continue;
+      
+      const { customerId, vehicleId } = res;
+      
+      const [existing] = await conn.query<RowDataPacket[]>(
+        'SELECT id FROM job_cards WHERE job_code = ? AND deleted_at IS NULL',
+        [q.job_no]
+      );
+      if (existing.length > 0) continue;
+      
+      const [jcResult] = await conn.query<ResultSetHeader>(
+        `INSERT INTO job_cards (job_code, customer_id, vehicle_id, job_type, status, internal_notes, created_by, public_token, created_at, updated_at, date_in, date_out)
+         VALUES (?, ?, ?, 'quick', ?, ?, 1, ?, ?, ?, ?, ?)`,
+        [
+          q.job_no,
+          customerId,
+          vehicleId,
+          q.status || 'in_progress',
+          q.notes || null,
+          q.public_token || null,
+          q.created_at,
+          q.updated_at,
+          q.created_at,
+          q.closed_at || null
+        ]
+      );
+      const standardJobCardId = jcResult.insertId;
+      
+      const [services] = await conn.query<RowDataPacket[]>(
+        'SELECT * FROM quick_job_card_services WHERE job_card_id = ?',
+        [q.id]
+      );
+      for (const s of services) {
+        const lineTotal = Number(s.rate || 0) * Number(s.qty || 1);
+        await conn.query(
+          `INSERT INTO job_services (job_card_id, service_name, service_type, package_tier, unit_price, quantity, line_total, tax_pct, item_type, inventory_item_id, sqft_used)
+           VALUES (?, ?, 'other', 'basic', ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            standardJobCardId,
+            s.service_name,
+            s.rate || 0,
+            s.qty || 1,
+            lineTotal,
+            s.tax_pct || 18.00,
+            s.item_type || 'labor',
+            s.inventory_item_id || null,
+            s.sqft_used || 0
+          ]
+        );
+      }
+      
+      const [invRows] = await conn.query<RowDataPacket[]>(
+        'SELECT * FROM quick_job_card_invoices WHERE job_card_id = ?',
+        [q.id]
+      );
+      for (const inv of invRows) {
+        const [existingInvoice] = await conn.query<RowDataPacket[]>(
+          'SELECT id FROM invoices WHERE invoice_code = ? AND deleted_at IS NULL',
+          [inv.invoice_no]
+        );
+        if (existingInvoice.length === 0) {
+          await conn.query(
+            `INSERT INTO invoices (invoice_code, job_card_id, subtotal, gst_amount, total_amount, discount_amount, apply_gst, payment_mode, invoice_type, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'tax_invoice', ?)`,
+            [
+              inv.invoice_no,
+              standardJobCardId,
+              inv.subtotal || 0,
+              inv.gst_amount || 0,
+              inv.total_amount || 0,
+              inv.discount_amount || 0,
+              1,
+              inv.payment_mode || 'cash',
+              inv.created_at
+            ]
+          );
+        }
+      }
+      
+      const [estRows] = await conn.query<RowDataPacket[]>(
+        'SELECT * FROM quick_job_card_estimates WHERE job_card_id = ?',
+        [q.id]
+      );
+      for (const est of estRows) {
+        const [existingEstimate] = await conn.query<RowDataPacket[]>(
+          'SELECT id FROM invoices WHERE invoice_code = ? AND deleted_at IS NULL',
+          [est.estimate_no]
+        );
+        if (existingEstimate.length === 0) {
+          await conn.query(
+            `INSERT INTO invoices (invoice_code, job_card_id, subtotal, gst_amount, total_amount, discount_amount, apply_gst, payment_mode, invoice_type, created_at)
+             VALUES (?, ?, ?, 0, ?, ?, 0, ?, 'estimate', ?)`,
+            [
+              est.estimate_no,
+              standardJobCardId,
+              est.subtotal || 0,
+              est.total_amount || 0,
+              est.discount_amount || 0,
+              est.payment_mode || 'cash',
+              est.created_at
+            ]
+          );
+        }
+      }
+      
+      console.log(`✅ Migrated quick job card ${q.job_no} to standard ID ${standardJobCardId}`);
+    }
+    console.log('🎉 Quick Job Cards migration completed.');
+  } catch (err) {
+    console.error('❌ Error during Quick Job Cards migration:', err);
+  }
+}
 
 import { generateCode } from './codes';
 

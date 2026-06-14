@@ -102,7 +102,9 @@ export default function JobCardMediaSection({ jobCardId, jobType, readOnly = fal
   const afterPhotos = mediaList.filter(item => item.media_type === 'after_image');
   const videos = mediaList.filter(item => item.media_type === 'video');
 
-  const backendBaseUrl = 'http://localhost:4000';
+  const backendBaseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:4000'
+    : window.location.origin;
 
   const renderSlot = (mediaType: 'before_image' | 'after_image' | 'video', label: string, icon: string, accept: string) => {
     const isUploading = uploadingType === mediaType;
@@ -210,44 +212,46 @@ export default function JobCardMediaSection({ jobCardId, jobType, readOnly = fal
       </div>
 
       {/* VIDEOS BLOCK */}
-      <div className="glass-panel p-5 rounded-2xl border border-white/5 bg-[#0c0c0c]/40 backdrop-blur-2xl">
-        <div className="flex justify-between items-center mb-4 border-b border-white/5 pb-2">
-          <h3 className="font-label-caps text-xs text-white tracking-widest uppercase flex items-center gap-2">
-            <span className="material-symbols-outlined text-sm text-blue-400">videocam</span>
-            VIDEOS
-            <span className="text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full font-bold">
-              {videos.length}
-            </span>
-          </h3>
-          <span className="text-[9px] text-tertiary/40 font-mono-data">MAX 50MB</span>
-        </div>
+      {jobType !== 'quick' && (
+        <div className="glass-panel p-5 rounded-2xl border border-white/5 bg-[#0c0c0c]/40 backdrop-blur-2xl">
+          <div className="flex justify-between items-center mb-4 border-b border-white/5 pb-2">
+            <h3 className="font-label-caps text-xs text-white tracking-widest uppercase flex items-center gap-2">
+              <span className="material-symbols-outlined text-sm text-blue-400">videocam</span>
+              VIDEOS
+              <span className="text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full font-bold">
+                {videos.length}
+              </span>
+            </h3>
+            <span className="text-[9px] text-tertiary/40 font-mono-data">MAX 50MB</span>
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {videos.map((item) => (
-            <div key={item.id} className="relative rounded-lg overflow-hidden border border-white/5 bg-black p-1 flex flex-col justify-between">
-              <video
-                src={`${backendBaseUrl}${item.file_path}`}
-                controls
-                className="w-full aspect-video object-cover rounded-md"
-              />
-              {!readOnly && (
-                <button
-                  onClick={() => handleDelete(item.id)}
-                  className="absolute top-2 right-2 bg-black/60 hover:bg-performance-red/90 text-white rounded-full p-1.5 transition-colors z-20 flex items-center justify-center border border-white/10"
-                  title="Delete video"
-                >
-                  <span className="material-symbols-outlined text-[14px]">delete</span>
-                </button>
-              )}
-            </div>
-          ))}
-          {!readOnly && (
-            <div className="w-full">
-              {renderSlot('video', '+ ADD VIDEO', 'video_call', 'video/*')}
-            </div>
-          )}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {videos.map((item) => (
+              <div key={item.id} className="relative rounded-lg overflow-hidden border border-white/5 bg-black p-1 flex flex-col justify-between">
+                <video
+                  src={`${backendBaseUrl}${item.file_path}`}
+                  controls
+                  className="w-full aspect-video object-cover rounded-md"
+                />
+                {!readOnly && (
+                  <button
+                    onClick={() => handleDelete(item.id)}
+                    className="absolute top-2 right-2 bg-black/60 hover:bg-performance-red/90 text-white rounded-full p-1.5 transition-colors z-20 flex items-center justify-center border border-white/10"
+                    title="Delete video"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">delete</span>
+                  </button>
+                )}
+              </div>
+            ))}
+            {!readOnly && (
+              <div className="w-full">
+                {renderSlot('video', '+ ADD VIDEO', 'video_call', 'video/*')}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* LIGHTBOX OVERLAY MODAL */}
       {activeOverlay && (

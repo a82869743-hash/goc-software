@@ -115,7 +115,7 @@ router.patch('/:id/status', validate(updateJobStatusSchema), updateJobStatus);
 
 // Services
 router.post('/:id/services', validate(addJobServiceSchema), addJobService);
-router.delete('/:id/services/:serviceId', rbac('admin', 'manager'), deleteJobService);
+router.delete('/:id/services/:serviceId', deleteJobService);
 
 // ─── Photo Upload ─────────────────────────────────
 router.post('/:id/photos', uploadPhoto.array('photos', 10), async (req: Request, res: Response): Promise<void> => {

@@ -119,8 +119,8 @@ export default function JobCardsPage() {
       </div>
 
       {/* ── Filters Bar ── */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-2 bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-2 flex-1 min-w-[200px] max-w-[400px]">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full">
+        <div className="flex items-center gap-2 bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-2 w-full sm:max-w-[400px]">
           <span className="material-symbols-outlined text-on-surface-variant/40 text-[18px]">search</span>
           <input
             value={search}
@@ -133,13 +133,13 @@ export default function JobCardsPage() {
           type="date"
           value={dateFrom}
           onChange={e => { setDateFrom(e.target.value); setPage(1); }}
-          className="bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-2 text-sm text-white font-data-sm outline-none focus:border-performance-red/40"
+          className="bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-2 text-sm text-white font-data-sm outline-none focus:border-performance-red/40 w-full sm:w-auto"
         />
         <input
           type="date"
           value={dateTo}
           onChange={e => { setDateTo(e.target.value); setPage(1); }}
-          className="bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-2 text-sm text-white font-data-sm outline-none focus:border-performance-red/40"
+          className="bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-2 text-sm text-white font-data-sm outline-none focus:border-performance-red/40 w-full sm:w-auto"
         />
         {(search || dateFrom || dateTo || activeTab !== 'all') && (
           <button
@@ -188,7 +188,7 @@ export default function JobCardsPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse min-w-[800px]">
               <thead>
                 <tr className="bg-black/45 text-on-surface-variant/50 text-[9px] font-label-caps uppercase tracking-widest border-b border-white/[0.06]">
                   {['Job Code', 'Customer', 'Vehicle', 'Services', 'Status', 'Total', 'Date In', 'Actions'].map(h => (
@@ -207,6 +207,11 @@ export default function JobCardsPage() {
                     >
                       <td className="py-3.5 px-5">
                         <p className="font-data-lg text-xs font-bold text-performance-red">{job.job_code}</p>
+                        {job.job_type === 'quick' && (
+                          <span className="inline-block mt-1 px-1.5 py-0.2 rounded bg-performance-red/10 border border-performance-red/20 text-performance-red text-[8px] font-label-caps uppercase tracking-wider font-bold">
+                            Quick
+                          </span>
+                        )}
                       </td>
                       <td className="py-3.5 px-5">
                         <p className="text-xs font-bold text-white">{job.customer_name || '—'}</p>

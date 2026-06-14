@@ -13,7 +13,6 @@ import authRoutes from './routes/auth';
 import leadsRoutes from './routes/leads';
 import customersRoutes from './routes/customers';
 import vehiclesRoutes from './routes/vehicles';
-import bookingsRoutes from './routes/bookings';
 import jobsRoutes from './routes/jobs';
 import quotationsRoutes from './routes/quotations';
 import invoicesRoutes from './routes/invoices';
@@ -33,6 +32,8 @@ import publicTrackingRoutes from './routes/publicTracking';
 import webhooksRoutes from './routes/webhooks';
 import smsAdminRoutes from './routes/smsAdmin';
 import integrationsRoutes from './routes/integrations';
+import staffManagementRoutes from './routes/staffManagement';
+import systemLogsRoutes from './routes/systemLogs';
 
 const app = express();
 
@@ -79,7 +80,6 @@ app.use(`${API_PREFIX}/auth`, authRoutes);
 app.use(`${API_PREFIX}/leads`, leadsRoutes);
 app.use(`${API_PREFIX}/customers`, customersRoutes);
 app.use(`${API_PREFIX}/vehicles`, vehiclesRoutes);
-app.use(`${API_PREFIX}/bookings`, bookingsRoutes);
 app.use(`${API_PREFIX}/jobs`, jobsRoutes);
 app.use(`${API_PREFIX}/quotations`, quotationsRoutes);
 app.use(`${API_PREFIX}/invoices`, invoicesRoutes);
@@ -97,6 +97,8 @@ app.use(`${API_PREFIX}/advance-bookings`, advanceBookingsRoutes);
 app.use(`${API_PREFIX}/webhooks`, webhooksRoutes);
 app.use(`${API_PREFIX}/sms`, smsAdminRoutes);
 app.use(`${API_PREFIX}/integrations`, integrationsRoutes);
+app.use(`${API_PREFIX}/staff-management`, staffManagementRoutes);
+app.use(`${API_PREFIX}/system-logs`, systemLogsRoutes);
 app.use(`/public`, publicTrackingRoutes);
 // ── Initialize Cron Jobs ────────────────────────────────────
 if (process.env.NODE_ENV !== 'test') {

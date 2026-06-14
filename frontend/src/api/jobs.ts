@@ -15,6 +15,7 @@ export interface JobService {
   line_total: number;
   tax_pct?: number;
   item_type?: string;
+  inventory_item_id?: number | null;
 }
 
 export interface StatusLogEntry {
@@ -34,7 +35,7 @@ export interface JobCard {
   customer_id: number;
   vehicle_id: number;
   job_type: 'booked' | 'walkin' | 'quick';
-  status: 'scheduled' | 'car_in' | 'washing' | 'in_progress' | 'qc' | 'rework' | 'ready' | 'delivered' | 'cancelled';
+  status: 'scheduled' | 'car_in' | 'washing' | 'in_progress' | 'qc' | 'rework' | 'ready' | 'delivered' | 'cancelled' | 'estimate';
   date_in?: string | null;
   expected_out?: string | null;
   date_out?: string | null;
@@ -56,6 +57,9 @@ export interface JobCard {
   customer_address?: string | null;
   customer_city?: string | null;
   customer_notes?: string | null;
+  insurance_company?: string | null;
+  insurance_expiry?: string | null;
+  km_reading?: number | null;
   vehicle_name?: string;
   reg_number?: string;
   vehicle_year?: number | null;
@@ -166,6 +170,7 @@ export const jobsAPI = {
     gst_applicable: boolean;
     payment_mode?: string;
     notes?: string;
+    gst_pct?: number | '';
   }): Promise<ApiResponse<any>> => {
     const { data } = await apiClient.post(`/jobs/${id}/complete`, payload);
     return data;

@@ -31,11 +31,6 @@ export default function DashboardPage() {
     queryFn: dashboardApi.getRecentJobs,
   });
 
-  const { data: todayBookings } = useQuery({
-    queryKey: ['dashboard-today-bookings'],
-    queryFn: dashboardApi.getTodayBookings,
-  });
-
   const { data: extendedStats } = useQuery({
     queryKey: ['dashboard-extended-stats'],
     queryFn: dashboardApi.getExtendedStats,
@@ -222,7 +217,7 @@ export default function DashboardPage() {
                 {String(kpis?.new_leads_today ?? 0).padStart(2, '0')}
               </h3>
               <p className="font-data-sm text-[12px] text-on-surface-variant mt-4">
-                Bookings Scheduled Today: <span className="text-white font-bold">{kpis?.today_bookings ?? 0}</span>
+                Active Lead Pipeline Tracking
               </p>
             </div>
 
@@ -514,7 +509,7 @@ export default function DashboardPage() {
                         onMouseMove={updateTooltipPosition}
                         onMouseLeave={hideTooltip}
                       >
-                        <div className={`funnel-tier ${stage.width} h-full border flex items-center justify-between px-10 ${stage.bg}`}>
+                        <div className={`funnel-tier ${stage.width} h-full border flex items-center justify-between px-4 sm:px-10 ${stage.bg}`}>
                           <span className="font-label-caps text-[10px] tracking-wider">{stage.label}</span>
                           <span className="font-data-lg text-lg font-bold">{stage.val}</span>
                         </div>
@@ -524,11 +519,11 @@ export default function DashboardPage() {
                 ) : (
                   // Static fallback bento funnel layout
                   <>
-                    <div className="funnel-tier w-full h-14 bg-white/5 border border-white/10 flex items-center justify-between px-10">
+                    <div className="funnel-tier w-full h-14 bg-white/5 border border-white/10 flex items-center justify-between px-4 sm:px-10">
                       <span className="font-label-caps text-[10px] text-on-surface-variant">NEW ACQUISITION</span>
                       <span className="font-data-lg text-lg text-white">—</span>
                     </div>
-                    <div className="funnel-tier w-[85%] h-14 bg-performance-red/20 border border-performance-red/30 flex items-center justify-between px-10">
+                    <div className="funnel-tier w-[85%] h-14 bg-performance-red/20 border border-performance-red/30 flex items-center justify-between px-4 sm:px-10">
                       <span className="font-label-caps text-[10px] text-on-surface">CONTACTED</span>
                       <span className="font-data-lg text-lg text-white">—</span>
                     </div>
@@ -636,7 +631,7 @@ export default function DashboardPage() {
               </div>
 
               <div className="flex-1 overflow-x-auto">
-                <table className="w-full text-left">
+                <table className="w-full text-left min-w-[600px]">
                   <thead>
                     <tr className="bg-black/30 text-on-surface-variant/60 font-label-caps text-[9px] uppercase tracking-widest border-b border-white/5">
                       <th className="px-8 py-3.5 font-normal">OPERATIONS VEHICLE</th>
@@ -880,7 +875,7 @@ export default function DashboardPage() {
 
                 {/* Always show at least one Assign bay option */}
                 <div
-                  onClick={() => navigate('/bookings')}
+                  onClick={() => navigate('/jobs/new')}
                   className="glass-panel rounded-2xl flex items-center justify-center border-dashed border-2 border-white/5 bg-white/[0.01] hover:bg-performance-red/[0.02] hover:border-performance-red/30 transition-all duration-300 cursor-pointer min-h-[220px] group"
                 >
                   <div className="text-center p-6">
@@ -888,7 +883,7 @@ export default function DashboardPage() {
                       <span className="material-symbols-outlined text-2xl text-performance-red">add</span>
                     </div>
                     <p className="font-label-caps text-[10px] tracking-[0.2em] text-on-surface-variant group-hover:text-white transition-colors uppercase font-bold">
-                      ASSIGN NEXT SLOT BAY
+                      CREATE NEW JOB CARD
                     </p>
                   </div>
                 </div>

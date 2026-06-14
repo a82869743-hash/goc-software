@@ -8,6 +8,7 @@ import { v4 as uuidv4 } from 'uuid';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { deductInventoryForJobCard } from '../controllers/jobCardController';
 
 const router = Router();
 
@@ -283,6 +284,12 @@ router.patch('/:id/status', async (req: Request, res: Response): Promise<void> =
     params.push(id);
     await pool.query(`UPDATE quick_job_cards SET ${extras.join(', ')} WHERE id = ?`, params);
 
+    // Deduct stock if transitioning to ready/delivered/invoiced
+    const staffId = req.staff?.id;
+    if (['ready', 'delivered', 'invoiced'].includes(new_status)) {
+      await deductInventoryForJobCard(pool, id, true, staffId);
+    }
+
     // SMS Status Notification
     const jc = existing[0];
     const tracking_url = `${process.env.BASE_URL || 'http://localhost:4000'}/track/${jc.public_token}`;
@@ -312,17 +319,23 @@ router.patch('/:id/status', async (req: Request, res: Response): Promise<void> =
 router.post('/:id/services', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { service_name, item_type, qty = 1, rate = 0, tax_pct = 0, hsn_sac } = req.body;
+    const { service_name, item_type, qty, rate, tax_pct, hsn_sac, inventory_item_id, sqft_used } = req.body;
     if (!service_name) {
       res.status(400).json({ success: false, error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'service_name is required' } });
       return;
     }
 
-    const amount = Number(qty) * Number(rate);
+    const qtyNum = qty === '' || qty === undefined || qty === null ? 1 : Number(qty);
+    const rateNum = rate === '' || rate === undefined || rate === null ? 0 : Number(rate);
+    const taxPctNum = tax_pct === '' || tax_pct === undefined || tax_pct === null ? 0 : Number(tax_pct);
+    const sqftUsedNum = sqft_used === '' || sqft_used === undefined || sqft_used === null ? null : Number(sqft_used);
+    const inventoryItemIdNum = inventory_item_id === '' || inventory_item_id === undefined || inventory_item_id === null ? null : Number(inventory_item_id);
+
+    const amount = qtyNum * rateNum;
     const [result] = await pool.query<ResultSetHeader>(
-      `INSERT INTO quick_job_card_services (job_card_id, service_name, item_type, qty, rate, amount, tax_pct, hsn_sac)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, service_name, item_type || 'service', qty, rate, amount, tax_pct, hsn_sac || null]
+      `INSERT INTO quick_job_card_services (job_card_id, service_name, item_type, qty, rate, amount, tax_pct, hsn_sac, inventory_item_id, sqft_used)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, service_name, item_type || 'service', qtyNum, rateNum, amount, taxPctNum, hsn_sac || null, inventoryItemIdNum, sqftUsedNum]
     );
 
     res.json({ success: true, data: { id: result.insertId, message: 'Service added' } });
@@ -339,12 +352,22 @@ router.put('/:id/services/:sid', async (req: Request, res: Response): Promise<vo
 
     const fields: string[] = [];
     const params: any[] = [];
-    const allowed = ['service_name', 'item_type', 'qty', 'rate', 'tax_pct', 'hsn_sac'];
+    const allowed = ['service_name', 'item_type', 'qty', 'rate', 'tax_pct', 'hsn_sac', 'inventory_item_id', 'sqft_used'];
 
     for (const f of allowed) {
       if (d[f] !== undefined) {
         fields.push(`${f} = ?`);
-        params.push(d[f]);
+        let val = d[f];
+        if (f === 'qty') {
+          val = val === '' || val === null ? 1 : Number(val);
+        } else if (f === 'rate') {
+          val = val === '' || val === null ? 0 : Number(val);
+        } else if (f === 'tax_pct') {
+          val = val === '' || val === null ? 0 : Number(val);
+        } else if (f === 'sqft_used' || f === 'inventory_item_id') {
+          val = val === '' || val === null ? null : Number(val);
+        }
+        params.push(val);
       }
     }
 
@@ -496,6 +519,12 @@ router.post('/:id/complete', async (req: Request, res: Response): Promise<void> 
       `UPDATE quick_job_cards SET completion_type = ?, status = 'invoiced' WHERE id = ?`,
       [completion_type, id]
     );
+
+    // Deduct stock if completion_type is invoice
+    const staffId = req.staff?.id;
+    if (completion_type === 'invoice') {
+      await deductInventoryForJobCard(connection, id, true, staffId);
+    }
 
     await connection.commit();
 

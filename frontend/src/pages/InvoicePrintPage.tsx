@@ -20,6 +20,8 @@ interface InvoiceData {
     insurance_expiry?: string;
     km_reading?: number;
     created_at: string;
+    advance_amount?: number;
+    amount_paid?: number;
   };
   customer?: {
     customer_name?: string;
@@ -45,18 +47,22 @@ interface InvoiceData {
     subtotal: number;
     gst_amount: number;
     total_amount: number;
+    discount_amount?: number;
+    apply_gst?: number | boolean;
     payment_mode?: string;
     created_at?: string;
     cgst_rate?: number;
     cgst_amount?: number;
     sgst_rate?: number;
     sgst_amount?: number;
+    taxable_amount?: number;
   };
   estimate?: {
     estimate_no: string;
     estimate_code?: string;
     subtotal: number;
     total_amount: number;
+    discount_amount?: number;
     payment_mode?: string;
   };
   concerns?: Array<{ concern_text: string }>;
@@ -124,7 +130,7 @@ export default function InvoicePrintPage() {
         </p>
         <button
           onClick={() => navigate(-1)}
-          style={{ backgroundColor: '#ff2b2b', border: 'none', color: '#white', padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold' }}
+          style={{ backgroundColor: '#ff2b2b', border: 'none', color: 'white', padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold' }}
         >
           Go Back
         </button>
@@ -145,7 +151,9 @@ export default function InvoicePrintPage() {
     insurance_company: jc.insurance_company,
     insurance_expiry: jc.insurance_expiry,
     km_reading: jc.km_reading,
-    created_at: jc.created_at
+    created_at: jc.created_at,
+    advance_amount: (jc as any).advance_amount,
+    amount_paid: jc.amount_paid
   };
 
   const mappedServices = data.services.map((s) => ({
@@ -162,18 +170,22 @@ export default function InvoicePrintPage() {
     subtotal: Number(data.invoice.subtotal || 0),
     gst_amount: Number(data.invoice.gst_amount || 0),
     total_amount: Number(data.invoice.total_amount || 0),
+    discount_amount: data.invoice.discount_amount !== undefined ? Number(data.invoice.discount_amount) : 0,
+    apply_gst: data.invoice.apply_gst !== undefined ? Boolean(data.invoice.apply_gst) : false,
     payment_mode: data.invoice.payment_mode,
     created_at: data.invoice.created_at,
     cgst_rate: data.invoice.cgst_rate !== undefined ? Number(data.invoice.cgst_rate) : undefined,
     cgst_amount: data.invoice.cgst_amount !== undefined ? Number(data.invoice.cgst_amount) : undefined,
     sgst_rate: data.invoice.sgst_rate !== undefined ? Number(data.invoice.sgst_rate) : undefined,
     sgst_amount: data.invoice.sgst_amount !== undefined ? Number(data.invoice.sgst_amount) : undefined,
+    taxable_amount: data.invoice.taxable_amount !== undefined ? Number(data.invoice.taxable_amount) : undefined,
   } : undefined;
 
   const mappedEstimate = data.estimate ? {
     estimate_no: data.estimate.estimate_code || data.estimate.estimate_no || '—',
     subtotal: Number(data.estimate.subtotal || 0),
     total_amount: Number(data.estimate.total_amount || 0),
+    discount_amount: data.estimate.discount_amount !== undefined ? Number(data.estimate.discount_amount) : 0,
     payment_mode: data.estimate.payment_mode
   } : undefined;
 
@@ -184,10 +196,9 @@ export default function InvoicePrintPage() {
     <div style={{ backgroundColor: '#f3f4f6', minHeight: '100vh', padding: '20px 0' }}>
       {/* NO-PRINT CONTROLS */}
       <div
-        className="no-print"
+        className="no-print mx-4 md:mx-auto"
         style={{
           maxWidth: '850px',
-          margin: '0 auto 20px auto',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -195,7 +206,8 @@ export default function InvoicePrintPage() {
           color: '#ffffff',
           padding: '12px 24px',
           borderRadius: '8px',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+          boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+          marginBottom: '20px'
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -239,19 +251,24 @@ export default function InvoicePrintPage() {
           </button>
         </div>
       </div>
-
+ 
       {/* RENDER INVOICE */}
-      <InvoiceTemplate
-        jobCard={mappedJobCard}
-        customer={data.customer}
-        services={mappedServices}
-        invoice={mappedInvoice}
-        estimate={mappedEstimate}
-        concerns={data.concerns}
-        type={printType}
-        source={type === 'quick' ? 'quick' : 'regular'}
-        studioName="God of Ceramic"
-      />
+      <div className="overflow-x-auto print:overflow-visible px-4 print:px-0">
+        <div className="min-w-[850px] print:min-w-0 mx-auto">
+          <InvoiceTemplate
+            jobCard={mappedJobCard}
+            customer={data.customer}
+            services={mappedServices}
+            invoice={mappedInvoice}
+            estimate={mappedEstimate}
+            concerns={data.concerns}
+            type={printType}
+            source={type === 'quick' ? 'quick' : 'regular'}
+            studioName="Pack Wolf Pvt Ltd"
+            studioPhone="+91 9925566886"
+          />
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,7 +1,16 @@
 import axios from 'axios';
 import { useAuthStore } from '../stores/authStore';
+import { usePermissionsStore } from '../stores/permissionsStore';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api/v1';
+const getApiBaseUrl = (): string => {
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  if (isLocal) {
+    return 'http://localhost:4000/api/v1';
+  }
+  return `${window.location.origin}/api/v1`;
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -31,6 +40,7 @@ apiClient.interceptors.response.use(
       // Token expired or invalid — force logout
       const { logout } = useAuthStore.getState();
       logout();
+      usePermissionsStore.getState().clearPermissions();
       window.location.href = '/login';
     }
     return Promise.reject(error);

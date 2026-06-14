@@ -70,7 +70,7 @@ export default function CommissionsPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
           { label:'Total Commissions', value:`₹${((totalPaid+totalPending)/1000).toFixed(1)}K`, icon:'handshake',  color:'text-white', glowColor: 'rgba(255,255,255,0.03)'        },
           { label:'Paid Out',          value:`₹${(totalPaid/1000).toFixed(1)}K`,                icon:'payments',   color:'text-emerald-400', glowColor: 'rgba(52,211,153,0.03)'    },
@@ -132,14 +132,14 @@ export default function CommissionsPage() {
         <div className="lg:col-span-2 bg-[#0c0c0c]/45 backdrop-blur-2xl border border-white/5 rounded-2xl overflow-hidden shadow-2xl flex flex-col relative h-full">
           <div className="absolute top-0 right-0 w-36 h-36 bg-performance-red/[0.02] blur-[60px] rounded-full pointer-events-none" />
           <div className="px-6 py-4 border-b border-white/5 flex items-center gap-3 bg-black/10 flex-wrap justify-between">
-            <div className="flex items-center gap-1.5 p-1 bg-black/30 border border-white/5 rounded-xl">
+            <div className="flex items-center gap-1.5 p-1 bg-black/30 border border-white/5 rounded-xl overflow-x-auto custom-scrollbar whitespace-nowrap max-w-full">
               {(['all','pending','approved','paid'] as const).map(s=>{
                 const cfg = s!=='all' ? STATUS_CFG[s] : null;
                 return (
                   <button 
                     key={s} 
                     onClick={()=>setFilter(s)}
-                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all hover:cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all hover:cursor-pointer shrink-0 ${
                       filter===s ? (cfg ? `${cfg.bg} ${cfg.color} border border-white/5` : 'bg-white/10 text-white') : 'text-tertiary/60 hover:text-white'
                     }`}
                   >
@@ -152,7 +152,7 @@ export default function CommissionsPage() {
           </div>
           
           <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse min-w-[650px]">
               <thead>
                 <tr className="bg-black/25 text-tertiary text-[10px] font-label-caps uppercase tracking-wider border-b border-white/5">
                   <th className="py-4 px-6 font-normal">Connector</th>

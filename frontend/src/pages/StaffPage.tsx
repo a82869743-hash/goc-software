@@ -35,7 +35,7 @@ export default function StaffPage() {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<StaffRole | 'all'>('all');
   const [view, setView] = useState<'grid' | 'list'>('grid');
-  const [activeTab, setActiveTab] = useState<'roster' | 'today' | 'attendance_history' | 'clockin'>('roster');
+  const [activeTab, setActiveTab] = useState<'roster' | 'today' | 'attendance_history'>('roster');
 
   // Attendance history filters
   const [historySearch, setHistorySearch] = useState('');
@@ -51,46 +51,13 @@ export default function StaffPage() {
   const [newAdvanceNotes, setNewAdvanceNotes] = useState('');
   const [newAdvanceDate, setNewAdvanceDate] = useState(new Date().toISOString().slice(0, 16));
 
-  // Running clock for biometric terminal simulator
-  const [currentTime, setCurrentTime] = useState('');
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setCurrentTime(
-        now.toLocaleTimeString('en-US', {
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-          hour12: true,
-        })
-      );
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
-  }, []);
 
-  // Biometric interaction state
-  const [biometricStatus, setBiometricStatus] = useState('Scanning for Token...');
-  const [biometricState, setBiometricState] = useState<'idle' | 'scanning' | 'success'>('idle');
+
+
 
   // Modals
-  const [showAddModal, setShowAddModal] = useState(false);
   const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
   const [showAttEditModal, setShowAttEditModal] = useState(false);
-
-  // Form states
-  const [newStaffForm, setNewStaffForm] = useState({
-    full_name: '',
-    phone: '',
-    email: '',
-    role: 'technician' as StaffRole,
-    salary_type: 'monthly' as 'monthly' | 'daily',
-    salary_amount: 15000,
-    join_date: new Date().toISOString().split('T')[0],
-    status: 'active' as 'active' | 'on_leave' | 'resigned',
-    password: '',
-  });
 
   const [attEditForm, setAttEditForm] = useState({
     staff_id: 0,
@@ -101,13 +68,7 @@ export default function StaffPage() {
     notes: '',
   });
 
-  // Simulated GPS Self Check-in State
-  const [gpsSimulated, setGpsSimulated] = useState({
-    latitude: '22.3072',
-    longitude: '73.1812',
-    selfieAttached: false,
-    notes: '',
-  });
+
 
   // API QUERIES
   const { data: staffRes, isLoading: isStaffLoading } = useQuery({
@@ -146,29 +107,7 @@ export default function StaffPage() {
   });
   const attendanceHistory = attendanceHistoryRes?.data || [];
 
-  // MUTATIONS
-  const createStaffMutation = useMutation({
-    mutationFn: (payload: any) => staffAPI.create(payload),
-    onSuccess: () => {
-      toast.success('Staff profile registered successfully!');
-      setShowAddModal(false);
-      queryClient.invalidateQueries({ queryKey: ['staff'] });
-      setNewStaffForm({
-        full_name: '',
-        phone: '',
-        email: '',
-        role: 'technician',
-        salary_type: 'monthly',
-        salary_amount: 15000,
-        join_date: new Date().toISOString().split('T')[0],
-        status: 'active',
-        password: '',
-      });
-    },
-    onError: (err: any) => {
-      toast.error(err.response?.data?.error?.message || 'Failed to register staff profile');
-    },
-  });
+
 
   const markAttendanceMutation = useMutation({
     mutationFn: (payload: { staff_id: number; status: string; notes?: string; check_in_time?: string | null; check_out_time?: string | null }) =>
@@ -224,43 +163,7 @@ export default function StaffPage() {
     }
   });
 
-  // Clock-in simulated action
-  const handleSimulatedClockin = (status: 'present' | 'late') => {
-    if (!gpsSimulated.selfieAttached) {
-      toast.error('Please snap selfie verification to satisfy biometric check-in');
-      return;
-    }
 
-    setBiometricState('scanning');
-    setBiometricStatus('VERIFYING BIOMETRICS...');
-
-    setTimeout(() => {
-      const activeTech = staffMembers.find((s) => s.status === 'active');
-      if (!activeTech) {
-        toast.error('No active technician registered in database');
-        setBiometricState('idle');
-        setBiometricStatus('Scanning for Token...');
-        return;
-      }
-
-      markAttendanceMutation.mutate({
-        staff_id: activeTech.id,
-        status: status,
-        notes: `GPS Coordinate: ${gpsSimulated.latitude}, ${gpsSimulated.longitude}. Selfie verified. ${gpsSimulated.notes}`,
-      });
-
-      setBiometricState('success');
-      setBiometricStatus(`GRANTED: ${activeTech.full_name.toUpperCase()}`);
-
-      toast.success(`Biometric match verified! Registered as ${status.toUpperCase()}`);
-
-      setTimeout(() => {
-        setBiometricState('idle');
-        setBiometricStatus('Scanning for Token...');
-        setActiveTab('today');
-      }, 2000);
-    }, 1200);
-  };
 
   const filtered = staffMembers.filter((s) => {
     const q = search.toLowerCase();
@@ -350,14 +253,6 @@ export default function StaffPage() {
               </button>
             ))}
           </div>
-
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="px-6 py-3 rounded-xl bg-gradient-to-r from-performance-red to-[#93000a] text-white hover:shadow-[0_0_25px_rgba(255,43,43,0.4)] transition-all font-label-caps text-label-caps tracking-wider flex items-center gap-2 active:scale-95 duration-300 font-bold"
-          >
-            <span className="material-symbols-outlined text-[18px]">person_add</span>
-            <span>Register Staff Member</span>
-          </button>
         </div>
       </div>
 
@@ -440,16 +335,7 @@ export default function StaffPage() {
         >
           ATTENDANCE HISTORY
         </button>
-        <button
-          onClick={() => setActiveTab('clockin')}
-          className={`pb-4 font-label-caps text-label-caps tracking-widest transition-all duration-300 relative ${
-            activeTab === 'clockin'
-              ? 'text-performance-red border-b-2 border-performance-red shadow-[0_4px_12px_rgba(255,43,43,0.15)] font-extrabold'
-              : 'text-tertiary hover:text-white font-bold'
-          }`}
-        >
-          SIMULATE BIOMETRICS
-        </button>
+
       </div>
 
       {/* TAB 1: ROSTER DIRECTORY */}
@@ -553,7 +439,8 @@ export default function StaffPage() {
             </div>
           ) : (
             <div className="bg-[#0c0c0c]/40 backdrop-blur-2xl border border-white/5 rounded-2xl overflow-hidden shadow-2xl">
-              <table className="w-full text-left border-collapse">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[800px] text-left border-collapse">
                 <thead>
                   <tr className="bg-black/35 text-tertiary/75 text-[10px] font-label-caps border-b border-white/5 uppercase tracking-widest font-bold">
                     <th className="py-4.5 px-6 font-normal">Staff Member</th>
@@ -625,6 +512,7 @@ export default function StaffPage() {
                 </tbody>
               </table>
             </div>
+          </div>
           )}
         </div>
       )}
@@ -645,7 +533,7 @@ export default function StaffPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full min-w-[800px] text-left border-collapse">
               <thead>
                 <tr className="bg-black/35 text-tertiary/75 text-[10px] font-label-caps border-b border-white/5 uppercase tracking-widest font-bold">
                   <th className="py-4.5 px-6 font-normal">Personnel Operator</th>
@@ -805,7 +693,7 @@ export default function StaffPage() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+                <table className="w-full min-w-[900px] text-left border-collapse">
                   <thead>
                     <tr className="bg-black/45 text-on-surface-variant/50 text-[9px] font-label-caps uppercase tracking-widest border-b border-white/[0.06] font-bold">
                       {['Date', 'Staff Code', 'Staff Member', 'Role', 'Status', 'Entry Time (In)', 'Leaving Time (Out)', 'Hours', 'Notes'].map(h => (
@@ -870,194 +758,13 @@ export default function StaffPage() {
         </div>
       )}
 
-      {/* TAB 4: SIMULATE BIOMETRICS */}
-      {activeTab === 'clockin' && (
-        <div className="grid grid-cols-12 gap-6 items-start">
-          {/* Biometric Terminal UI (Col span 7) */}
-          <section className="col-span-12 lg:col-span-7 bg-[#0c0c0c]/40 backdrop-blur-2xl border border-white/5 rounded-2xl p-6 md:p-8 flex flex-col relative min-h-[480px] overflow-hidden shadow-2xl">
-            <div className="absolute top-0 right-0 p-6 opacity-[0.03] pointer-events-none group-hover:opacity-10 transition-opacity">
-              <span className="material-symbols-outlined text-8xl text-performance-red">fingerprint</span>
-            </div>
+      {/* Simulate Biometrics UI Removed */}
 
-            <div className="flex items-center gap-2 mb-6 relative z-10 font-bold">
-              <div className="w-2.5 h-2.5 bg-performance-red rounded-full animate-pulse shadow-[0_0_8px_rgba(255,43,43,0.8)]"></div>
-              <h3 className="font-label-caps text-label-caps text-tertiary uppercase tracking-widest">
-                Biometric Gateway Terminal Alpha
-              </h3>
-            </div>
-
-            <div className="flex flex-col md:flex-row gap-6 relative z-10">
-              {/* Webcam simulator screen */}
-              <div className="w-full md:w-1/2 aspect-video bg-black/80 rounded-xl border border-white/5 overflow-hidden relative shadow-2xl min-h-[200px]">
-                <img
-                  alt="Biometric Capture Camera feed"
-                  className="w-full h-full object-cover opacity-50 grayscale hover:grayscale-0 transition-all duration-1000"
-                  src="https://images.unsplash.com/photo-1617788138017-80ad40651399?auto=format&fit=crop&q=80&w=600"
-                />
-                <div className="absolute inset-0 flex flex-col justify-between p-4 bg-gradient-to-t from-black/95 via-transparent to-transparent">
-                  <div className="flex justify-between items-start font-bold">
-                    <span className="font-data-sm text-[9px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/25 tracking-widest uppercase">
-                      LIVE CAMERA FEED
-                    </span>
-                    <span className="font-data-sm text-[9px] text-tertiary/40">
-                      CH: 01_BIOMETRIC
-                    </span>
-                  </div>
-                  <div className="space-y-0.5 font-bold">
-                    <p className="font-data-sm text-[9px] text-performance-red/60">LAT: 22.3072° N</p>
-                    <p className="font-data-sm text-[9px] text-performance-red/60">LONG: 73.1812° E</p>
-                  </div>
-                </div>
-                {/* Tech Scanning Line Overlay Animation */}
-                <div
-                  className={`absolute left-0 w-full h-[2px] bg-performance-red/70 shadow-[0_0_15px_rgba(255,43,43,1)] transition-all duration-300`}
-                  style={{
-                    animation: biometricState === 'scanning' ? 'scan 0.3s infinite linear' : 'scan 3s infinite linear',
-                    position: 'absolute',
-                  }}
-                />
-              </div>
-
-              {/* Biometric trigger controls */}
-              <div className="w-full md:w-1/2 flex flex-col justify-between min-h-[220px]">
-                <div className="space-y-4">
-                  <div className="bg-black/40 border border-white/5 rounded-xl p-4 border-l-2 border-l-performance-red shadow-inner font-bold">
-                    <p className="font-label-caps text-[9px] text-tertiary/45 mb-1.5 tracking-wider">
-                      GATEWAY IDENTITY ACCESS
-                    </p>
-                    <p
-                      className={`font-headline-md text-base font-bold ${
-                        biometricState === 'success'
-                          ? 'text-emerald-400 animate-none'
-                          : biometricState === 'scanning'
-                          ? 'text-performance-red animate-pulse'
-                          : 'text-white'
-                      }`}
-                    >
-                      {biometricStatus}
-                    </p>
-                  </div>
-
-                  <div className="bg-black/40 border border-white/5 rounded-xl p-4 border-l-2 border-l-white/10 shadow-inner font-bold">
-                    <p className="font-label-caps text-[9px] text-tertiary/45 mb-1.5 tracking-wider">
-                      SECURED TIME MATRIX
-                    </p>
-                    <p className="font-data-lg text-lg text-white font-semibold">
-                      {currentTime || 'Syncing...'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="h-16 flex items-center justify-center text-center font-label-caps text-xs text-tertiary bg-white/[0.02] border border-white/5 rounded-xl p-3 shadow-inner font-bold">
-                  Simulate verification telemetry details on the right card panel.
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Biometric Telemetry coordinates config (Col span 5) */}
-          <section className="col-span-12 lg:col-span-5 bg-[#0c0c0c]/40 backdrop-blur-2xl border border-white/5 rounded-2xl p-6 md:p-8 flex flex-col gap-5 shadow-2xl relative font-bold">
-            <h3 className="font-label-caps text-label-caps text-tertiary tracking-wider uppercase flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-performance-red animate-pulse"></span>
-              Verification Parameters Config
-            </h3>
-
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3 font-data-sm text-xs">
-                <div>
-                  <label className="block text-[10px] text-tertiary font-label-caps uppercase mb-1.5 tracking-wider">
-                    GPS LATITUDE
-                  </label>
-                  <input
-                    type="text"
-                    value={gpsSimulated.latitude}
-                    onChange={(e) => setGpsSimulated({ ...gpsSimulated, latitude: e.target.value })}
-                    className="w-full bg-black border border-white/10 focus:border-performance-red/50 focus:outline-none rounded-xl p-3 text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] text-tertiary font-label-caps uppercase mb-1.5 tracking-wider">
-                    GPS LONGITUDE
-                  </label>
-                  <input
-                    type="text"
-                    value={gpsSimulated.longitude}
-                    onChange={(e) => setGpsSimulated({ ...gpsSimulated, longitude: e.target.value })}
-                    className="w-full bg-black border border-white/10 focus:border-performance-red/50 focus:outline-none rounded-xl p-3 text-white"
-                  />
-                </div>
-              </div>
-
-              {/* Snap selfie verification simulator */}
-              <div className="bg-black/35 border border-white/5 rounded-2xl p-4 flex items-center justify-between shadow-inner group">
-                <div className="flex items-center gap-3 text-xs">
-                  <span className="material-symbols-outlined text-tertiary/50 group-hover:text-performance-red transition-colors duration-300">
-                    photo_camera
-                  </span>
-                  <div>
-                    <p className="text-white font-semibold font-body-lg">
-                      Snap Selfie verification
-                    </p>
-                    <p className="text-tertiary/40 font-data-sm text-[10px] mt-0.5">
-                      {gpsSimulated.selfieAttached ? 'Selfie verification secured.' : 'Click to snap live biometric selfie'}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setGpsSimulated({ ...gpsSimulated, selfieAttached: true });
-                    toast.success('Selfie upload trace successfully logged!');
-                  }}
-                  className={`px-3 py-1.5 rounded-xl text-[10px] font-label-caps transition-all duration-300 active:scale-95 cursor-pointer font-bold ${
-                    gpsSimulated.selfieAttached
-                      ? 'bg-emerald-600/10 border border-emerald-500/25 text-emerald-400'
-                      : 'bg-performance-red text-white hover:shadow-[0_0_15px_rgba(255,43,43,0.3)]'
-                  }`}
-                >
-                  {gpsSimulated.selfieAttached ? 'VERIFIED' : 'SNAP'}
-                </button>
-              </div>
-
-              <div>
-                <label className="block text-[10px] text-tertiary font-label-caps uppercase mb-1.5 tracking-wider">
-                  Self Reporting Notes
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Report any shifts exceptions or reason details..."
-                  value={gpsSimulated.notes}
-                  onChange={(e) => setGpsSimulated({ ...gpsSimulated, notes: e.target.value })}
-                  className="w-full bg-black border border-white/10 focus:border-performance-red/50 focus:outline-none rounded-2xl p-3 text-xs text-white resize-none font-body-lg"
-                />
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => handleSimulatedClockin('present')}
-                  className="flex-1 bg-gradient-to-r from-emerald-600 to-emerald-800 text-white py-3.5 rounded-xl font-label-caps text-label-caps tracking-widest text-center active:scale-95 transition-all shadow-lg font-bold cursor-pointer"
-                >
-                  CLOCK IN ON TIME
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSimulatedClockin('late')}
-                  className="flex-1 bg-gradient-to-r from-amber-600 to-amber-800 text-white py-3.5 rounded-xl font-label-caps text-label-caps tracking-widest text-center active:scale-95 transition-all shadow-lg font-bold cursor-pointer"
-                >
-                  CLOCK IN LATE
-                </button>
-              </div>
-            </div>
-          </section>
-        </div>
-      )}
-
-      {/* ROSTER PROFILE DRAWER SHEET */}
+      {/* ROSTER PROFILE MODAL */}
       {selectedStaffId && activeStaffDetail && (
-        <div className="fixed inset-0 z-40 flex justify-end bg-black/75 backdrop-blur-md">
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 md:p-6 overflow-y-auto">
           <div className="absolute inset-0 z-0 bg-transparent" onClick={() => setSelectedStaffId(null)} />
-          <div className="bg-[#050505] border-l border-white/5 w-full max-w-xl h-full flex flex-col p-8 overflow-y-auto relative z-10 shadow-2xl custom-scrollbar font-bold text-xs">
+          <div className="bg-[#0c0c0c] border border-white/10 w-full max-w-xl rounded-2xl flex flex-col p-6 md:p-8 relative z-10 shadow-2xl custom-scrollbar font-bold text-xs my-auto max-h-[90vh] overflow-y-auto">
             <div className="absolute -top-32 -right-32 w-64 h-64 bg-performance-red/[0.03] blur-[120px] pointer-events-none" />
 
             <div className="flex justify-between items-start mb-8 border-b border-white/5 pb-5">
@@ -1327,10 +1034,10 @@ export default function StaffPage() {
 
       {/* MODAL: MANUAL ATTENDANCE ADJUSTMENT LOG */}
       {showAttEditModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md">
-          <div className="bg-[#0c0c0c] border border-white/10 rounded-2xl p-6 max-w-md w-full relative shadow-2xl overflow-hidden font-bold text-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
+          <div className="bg-[#0c0c0c] border border-white/10 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden my-auto max-h-[90vh] flex flex-col font-bold text-xs">
             <div className="absolute -top-24 -left-24 w-48 h-48 bg-performance-red/[0.04] blur-[60px] pointer-events-none" />
-            <div className="flex justify-between items-center mb-6 border-b border-white/5 pb-4">
+            <div className="flex justify-between items-center px-6 pt-6 pb-4 border-b border-white/5 shrink-0">
               <h3 className="font-display-hero text-base font-black text-white uppercase tracking-wider">
                 Adjust Attendance Log
               </h3>
@@ -1361,7 +1068,7 @@ export default function StaffPage() {
                   }
                 });
               }}
-              className="space-y-4"
+              className="space-y-4 overflow-y-auto custom-scrollbar p-6"
             >
               <div className="bg-white/[0.02] p-3 rounded-lg border border-white/5 mb-3">
                 <p className="text-tertiary text-[10px] uppercase font-bold tracking-wider">Operator</p>
@@ -1448,184 +1155,7 @@ export default function StaffPage() {
         </div>
       )}
 
-      {/* MODAL: NEW CREW PROFILE REGISTRATION */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md">
-          <div className="bg-[#0c0c0c] border border-white/10 rounded-2xl p-6 max-w-lg w-full relative shadow-2xl overflow-hidden font-bold text-xs">
-            <div className="absolute -top-24 -left-24 w-48 h-48 bg-performance-red/[0.04] blur-[60px] pointer-events-none" />
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="font-display-hero text-lg font-black text-white uppercase tracking-wider">
-                Roster Profile Registration
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowAddModal(false)}
-                className="text-tertiary hover:text-white p-1 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[20px]">close</span>
-              </button>
-            </div>
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                createStaffMutation.mutate(newStaffForm);
-              }}
-              className="space-y-4"
-            >
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] text-tertiary font-label-caps mb-1.5 uppercase tracking-wider">
-                    Full Roster Name
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Parth Patel"
-                    value={newStaffForm.full_name}
-                    onChange={(e) => setNewStaffForm({ ...newStaffForm, full_name: e.target.value })}
-                    className="w-full bg-black border border-white/10 focus:border-performance-red/50 focus:outline-none rounded-xl px-3 py-2.5 text-xs text-white font-body-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] text-tertiary font-label-caps mb-1.5 uppercase tracking-wider">
-                    Mobile Contact
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="10-digit phone"
-                    value={newStaffForm.phone}
-                    onChange={(e) => setNewStaffForm({ ...newStaffForm, phone: e.target.value })}
-                    className="w-full bg-black border border-white/10 focus:border-performance-red/50 focus:outline-none rounded-xl px-3 py-2.5 text-xs text-white font-data-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] text-tertiary font-label-caps mb-1.5 uppercase tracking-wider">
-                    Email address
-                  </label>
-                  <input
-                    type="email"
-                    placeholder="name@gocstudio.com"
-                    value={newStaffForm.email}
-                    onChange={(e) => setNewStaffForm({ ...newStaffForm, email: e.target.value })}
-                    className="w-full bg-black border border-white/10 focus:border-performance-red/50 focus:outline-none rounded-xl px-3 py-2.5 text-xs text-white font-body-lg"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] text-tertiary font-label-caps mb-1.5 uppercase tracking-wider">
-                    Hangar Roster Role
-                  </label>
-                  <select
-                    value={newStaffForm.role}
-                    onChange={(e) => setNewStaffForm({ ...newStaffForm, role: e.target.value as StaffRole })}
-                    className="w-full bg-black border border-white/10 focus:border-performance-red/50 focus:outline-none rounded-xl p-2.5 text-xs text-white font-body-lg"
-                  >
-                    <option value="admin" className="bg-[#0c0c0c]">Admin</option>
-                    <option value="technician" className="bg-[#0c0c0c]">Technician</option>
-                    <option value="receptionist" className="bg-[#0c0c0c]">Receptionist</option>
-                    <option value="manager" className="bg-[#0c0c0c]">Manager</option>
-                    <option value="staff" className="bg-[#0c0c0c]">Staff</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 font-data-sm text-xs">
-                <div>
-                  <label className="block text-[10px] text-tertiary font-label-caps mb-1.5 uppercase tracking-wider">
-                    Salary Compensation Type
-                  </label>
-                  <select
-                    value={newStaffForm.salary_type}
-                    onChange={(e) =>
-                      setNewStaffForm({ ...newStaffForm, salary_type: e.target.value as any })
-                    }
-                    className="w-full bg-black border border-white/10 focus:border-performance-red/50 focus:outline-none rounded-xl p-2.5 text-xs text-white font-body-lg"
-                  >
-                    <option value="monthly" className="bg-[#0c0c0c]">Monthly Salary</option>
-                    <option value="daily" className="bg-[#0c0c0c]">Daily Wages</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] text-tertiary font-label-caps mb-1.5 uppercase tracking-wider">
-                    Compensation Amount (₹)
-                  </label>
-                  <input
-                    type="number"
-                    value={newStaffForm.salary_amount}
-                    onChange={(e) => setNewStaffForm({ ...newStaffForm, salary_amount: Number(e.target.value) })}
-                    className="w-full bg-black border border-white/10 focus:border-performance-red/50 focus:outline-none rounded-xl p-2.5 text-white text-right"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] text-tertiary font-label-caps mb-1.5 uppercase tracking-wider">
-                    Joining Date
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={newStaffForm.join_date}
-                    onChange={(e) => setNewStaffForm({ ...newStaffForm, join_date: e.target.value })}
-                    className="w-full bg-black border border-white/10 focus:border-performance-red/50 focus:outline-none rounded-xl p-2.5 text-white font-data-sm focus:border-performance-red/50 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] text-tertiary font-label-caps mb-1.5 uppercase tracking-wider">
-                    Roster Status
-                  </label>
-                  <select
-                    value={newStaffForm.status}
-                    onChange={(e) => setNewStaffForm({ ...newStaffForm, status: e.target.value as any })}
-                    className="w-full bg-black border border-white/10 focus:border-performance-red/50 focus:outline-none rounded-xl p-2.5 text-xs text-white font-body-lg"
-                  >
-                    <option value="active" className="bg-[#0c0c0c]">Active</option>
-                    <option value="on_leave" className="bg-[#0c0c0c]">On Leave</option>
-                    <option value="resigned" className="bg-[#0c0c0c]">Resigned</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Added required password input */}
-              <div>
-                <label className="block text-[10px] text-tertiary font-label-caps mb-1.5 uppercase tracking-wider">
-                  Default Login Password
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Choose login password (min 6 characters)"
-                  value={newStaffForm.password}
-                  onChange={(e) => setNewStaffForm({ ...newStaffForm, password: e.target.value })}
-                  className="w-full bg-black border border-white/10 focus:border-performance-red/50 focus:outline-none rounded-xl px-3 py-2.5 text-xs text-white"
-                />
-              </div>
-
-              <div className="flex gap-3 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="flex-1 bg-white/5 border border-white/10 py-2.5 rounded-xl text-xs font-label-caps text-tertiary hover:text-white transition-all cursor-pointer font-bold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={createStaffMutation.isPending}
-                  className="flex-1 bg-gradient-to-r from-performance-red to-[#93000a] py-2.5 rounded-xl text-xs font-label-caps text-white hover:shadow-[0_0_20px_rgba(255,43,43,0.3)] transition-all font-bold cursor-pointer"
-                >
-                  {createStaffMutation.isPending ? 'Registering...' : 'Confirm Registration'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

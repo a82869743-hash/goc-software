@@ -1,4 +1,4 @@
-// Auto-generated from car model dataset.csv
+// Auto-generated from cars_ds_final.csv
 export interface CarBrand {
   brand: string;
   models: string[];

@@ -140,6 +140,24 @@ pool.getConnection()
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `).catch(err => console.error('❌ Failed to auto-migrate staff_advances table:', err));
 
+    // Auto-migrate staff_payment_requests table if not exists
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS staff_payment_requests (
+        id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        staff_id        INT UNSIGNED NOT NULL,
+        amount          DECIMAL(10,2) NOT NULL,
+        request_type    VARCHAR(50) NOT NULL DEFAULT 'advance',
+        reason          TEXT NOT NULL,
+        notes           TEXT NULL,
+        status          ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+        approved_by     INT UNSIGNED NULL,
+        created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (staff_id) REFERENCES staff(id) ON DELETE CASCADE,
+        FOREIGN KEY (approved_by) REFERENCES staff(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `).catch(err => console.error('❌ Failed to auto-migrate staff_payment_requests table:', err));
+
     // Auto-migrate sms_templates table if not exists
     await conn.query(`
       CREATE TABLE IF NOT EXISTS sms_templates (

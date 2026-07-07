@@ -279,11 +279,23 @@ export default function JobCardDetailPage() {
     window.open(url, '_blank');
   };
 
-  const shareJobCardLink = () => {
+  const shareJobCardLink = async () => {
     if (!job) return;
     const vehicleStr = `${job.vehicle_name || ''}`.trim() || 'your vehicle';
-    const jobCardUrl = `${window.location.origin}/track/${job.job_code}`;
-    const msg = `🙏 Greetings from *God of Ceramic Studio*!\n\nDear *${job.customer_name}*,\n\nThis is your Job Card for *${vehicleStr}* (${job.reg_number || ''}).\n\n📋 *Job Code:* ${job.job_code}\n🔗 *View Job Card:* ${jobCardUrl}\n\nFor any queries, feel free to contact us.\nThank you for choosing God of Ceramic! 🚗✨`;
+    let jobCardPdfUrl = '';
+    try {
+      const res = await jobsAPI.getJobCardPdf(Number(id));
+      if (res.data?.pdf_url) {
+        jobCardPdfUrl = getBackendURL(res.data.pdf_url);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    if (!jobCardPdfUrl) {
+      toast.error('Failed to generate Job Card PDF.');
+      return;
+    }
+    const msg = `🙏 Greetings from *God of Ceramic Studio*!\n\nDear *${job.customer_name}*,\n\nThis is your Job Card for *${vehicleStr}* (${job.reg_number || ''}).\n\n📋 *Job Code:* ${job.job_code}\n📄 *Download Job Card PDF:*\n${jobCardPdfUrl}\n\nFor any queries, feel free to contact us.\nThank you for choosing God of Ceramic! 🚗✨`;
     sendWhatsAppMessage(msg);
   };
 
@@ -901,6 +913,74 @@ export default function JobCardDetailPage() {
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Owner Image */}
+          <div className="glass-panel rounded-2xl p-6 space-y-3">
+            <h2 className="font-label-caps text-[10px] text-on-surface-variant/50 tracking-widest">OWNER IDENTIFICATION</h2>
+            {job.owner_image_url ? (
+              <div className="space-y-2">
+                <div className="w-full h-48 rounded-xl overflow-hidden border border-white/10 bg-black/40 flex items-center justify-center">
+                  <img
+                    src={getBackendURL(job.owner_image_url)}
+                    alt="Owner avatar"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-on-surface-variant/50 font-label-caps">Owner Image Saved</span>
+                  <label className="text-xs text-performance-red hover:underline font-label-caps cursor-pointer">
+                    Change Image
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        try {
+                          const res = await jobsAPI.uploadOwnerImage(Number(id), file);
+                          if (res.success) {
+                            toast.success('Owner image updated successfully!');
+                            queryClient.invalidateQueries({ queryKey: ['job-detail', id] });
+                          }
+                        } catch (err: any) {
+                          toast.error(err.response?.data?.error?.message || 'Failed to update owner image');
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="w-full h-24 rounded-xl border border-dashed border-white/10 flex flex-col items-center justify-center text-on-surface-variant/40 hover:bg-white/[0.02] transition-all">
+                  <span className="material-symbols-outlined text-[24px]">account_box</span>
+                  <span className="text-[10px] font-label-caps mt-1">No owner image added</span>
+                </div>
+                <label className="block text-center py-2 bg-white/5 border border-white/10 hover:bg-white/10 rounded-xl text-xs font-bold font-label-caps uppercase tracking-wider cursor-pointer transition-all">
+                  Upload Owner Image
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      try {
+                        const res = await jobsAPI.uploadOwnerImage(Number(id), file);
+                        if (res.success) {
+                          toast.success('Owner image uploaded successfully!');
+                          queryClient.invalidateQueries({ queryKey: ['job-detail', id] });
+                        }
+                      } catch (err: any) {
+                        toast.error(err.response?.data?.error?.message || 'Failed to upload owner image');
+                      }
+                    }}
+                  />
+                </label>
+              </div>
+            )}
           </div>
 
           {/* Certificate */}

@@ -740,7 +740,7 @@ export const getPaymentRequests = async (req: Request, res: Response): Promise<v
 export const createPaymentRequest = async (req: Request, res: Response): Promise<void> => {
   try {
     const { amount, request_type, reason, notes } = req.body;
-    const staffId = (req as any).user?.id;
+    const staffId = req.staff?.id;
     
     if (!staffId) {
       res.status(401).json({ success: false, error: { code: ERROR_CODES.AUTH_REQUIRED, message: 'Unauthorized.' } });
@@ -770,10 +770,10 @@ export const approvePaymentRequest = async (req: Request, res: Response): Promis
   try {
     const { id } = req.params;
     const { status, notes } = req.body;
-    const approvedBy = (req as any).user?.id;
-    const userRole = (req as any).user?.role;
+    const approvedBy = req.staff?.id;
+    const userRole = req.staff?.role;
     
-    if (!['hr', 'manager', 'admin'].includes(userRole)) {
+    if (!approvedBy || !['hr', 'manager', 'admin'].includes(userRole || '')) {
       res.status(403).json({ success: false, error: { code: ERROR_CODES.FORBIDDEN, message: 'Only HR, Manager, or Admin can approve payment requests.' } });
       return;
     }

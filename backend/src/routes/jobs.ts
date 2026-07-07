@@ -10,7 +10,7 @@ import { uploadPhoto } from '../middleware/upload';
 import pool from '../utils/db';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { ERROR_CODES } from '../utils/constants';
-import { generateInvoicePDF } from '../services/pdfService';
+import { generateInvoicePDF, generateJobCardPDF } from '../services/pdfService';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -175,6 +175,17 @@ router.get('/:id/invoice-html', async (req: Request, res: Response): Promise<voi
     res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed to generate invoice.' } });
   }
 });
+// ─── Job Card PDF generation ──────────────────────
+router.get('/:id/pdf', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const jobId = Number(req.params.id);
+    const pdfUrl = await generateJobCardPDF(jobId);
+    res.json({ success: true, data: { pdf_url: pdfUrl } });
+  } catch (error: any) {
+    console.error('Job Card PDF generation error:', error);
+    res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: error.message || 'Failed to generate Job Card PDF.' } });
+  }
+});
 
 // Complete job (create invoice/estimate)
 router.post('/:id/complete', completeJob);
@@ -306,6 +317,23 @@ router.post('/:id/certificate', mediaUpload.single('file'), async (req: Request,
   } catch (e) {
     console.error(e);
     res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Certificate upload failed' } });
+  }
+});
+
+// ─── Owner Image Upload ────────────────────────────
+router.post('/:id/owner-image', mediaUpload.single('file'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    if (!req.file) {
+      res.status(400).json({ success: false, error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'No file uploaded' } });
+      return;
+    }
+    const file_path = `/uploads/job-media/${req.file.filename}`;
+    await pool.query('UPDATE job_cards SET owner_image_url = ? WHERE id = ?', [file_path, id]);
+    res.json({ success: true, data: { owner_image_url: file_path, message: 'Owner image uploaded successfully' } });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Owner image upload failed' } });
   }
 });
 

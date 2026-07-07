@@ -71,6 +71,8 @@ export interface JobCard {
   services?: JobService[];
   statusLog?: StatusLogEntry[];
   photos?: { id: number; stage: string; file_url: string; created_at: string }[];
+  owner_image_url?: string | null;
+  pdf_url?: string | null;
   created_at: string;
 }
 
@@ -189,6 +191,20 @@ export const jobsAPI = {
 
   getInvoicePdf: async (id: number): Promise<ApiResponse<{ pdf_url: string }>> => {
     const { data } = await apiClient.get(`/jobs/${id}/invoice-html`, { timeout: 60000 });
+    return data;
+  },
+
+  getJobCardPdf: async (id: number): Promise<ApiResponse<{ pdf_url: string }>> => {
+    const { data } = await apiClient.get(`/jobs/${id}/pdf`, { timeout: 60000 });
+    return data;
+  },
+
+  uploadOwnerImage: async (id: number, file: File): Promise<ApiResponse<{ owner_image_url: string }>> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const { data } = await apiClient.post(`/jobs/${id}/owner-image`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
     return data;
   },
 

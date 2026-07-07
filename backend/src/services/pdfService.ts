@@ -698,3 +698,222 @@ export async function generateQuotationPDF(quotationId: number): Promise<string>
   await pool.query('UPDATE quotations SET pdf_url = ? WHERE id = ?', [pdfUrl, quotationId]);
   return pdfUrl;
 }
+
+// ── GENERATE JOB CARD PDF ───────────────────────────────────
+export async function generateJobCardPDF(jobId: number): Promise<string> {
+  const [jobRows] = await pool.query<RowDataPacket[]>(
+    `SELECT j.*, c.full_name as customer_name, c.phone as customer_phone, c.email as customer_email,
+            c.address as customer_address, c.city as customer_city,
+            CONCAT(v.make, ' ', v.model) as vehicle_name, v.reg_number, v.color as vehicle_color,
+            v.year as vehicle_year, v.chassis_number, v.engine_number,
+            s.full_name as creator_name
+     FROM job_cards j
+     LEFT JOIN customers c ON j.customer_id = c.id
+     LEFT JOIN vehicles v ON j.vehicle_id = v.id
+     LEFT JOIN staff s ON j.created_by = s.id
+     WHERE j.id = ?`, [jobId]);
+
+  if (jobRows.length === 0) throw new Error('Job Card not found');
+  const job = jobRows[0];
+
+  const [services] = await pool.query<RowDataPacket[]>('SELECT * FROM job_services WHERE job_card_id = ?', [jobId]);
+  const [concerns] = await pool.query<RowDataPacket[]>('SELECT * FROM customer_concerns WHERE job_card_id = ?', [jobId]);
+
+  const studioName = process.env.STUDIO_NAME || 'GOC Studio';
+  const studioAddress = process.env.STUDIO_ADDRESS || 'Near Akshar Chowk, Alkapuri, Vadodara, Gujarat 390007';
+  const studioPhone = process.env.STUDIO_PHONE || '+91 9925566886';
+
+  let logoBase64 = '';
+  try {
+    const logoPath = path.resolve(__dirname, '../../../uploads/logo.png');
+    if (fs.existsSync(logoPath)) {
+      logoBase64 = fs.readFileSync(logoPath, 'base64');
+    }
+  } catch (e) {}
+
+  let ownerImgBase64 = '';
+  if (job.owner_image_url) {
+    try {
+      const imgPath = path.resolve(__dirname, '../../../', job.owner_image_url.substring(1));
+      if (fs.existsSync(imgPath)) {
+        ownerImgBase64 = fs.readFileSync(imgPath, 'base64');
+      }
+    } catch (e) {}
+  }
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        \${sharedStyles}
+        body { font-family: 'Inter', -apple-system, sans-serif; color: #1a1a1a; font-size: 11px; }
+        .concern-item { padding: 6px 10px; background: #fff3cd; border: 1px solid #ffeeba; border-radius: 6px; margin-bottom: 6px; }
+        .owner-avatar { width: 100px; height: 100px; border-radius: 8px; border: 1px solid #ddd; object-fit: cover; }
+      </style>
+    </head>
+    <body>
+      <div class="page">
+        <div class="header">
+          <div class="brand">
+            \${logoBase64 ? '<img src="data:image/png;base64,' + logoBase64 + '" style="height: 48px; vertical-align: middle; margin-right: 12px;" />' : '<div class="brand-mark">G</div>'}
+            <div class="brand-text">
+              <h1>\${studioName.toUpperCase()}</h1>
+              <p>\${studioAddress}</p>
+              <p>Phone: \${studioPhone}</p>
+            </div>
+          </div>
+          <div class="doc-type">
+            <h2>JOB CARD</h2>
+            <div class="doc-number">\${job.job_code}</div>
+            <div class="doc-date">Date In: \${job.date_in ? formatDate(job.date_in) : formatDate(job.created_at)}</div>
+            \${job.expected_out ? \`<div class="doc-date" style="color:#CC0000; font-weight:600;">Expected Out: \${formatDate(job.expected_out)}</div>\` : ''}
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; gap:20px; margin-bottom:20px;">
+          <div class="info-box" style="flex:1;">
+            <h3>Customer Details</h3>
+            <div class="info-row"><span class="info-label">Name</span><span class="info-value">\${job.customer_name || '-'}</span></div>
+            <div class="info-row"><span class="info-label">Phone</span><span class="info-value">\${job.customer_phone || '-'}</span></div>
+            <div class="info-row"><span class="info-label">Email</span><span class="info-value">\${job.customer_email || '-'}</span></div>
+            <div class="info-row"><span class="info-label">Address</span><span class="info-value">\${job.customer_address || '-'}, \${job.customer_city || ''}</span></div>
+          </div>
+          
+          <div class="info-box" style="flex:1;">
+            <h3>Vehicle Details</h3>
+            <div class="info-row"><span class="info-label">Vehicle</span><span class="info-value">\${job.vehicle_name || '-'}</span></div>
+            <div class="info-row"><span class="info-label">Reg No.</span><span class="info-value">\${job.reg_number || '-'}</span></div>
+            <div class="info-row"><span class="info-label">Color</span><span class="info-value">\${job.vehicle_color || '-'}</span></div>
+            <div class="info-row"><span class="info-label">Year</span><span class="info-value">\${job.vehicle_year || '-'}</span></div>
+            \${job.chassis_number ? \`<div class="info-row"><span class="info-label">Chassis No</span><span class="info-value">\${job.chassis_number}</span></div>\` : ''}
+          </div>
+
+          \${ownerImgBase64 ? \`
+            <div style="text-align:center;">
+              <h3 style="font-size:9px; font-weight:700; color:#CC0000; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">Owner Image</h3>
+              <img src="data:image/png;base64,\${ownerImgBase64}" class="owner-avatar" />
+            </div>
+          \` : ''}
+        </div>
+
+        \${concerns.length > 0 ? \`
+          <div style="margin-bottom:20px;">
+            <h3 style="font-size:10px; font-weight:700; color:#CC0000; text-transform:uppercase; letter-spacing:1.5px; margin-bottom:8px;">Customer Concerns / Requirements</h3>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+              \${concerns.map(c => \`
+                <div class="concern-item">
+                  <strong>\${c.concern_type.toUpperCase()}:</strong> \${c.description}
+                </div>
+              \`).join('')}
+            </div>
+          </div>
+        \` : ''}
+
+        <h3 style="font-size:10px; font-weight:700; color:#CC0000; text-transform:uppercase; letter-spacing:1.5px; margin-bottom:8px;">Job Card Services</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:5%">#</th>
+              <th style="width:45%">Service Name</th>
+              <th style="width:15%">Type</th>
+              <th style="width:15%">Package</th>
+              <th style="width:20%; text-align:right;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            \${services.length === 0 ? \`
+              <tr><td colspan="5" style="text-align:center; color:#999; font-style:italic;">No services added yet</td></tr>
+            \` : services.map((s, idx) => \`
+              <tr>
+                <td>\${idx + 1}</td>
+                <td><strong>\${s.service_name}</strong>\${s.description ? \`<br/><small style="color:#666">\${s.description}</small>\` : ''}</td>
+                <td style="text-transform:uppercase">\${s.service_type}</td>
+                <td style="text-transform:uppercase">\${s.package_tier}</td>
+                <td style="text-align:right; font-weight:600;">\${formatCurrency(s.line_total)}</td>
+              </tr>
+            \`).join('')}
+          </tbody>
+        </table>
+
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-top:20px;">
+          <div style="flex:1; max-width:60%;">
+            \${job.internal_notes ? \`
+              <div style="margin-bottom:12px;">
+                <strong>Remarks / Notes:</strong>
+                <p style="color:#666; font-size:10px; margin-top:4px;">\${job.internal_notes}</p>
+              </div>
+            \` : ''}
+            <div>
+              <strong>Terms & Conditions:</strong>
+              <ul style="padding-left:14px; font-size:9px; color:#666; margin-top:4px; line-height:1.4;">
+                <li>The vehicle is accepted for detailing/wash at owner's risk.</li>
+                <li>Please remove all valuables before leaving the vehicle. GOC is not responsible for lost items.</li>
+                <li>Estimated delivery times are subject to change based on detailing queue and paint corrections needed.</li>
+              </ul>
+            </div>
+          </div>
+          
+          <div style="text-align:right; min-width:200px;">
+            <div style="background:#f8f8f8; border:1px solid #e5e5e5; border-radius:8px; padding:10px 14px; margin-bottom:20px;">
+              <div class="info-row" style="margin-bottom:6px;">
+                <span class="info-label">Estimated Total</span>
+                <span class="info-value" style="font-size:13px; font-weight:700; color:#CC0000;">\${formatCurrency(job.total_amount)}</span>
+              </div>
+              <div class="info-row" style="margin-bottom:6px;">
+                <span class="info-label">Advance Paid</span>
+                <span class="info-value" style="font-weight:600; color:#2e7d32;">\${formatCurrency(job.amount_paid)}</span>
+              </div>
+              <div class="info-row" style="border-top:1px solid #ddd; padding-top:6px; margin-top:6px;">
+                <span class="info-label">Balance Due</span>
+                <span class="info-value" style="font-weight:700;">\${formatCurrency(job.balance_due)}</span>
+              </div>
+            </div>
+            
+            <div class="stamp-area" style="margin-top:20px;">
+              <div class="stamp-label">Customer Signature</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">
+          <span>This is an official GOC Studio Job Card. Created by: \${job.creator_name || 'Admin'}</span>
+          <span>\thttp://godofceramic.cloud | \${studioPhone}</span>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const fileName = `jobcard_\${job.job_code}.pdf`;
+  const filePath = path.join(PDF_DIR, fileName);
+
+  try {
+    const puppeteer = await import('puppeteer');
+    const launchFn = puppeteer.default?.launch || puppeteer.launch;
+    const browser = await launchFn(getPuppeteerLaunchOptions());
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    await page.pdf({
+      path: filePath,
+      format: 'A4',
+      printBackground: true,
+      margin: { top: '0', right: '0', bottom: '0', left: '0' },
+    });
+    await browser.close();
+  } catch (err) {
+    console.warn('Puppeteer not available, saving HTML fallback:', err);
+    const htmlFileName = fileName.replace('.pdf', '.html');
+    const htmlPath = path.join(PDF_DIR, htmlFileName);
+    fs.writeFileSync(htmlPath, html, 'utf-8');
+    const pdfUrl = `/uploads/pdfs/\${htmlFileName}`;
+    await pool.query('UPDATE job_cards SET pdf_url = ? WHERE id = ?', [pdfUrl, jobId]);
+    return pdfUrl;
+  }
+
+  const pdfUrl = `/uploads/pdfs/\${fileName}`;
+  await pool.query('UPDATE job_cards SET pdf_url = ? WHERE id = ?', [pdfUrl, jobId]);
+  return pdfUrl;
+}
+

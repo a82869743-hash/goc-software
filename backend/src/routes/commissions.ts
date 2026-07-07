@@ -1,13 +1,18 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { rbac } from '../middleware/rbac';
-import { getCommissions, updateCommissionStatus, getCommissionStats } from '../controllers/commissionController';
+import { getCommissions, updateCommissionStatus, getCommissionStats, getConnectors, createConnector, deleteConnector } from '../controllers/commissionController';
 
 const router = Router();
 
 router.use(authMiddleware);
 
-// All staff can view stats and lists, maybe only managers/owners can update
+// Connectors management
+router.get('/connectors', getConnectors);
+router.post('/connectors', rbac('admin', 'manager'), createConnector);
+router.delete('/connectors/:id', rbac('admin', 'manager'), deleteConnector);
+
+// Commissions management
 router.get('/stats', getCommissionStats);
 router.get('/', getCommissions);
 

@@ -97,3 +97,80 @@ export const getCommissionStats = async (req: Request, res: Response): Promise<v
     res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed to fetch stats.' } });
   }
 };
+
+/** GET /commissions/connectors — List all active connectors */
+export const getConnectors = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const [rows] = await pool.query<RowDataPacket[]>(
+      'SELECT * FROM connectors WHERE deleted_at IS NULL ORDER BY full_name ASC'
+    );
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    console.error('Get connectors error:', error);
+    res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed to fetch connectors.' } });
+  }
+};
+
+/** POST /commissions/connectors — Create new connector */
+export const createConnector = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { full_name, phone, email, commission_type, commission_value } = req.body;
+    if (!full_name || !phone) {
+      res.status(400).json({ success: false, error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'Full name and phone are required.' } });
+      return;
+    }
+
+    const [existing] = await pool.query<RowDataPacket[]>(
+      'SELECT id FROM connectors WHERE phone = ? AND deleted_at IS NULL',
+      [phone]
+    );
+
+    if (existing.length > 0) {
+      res.status(409).json({ success: false, error: { code: ERROR_CODES.CONFLICT, message: 'Connector with this phone already exists.' } });
+      return;
+    }
+
+    const [result] = await pool.query<ResultSetHeader>(
+      `INSERT INTO connectors (full_name, phone, email, commission_type, commission_value)
+       VALUES (?, ?, ?, ?, ?)`,
+      [full_name, phone, email || null, commission_type || 'percentage', Number(commission_value) || 0]
+    );
+
+    res.status(201).json({
+      success: true,
+      data: {
+        id: result.insertId,
+        full_name,
+        phone,
+        email: email || null,
+        commission_type: commission_type || 'percentage',
+        commission_value: Number(commission_value) || 0
+      }
+    });
+  } catch (error) {
+    console.error('Create connector error:', error);
+    res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed to create connector.' } });
+  }
+};
+
+/** DELETE /commissions/connectors/:id — Delete/Deactivate connector */
+export const deleteConnector = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const [result] = await pool.query<ResultSetHeader>(
+      'UPDATE connectors SET deleted_at = NOW() WHERE id = ?',
+      [id]
+    );
+
+    if (result.affectedRows === 0) {
+      res.status(404).json({ success: false, error: { code: ERROR_CODES.NOT_FOUND, message: 'Connector not found.' } });
+      return;
+    }
+
+    res.json({ success: true, data: { message: 'Connector deleted successfully.' } });
+  } catch (error) {
+    console.error('Delete connector error:', error);
+    res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed to delete connector.' } });
+  }
+};
+

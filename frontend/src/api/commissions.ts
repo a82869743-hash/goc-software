@@ -27,6 +27,17 @@ export interface CommissionStats {
   pending_count: number;
 }
 
+export interface Connector {
+  id: number;
+  full_name: string;
+  phone: string;
+  email: string | null;
+  commission_type: 'percentage' | 'flat';
+  commission_value: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export const commissionsAPI = {
   list: async (params?: { status?: string; connector_id?: number; page?: number; limit?: number }) => {
     const { data } = await apiClient.get('/commissions', { params });
@@ -41,5 +52,20 @@ export const commissionsAPI = {
   updateStatus: async (id: number, payload: { status: 'pending' | 'approved' | 'paid'; payment_mode?: string; notes?: string }) => {
     const { data } = await apiClient.put(`/commissions/${id}/status`, payload);
     return data as { data: Commission };
+  },
+
+  listConnectors: async () => {
+    const { data } = await apiClient.get('/commissions/connectors');
+    return data as { data: Connector[] };
+  },
+
+  createConnector: async (payload: { full_name: string; phone: string; email?: string; commission_type: 'percentage' | 'flat'; commission_value: number }) => {
+    const { data } = await apiClient.post('/commissions/connectors', payload);
+    return data as { data: Connector };
+  },
+
+  deleteConnector: async (id: number) => {
+    const { data } = await apiClient.delete(`/commissions/connectors/${id}`);
+    return data;
   }
 };

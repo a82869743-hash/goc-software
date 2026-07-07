@@ -510,6 +510,14 @@ export default function CustomersPage() {
                     {customerDetail.city || 'Vadodara'}
                   </span>
                 </div>
+                <div>
+                  <span className="block text-[9px] uppercase tracking-wider text-tertiary/40 font-bold font-label-caps mb-1">
+                    Referral Partner / Connector
+                  </span>
+                  <span className="text-xs text-white font-bold font-body-lg">
+                    {customerDetail.connector_name ? `${customerDetail.connector_name} (${customerDetail.connector_phone})` : 'None (Direct Walk-in)'}
+                  </span>
+                </div>
                 <div className="col-span-2">
                   <span className="block text-[9px] uppercase tracking-wider text-tertiary/40 font-bold font-label-caps mb-1">
                     Full Address

@@ -143,6 +143,8 @@ export interface Customer {
   updated_at: string;
   vehicle_count?: number;
   vehicles?: Vehicle[];
+  connector_name?: string | null;
+  connector_phone?: string | null;
 }
 
 // ── Vehicle ──────────────────────────────────────────────

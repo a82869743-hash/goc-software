@@ -13,12 +13,41 @@ export default function CommissionsPage() {
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<'all'|'pending'|'approved'|'paid'>('all');
 
-  const { data: commissionsRes, isLoading } = useQuery({
+  // Add Connector Modal State
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addForm, setAddForm] = useState({
+    full_name: '',
+    phone: '',
+    email: '',
+    commission_type: 'percentage' as 'percentage' | 'flat',
+    commission_value: 10
+  });
+
+  const { data: commissionsRes, isLoading: isCommissionsLoading } = useQuery({
     queryKey: ['commissions'],
     queryFn: () => commissionsAPI.list(),
   });
 
+  const { data: connectorsRes, isLoading: isConnectorsLoading } = useQuery({
+    queryKey: ['connectors'],
+    queryFn: () => commissionsAPI.listConnectors(),
+  });
+
   const commissions = (commissionsRes?.data || []) as Commission[];
+  const dbConnectors = connectorsRes?.data || [];
+
+  const addConnectorMutation = useMutation({
+    mutationFn: (payload: typeof addForm) => commissionsAPI.createConnector(payload),
+    onSuccess: () => {
+      toast.success('Referral partner registered successfully!');
+      setShowAddModal(false);
+      setAddForm({ full_name: '', phone: '', email: '', commission_type: 'percentage', commission_value: 10 });
+      queryClient.invalidateQueries({ queryKey: ['connectors'] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error?.message || 'Failed to register partner');
+    }
+  });
 
   const markPaidMutation = useMutation({
     mutationFn: (id: number) => commissionsAPI.updateStatus(id, { status: 'paid', payment_mode: 'bank_transfer' }),
@@ -31,17 +60,23 @@ export default function CommissionsPage() {
     },
   });
 
+  const isLoading = isCommissionsLoading || isConnectorsLoading;
   const filtered = commissions.filter(c => filter==='all' || c.status===filter);
   const totalPaid    = commissions.filter(c=>c.status==='paid').reduce((s,c)=>s+Number(c.commission_amount),0);
   const totalPending = commissions.filter(c=>c.status!=='paid').reduce((s,c)=>s+Number(c.commission_amount),0);
 
-  // Group connectors
-  const connectors = [...new Map(commissions.map(c=>[c.connector_name || c.connector_id,{
-    name: c.connector_name || `Connector ${c.connector_id}`, phone: c.connector_phone || '—',
-    jobs: commissions.filter(x=>(x.connector_name || x.connector_id)===(c.connector_name || c.connector_id)).length,
-    total: commissions.filter(x=>(x.connector_name || x.connector_id)===(c.connector_name || c.connector_id)).reduce((s,x)=>s+Number(x.commission_amount),0),
-    paid: commissions.filter(x=>(x.connector_name || x.connector_id)===(c.connector_name || c.connector_id)&&x.status==='paid').reduce((s,x)=>s+Number(x.commission_amount),0),
-  }])).values()];
+  // Merge registered connectors with commission statistics
+  const connectorsList = dbConnectors.map((c: any) => {
+    const connComm = commissions.filter(x => x.connector_id === c.id);
+    return {
+      id: c.id,
+      name: c.full_name,
+      phone: c.phone,
+      jobs: connComm.length,
+      total: connComm.reduce((s, x) => s + Number(x.commission_amount), 0),
+      paid: connComm.filter(x => x.status === 'paid').reduce((s, x) => s + Number(x.commission_amount), 0),
+    };
+  });
 
   return (
     <div className="space-y-8 relative z-10 font-body-lg animate-fade-in">
@@ -63,7 +98,10 @@ export default function CommissionsPage() {
           </p>
         </div>
         <div>
-          <button className="btn btn-primary px-5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:cursor-pointer">
+          <button 
+            onClick={() => setShowAddModal(true)}
+            className="btn btn-primary px-5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:cursor-pointer"
+          >
             <span className="material-symbols-outlined text-[18px]">add</span>Add Referral
           </button>
         </div>
@@ -75,7 +113,7 @@ export default function CommissionsPage() {
           { label:'Total Commissions', value:`₹${((totalPaid+totalPending)/1000).toFixed(1)}K`, icon:'handshake',  color:'text-white', glowColor: 'rgba(255,255,255,0.03)'        },
           { label:'Paid Out',          value:`₹${(totalPaid/1000).toFixed(1)}K`,                icon:'payments',   color:'text-emerald-400', glowColor: 'rgba(52,211,153,0.03)'    },
           { label:'Pending',           value:`₹${(totalPending/1000).toFixed(1)}K`,             icon:'schedule',   color:'text-amber-400', glowColor: 'rgba(251,191,36,0.03)'   },
-          { label:'Connectors',        value:connectors.length,                                  icon:'group',      color:'text-performance-red', glowColor: 'rgba(255,43,43,0.03)'   },
+          { label:'Connectors',        value:connectorsList.length,                              icon:'group',      color:'text-performance-red', glowColor: 'rgba(255,43,43,0.03)'   },
         ].map(({label,value,icon,color,glowColor})=>(
           <div key={label} className="bg-[#0c0c0c]/45 backdrop-blur-2xl border border-white/5 rounded-2xl p-6 relative overflow-hidden group shadow-2xl flex items-center gap-4">
             <div className="absolute top-0 right-0 w-24 h-24 blur-[40px] rounded-full pointer-events-none" style={{ backgroundColor: glowColor }} />
@@ -104,10 +142,10 @@ export default function CommissionsPage() {
           <div className="divide-y divide-white/5 max-h-[480px] overflow-y-auto custom-scrollbar">
             {isLoading ? (
               <div className="py-12 text-center text-tertiary/40 italic font-body-lg text-sm">Loading connectors...</div>
-            ) : connectors.length === 0 ? (
+            ) : connectorsList.length === 0 ? (
               <div className="py-12 text-center text-tertiary/30 italic text-sm">No connectors registered</div>
-            ) : connectors.sort((a,b)=>b.total-a.total).map((c,i)=>(
-              <div key={c.name} className="px-6 py-4 hover:bg-white/[0.01] transition-colors flex items-center gap-4">
+            ) : connectorsList.sort((a,b)=>b.total-a.total).map((c,i)=>(
+              <div key={c.id} className="px-6 py-4 hover:bg-white/[0.01] transition-colors flex items-center gap-4">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold font-data-sm ${
                   i===0 ? 'bg-amber-500/10 text-amber-400 border border-amber-500/25' : 
                   i===1 ? 'bg-slate-300/10 text-slate-300 border border-slate-300/20' : 
@@ -218,6 +256,101 @@ export default function CommissionsPage() {
           </div>
         </div>
       </div>
+
+      {/* ADD CONNECTOR MODAL */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="glass-panel w-full max-w-md p-6 rounded-2xl relative space-y-4 border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="font-display-hero text-lg font-black text-white tracking-tight italic uppercase">
+                  Add Referral Partner
+                </h3>
+                <p className="text-[10px] text-tertiary/50 font-label-caps tracking-widest uppercase">
+                  Register new connector details
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                className="text-tertiary hover:text-white p-1 hover:bg-white/5 rounded-lg transition-all"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="font-label-caps text-[9px] text-tertiary/60 tracking-widest block mb-1">Full Name *</label>
+                <input
+                  type="text"
+                  value={addForm.full_name}
+                  onChange={e => setAddForm(p => ({ ...p, full_name: e.target.value }))}
+                  placeholder="Partner Name"
+                  className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-performance-red/40"
+                />
+              </div>
+
+              <div>
+                <label className="font-label-caps text-[9px] text-tertiary/60 tracking-widest block mb-1">Phone Number *</label>
+                <input
+                  type="text"
+                  value={addForm.phone}
+                  onChange={e => setAddForm(p => ({ ...p, phone: e.target.value.replace(/\D/g, '') }))}
+                  placeholder="10-digit Phone"
+                  className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-performance-red/40"
+                />
+              </div>
+
+              <div>
+                <label className="font-label-caps text-[9px] text-tertiary/60 tracking-widest block mb-1">Email (Optional)</label>
+                <input
+                  type="email"
+                  value={addForm.email}
+                  onChange={e => setAddForm(p => ({ ...p, email: e.target.value }))}
+                  placeholder="partner@example.com"
+                  className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-performance-red/40"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-label-caps text-[9px] text-tertiary/60 tracking-widest block mb-1">Commission Type</label>
+                  <select
+                    value={addForm.commission_type}
+                    onChange={e => setAddForm(p => ({ ...p, commission_type: e.target.value as 'percentage' | 'flat' }))}
+                    className="w-full bg-[#0a0a0a] border border-white/[0.07] rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-performance-red/40"
+                  >
+                    <option value="percentage">Percentage (%)</option>
+                    <option value="flat">Flat Rate (₹)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="font-label-caps text-[9px] text-tertiary/60 tracking-widest block mb-1">
+                    Value {addForm.commission_type === 'percentage' ? '(%)' : '(₹)'}
+                  </label>
+                  <input
+                    type="number"
+                    value={addForm.commission_value}
+                    onChange={e => setAddForm(p => ({ ...p, commission_value: e.target.value === '' ? 0 : Number(e.target.value) }))}
+                    placeholder="10"
+                    className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-performance-red/40"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              disabled={!addForm.full_name || !addForm.phone || addConnectorMutation.isPending}
+              onClick={() => addConnectorMutation.mutate(addForm)}
+              className="w-full py-3 bg-gradient-to-r from-performance-red to-[#93000a] text-white rounded-xl text-xs font-label-caps tracking-widest font-bold border border-white/10 uppercase transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-[0_0_20px_rgba(255,43,43,0.3)]"
+            >
+              {addConnectorMutation.isPending ? 'REGISTERING...' : 'REGISTER CONNECTOR'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

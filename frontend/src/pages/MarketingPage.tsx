@@ -46,10 +46,15 @@ const MarketingPage: React.FC = () => {
   const quickSendMut = useMutation({
     mutationFn: () => marketingAPI.quickSend({ phone: quickPhone, message: quickMsg }),
     onSuccess: () => {
+      const waPhone = quickPhone.replace(/\D/g, '');
+      const cleanPhone = waPhone.startsWith('91') && waPhone.length > 10 ? waPhone : `91${waPhone}`;
+      const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(quickMsg)}`;
+      window.open(url, '_blank');
+
       setShowQuickSend(false);
       setQuickPhone('');
       setQuickMsg('');
-      toast.success('Message queued successfully');
+      toast.success('WhatsApp link opened successfully!');
       queryClient.invalidateQueries({ queryKey: ['whatsapp-logs'] });
       queryClient.invalidateQueries({ queryKey: ['whatsapp-stats'] });
     },

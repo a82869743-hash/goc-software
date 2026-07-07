@@ -317,8 +317,8 @@ export const scanPurchaseBill = async (req: Request, res: Response): Promise<voi
         } else {
           itemCode = `INV-${Math.floor(1000 + Math.random() * 9000)}`;
           const [newIns] = await conn.query<ResultSetHeader>(
-            `INSERT INTO inventory_items (item_code, name, category, current_stock, minimum_stock, purchase_price, unit, notes)
-             VALUES (?, ?, ?, ?, 5, ?, 'pcs', 'Auto-created from scanned purchase bill')`,
+            `INSERT INTO inventory_items (item_code, name, category, current_stock, min_threshold, purchase_price, unit, notes)
+             VALUES (?, ?, ?, ?, 5, ?, 'units', 'Auto-created from scanned purchase bill')`,
             [itemCode, item.name, item.category, item.qty, item.unit_price]
           );
           itemId = newIns.insertId;

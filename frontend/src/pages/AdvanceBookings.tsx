@@ -313,14 +313,32 @@ export default function AdvanceBookings() {
                         </td>
                         <td className="py-3 text-right font-medium">
                           {b.status !== 'converted' && b.status !== 'cancelled' && (
-                            <button
-                              onClick={() => navigate(`/jobs/new?advance_booking_id=${b.id}`)}
-                              className="mr-3 px-2 py-1 bg-green-500/10 border border-green-500/20 text-green-400 rounded text-[9px] font-label-caps tracking-widest uppercase hover:bg-green-500 hover:text-white transition-all inline-flex items-center gap-1 font-bold"
-                              title="Create Job Card"
-                            >
-                              <span className="material-symbols-outlined text-[10px]">precision_manufacturing</span>
-                              Create Job
-                            </button>
+                            <>
+                              <button
+                                onClick={() => {
+                                  const formattedDate = new Date(b.booking_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+                                  const vehicleStr = [b.car_make, b.car_model].filter(Boolean).join(' ') || 'your vehicle';
+                                  const message = `Hello ${b.customer_name}, thank you for choosing God of Ceramic Studio. Your advance slot for ${vehicleStr} is confirmed on ${formattedDate} at ${b.booking_time.substring(0, 5)}. Address: God of Ceramic Studio, Vadodara. We look forward to welcoming you!`;
+                                  const waPhone = b.mobile.replace(/\D/g, '');
+                                  const cleanPhone = waPhone.startsWith('91') && waPhone.length > 10 ? waPhone : `91${waPhone}`;
+                                  const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+                                  window.open(url, '_blank');
+                                }}
+                                className="mr-3 px-2 py-1 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded text-[9px] font-label-caps tracking-widest uppercase hover:bg-cyan-500 hover:text-white transition-all inline-flex items-center gap-1 font-bold"
+                                title="Send WhatsApp Slot Confirmation"
+                              >
+                                <span className="material-symbols-outlined text-[10px]">chat</span>
+                                WhatsApp
+                              </button>
+                              <button
+                                onClick={() => navigate(`/jobs/new?advance_booking_id=${b.id}`)}
+                                className="mr-3 px-2 py-1 bg-green-500/10 border border-green-500/20 text-green-400 rounded text-[9px] font-label-caps tracking-widest uppercase hover:bg-green-500 hover:text-white transition-all inline-flex items-center gap-1 font-bold"
+                                title="Create Job Card"
+                              >
+                                <span className="material-symbols-outlined text-[10px]">precision_manufacturing</span>
+                                Create Job
+                              </button>
+                            </>
                           )}
                           <button
                             onClick={() => {

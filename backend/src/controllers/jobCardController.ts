@@ -349,14 +349,6 @@ export const updateJobStatus = async (req: Request, res: Response): Promise<void
 
     const staffId = (req as any).staff?.id;
 
-    // Certificate required before final delivery
-    if (new_status === 'delivered') {
-      if (!existing[0].certificate_url) {
-        res.status(400).json({ success: false, error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'A certificate must be uploaded before final delivery. Please upload the warranty/ceramic certificate first.' } });
-        return;
-      }
-    }
-
     // Update status with timestamp for car_in and delivered
     const extras: string[] = ['status = ?'];
     const evals: any[] = [new_status];

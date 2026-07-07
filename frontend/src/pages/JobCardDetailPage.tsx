@@ -258,6 +258,19 @@ export default function JobCardDetailPage() {
     onError: () => toast.error('Failed to dispatch.'),
   });
 
+  const openWhatsApp = () => {
+    if (!job) return;
+    const vehicleStr = `${job.vehicle_name || ''}`.trim() || 'your vehicle';
+    const trackingUrl = `https://godofceramic.cloud/track/${job.job_code}`;
+    const statusLabel = STATUS_CONFIG[job.status]?.label || job.status;
+    const message = `Dear ${job.customer_name}, your vehicle ${vehicleStr} (${job.reg_number || ''}) is currently in "${statusLabel}" stage at Pack Wolf Services Pvt. Ltd. You can track its live status, view estimates, and invoices here: ${trackingUrl}`;
+    const customerPhone = job.customer_phone || '';
+    const waPhone = customerPhone.replace(/\D/g, '');
+    const cleanPhone = waPhone.startsWith('91') && waPhone.length > 10 ? waPhone : `91${waPhone}`;
+    const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  };
+
   const deleteMutation = useMutation({
     mutationFn: () => jobsAPI.delete(Number(id)),
     onSuccess: () => { toast.success('Job card deleted.'); navigate('/jobs'); },
@@ -326,7 +339,7 @@ export default function JobCardDetailPage() {
           <Link to={`/jobs/${id}/edit`} className="px-4 py-2 rounded-lg border border-white/10 text-on-surface-variant/60 hover:text-white font-label-caps text-xs tracking-widest transition-all flex items-center gap-2">
             <span className="material-symbols-outlined text-[16px]">edit</span> Edit
           </Link>
-          <button onClick={() => dispatchMutation.mutate()} disabled={dispatchMutation.isPending} className="px-4 py-2 rounded-lg border border-green-500/20 text-green-400 hover:bg-green-500/10 font-label-caps text-xs tracking-widest transition-all flex items-center gap-2">
+          <button onClick={openWhatsApp} className="px-4 py-2 rounded-lg border border-green-500/20 text-green-400 hover:bg-green-500/10 font-label-caps text-xs tracking-widest transition-all flex items-center gap-2">
             <span className="material-symbols-outlined text-[16px]">send</span> WhatsApp
           </button>
           {!['delivered', 'cancelled'].includes(job.status) && staff?.role === 'admin' && (

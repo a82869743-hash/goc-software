@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leadsAPI } from '../api/leads';
 import { staffAPI } from '../api/staff';
+import { commissionsAPI } from '../api/commissions';
 import type { LeadStatus, LeadSource, Lead } from '../types';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -148,6 +149,7 @@ export default function LeadsPage() {
     vehicle_model: '',
     requirement: '',
     source: 'walkin' as LeadSource,
+    connector_id: null as number | null,
     notes: '',
   });
 
@@ -162,6 +164,11 @@ export default function LeadsPage() {
     queryFn: () => staffAPI.list({ status: 'active' }),
   });
 
+  const { data: connectorsRes } = useQuery({
+    queryKey: ['connectors'],
+    queryFn: () => commissionsAPI.listConnectors(),
+  });
+
   const { data: leadDetailRes } = useQuery({
     queryKey: ['leads', selectedLeadId],
     queryFn: () => (selectedLeadId ? leadsAPI.getById(selectedLeadId) : null),
@@ -170,6 +177,7 @@ export default function LeadsPage() {
 
   const leads = (leadsRes?.data || []) as Lead[];
   const staffMembers = staffRes?.data || [];
+  const connectors = connectorsRes?.data || [];
 
   const createMutation = useMutation({
     mutationFn: (payload: typeof form) => leadsAPI.create(payload as any),
@@ -184,6 +192,7 @@ export default function LeadsPage() {
         vehicle_model: '',
         requirement: '',
         source: 'walkin',
+        connector_id: null,
         notes: '',
       });
     },
@@ -888,7 +897,7 @@ export default function LeadsPage() {
                 </label>
                 <select
                   value={form.source}
-                  onChange={(e) => setForm({ ...form, source: e.target.value as LeadSource })}
+                  onChange={(e) => setForm({ ...form, source: e.target.value as LeadSource, connector_id: e.target.value === 'reference' ? form.connector_id : null })}
                   className="w-full bg-white/[0.04] border border-white/[0.07] rounded-xl py-2.5 px-4 text-xs text-white focus:outline-none focus:border-performance-red/50"
                 >
                   <option value="walkin" className="bg-[#121414]">Walk-in</option>
@@ -899,6 +908,26 @@ export default function LeadsPage() {
                   <option value="other" className="bg-[#121414]">Other</option>
                 </select>
               </div>
+
+              {form.source === 'reference' && (
+                <div>
+                  <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-bold mb-1.5">
+                    Referral Partner (Connector) *
+                  </label>
+                  <select
+                    value={form.connector_id || ''}
+                    onChange={(e) => setForm({ ...form, connector_id: e.target.value ? Number(e.target.value) : null })}
+                    className="w-full bg-[#121414] border border-white/[0.07] rounded-xl py-2.5 px-4 text-xs text-white focus:outline-none focus:border-performance-red/50"
+                  >
+                    <option value="" className="bg-[#121414]">Select Partner...</option>
+                    {connectors.map((c: any) => (
+                      <option key={c.id} value={c.id} className="bg-[#121414]">
+                        {c.full_name} ({c.phone})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-bold mb-1.5">
                   Internal Notes

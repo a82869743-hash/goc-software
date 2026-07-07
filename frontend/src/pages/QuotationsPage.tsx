@@ -1106,9 +1106,16 @@ export default function QuotationsPage() {
                     </button>
 
                     <button
-                      onClick={() => sendWhatsAppMutation.mutate(qt.id)}
-                      disabled={sendWhatsAppMutation.isPending}
-                      className="p-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-green-400 hover:text-green-300 transition-colors cursor-pointer"
+                      onClick={() => {
+                        const waPhone = customerPhone.replace(/\D/g, '');
+                        const cleanPhone = waPhone.startsWith('91') && waPhone.length > 10 ? waPhone : `91${waPhone}`;
+                        const pdfUrl = qt.pdf_url ? (qt.pdf_url.startsWith('http') ? qt.pdf_url : `${window.location.origin.replace('5173', '4000')}${qt.pdf_url}`) : '';
+                        const msg = `🙏 Greetings from *God of Ceramic Studio*!\n\nDear *${customerName}*,\n\nPlease find your quotation *${qt.quotation_code}* for ${vehicleDesc}${regNumber ? ` (${regNumber})` : ''}.\n\n💰 *Estimated Total:* ₹${Number(qt.grand_total).toLocaleString('en-IN')}${pdfUrl ? `\n\n📄 *View Quotation PDF:*\n${pdfUrl}` : ''}\n\nKindly review and let us know if you'd like to proceed.\nThank you! 🚗✨`;
+                        const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
+                        window.open(url, '_blank');
+                      }}
+                      disabled={!customerPhone}
+                      className="p-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-green-400 hover:text-green-300 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                       title="Send Quote via WhatsApp"
                     >
                       <span className="material-symbols-outlined text-base">chat</span>

@@ -32,7 +32,7 @@ export interface Connector {
   full_name: string;
   phone: string;
   email: string | null;
-  commission_type: 'percentage' | 'flat';
+  commission_type: 'percentage' | 'fixed';
   commission_value: number;
   created_at: string;
   updated_at: string;
@@ -59,7 +59,7 @@ export const commissionsAPI = {
     return data as { data: Connector[] };
   },
 
-  createConnector: async (payload: { full_name: string; phone: string; email?: string; commission_type: 'percentage' | 'flat'; commission_value: number }) => {
+  createConnector: async (payload: { full_name: string; phone: string; email?: string; commission_type: 'percentage' | 'fixed'; commission_value: number }) => {
     const { data } = await apiClient.post('/commissions/connectors', payload);
     return data as { data: Connector };
   },

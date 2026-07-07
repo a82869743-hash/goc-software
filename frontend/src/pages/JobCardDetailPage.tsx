@@ -279,36 +279,52 @@ export default function JobCardDetailPage() {
     window.open(url, '_blank');
   };
 
-  const shareTrackingLink = () => {
+  const shareJobCardLink = () => {
     if (!job) return;
     const vehicleStr = `${job.vehicle_name || ''}`.trim() || 'your vehicle';
-    const statusLabel = STATUS_CONFIG[job.status]?.label || job.status;
-    const trackingUrl = `${window.location.origin}/track/${job.job_code}`;
-    const msg = `Dear *${job.customer_name}*, your vehicle *${vehicleStr}* (${job.reg_number || ''}) is currently in *${statusLabel}* stage at God of Ceramic Studio. You can track its live status, view detailing photo feed, and access documents here: ${trackingUrl}`;
+    const jobCardUrl = `${window.location.origin}/track/${job.job_code}`;
+    const msg = `🙏 Greetings from *God of Ceramic Studio*!\n\nDear *${job.customer_name}*,\n\nThis is your Job Card for *${vehicleStr}* (${job.reg_number || ''}).\n\n📋 *Job Code:* ${job.job_code}\n🔗 *View Job Card:* ${jobCardUrl}\n\nFor any queries, feel free to contact us.\nThank you for choosing God of Ceramic! 🚗✨`;
     sendWhatsAppMessage(msg);
   };
 
-  const shareEstimateLink = () => {
+  const shareEstimateLink = async () => {
     if (!job) return;
-    if (!invoiceData?.estimate?.pdf_url) {
-      toast.error('Please generate an estimate first by completing the job as Estimate.');
+    const vehicleStr = `${job.vehicle_name || ''}`.trim() || 'your vehicle';
+    let estimateUrl = invoiceData?.estimate?.pdf_url ? getBackendURL(invoiceData.estimate.pdf_url) : '';
+    if (!estimateUrl) {
+      // Try to generate the PDF on the fly
+      try {
+        const pdfRes = await jobsAPI.getInvoicePdf(Number(id));
+        if (pdfRes.data?.pdf_url) {
+          estimateUrl = getBackendURL(pdfRes.data.pdf_url);
+        }
+      } catch {}
+    }
+    if (!estimateUrl) {
+      toast.error('Please generate an estimate first by completing the job.');
       return;
     }
-    const vehicleStr = `${job.vehicle_name || ''}`.trim() || 'your vehicle';
-    const estimateUrl = getBackendURL(invoiceData.estimate.pdf_url);
-    const msg = `Dear *${job.customer_name}*, please find the detailing estimate for your vehicle *${vehicleStr}* (${job.reg_number || ''}) from God of Ceramic Studio. You can view or download the estimate PDF here: ${estimateUrl}`;
+    const msg = `🙏 Greetings from *God of Ceramic Studio*!\n\nDear *${job.customer_name}*,\n\nPlease find the detailing estimate for your vehicle *${vehicleStr}* (${job.reg_number || ''}).\n\n📄 *Download Estimate PDF:*\n${estimateUrl}\n\nKindly review and let us know if you'd like to proceed.\nThank you! 🚗✨`;
     sendWhatsAppMessage(msg);
   };
 
-  const shareInvoiceLink = () => {
+  const shareInvoiceLink = async () => {
     if (!job) return;
-    if (!invoiceData?.invoice?.pdf_url) {
+    const vehicleStr = `${job.vehicle_name || ''}`.trim() || 'your vehicle';
+    let invoiceUrl = invoiceData?.invoice?.pdf_url ? getBackendURL(invoiceData.invoice.pdf_url) : '';
+    if (!invoiceUrl) {
+      try {
+        const pdfRes = await jobsAPI.getInvoicePdf(Number(id));
+        if (pdfRes.data?.pdf_url) {
+          invoiceUrl = getBackendURL(pdfRes.data.pdf_url);
+        }
+      } catch {}
+    }
+    if (!invoiceUrl) {
       toast.error('Please complete the job and generate a tax invoice first.');
       return;
     }
-    const vehicleStr = `${job.vehicle_name || ''}`.trim() || 'your vehicle';
-    const invoiceUrl = getBackendURL(invoiceData.invoice.pdf_url);
-    const msg = `Dear *${job.customer_name}*, thank you for detaling your vehicle *${vehicleStr}* (${job.reg_number || ''}) with us! Please find your Tax Invoice PDF here: ${invoiceUrl}`;
+    const msg = `🙏 Greetings from *God of Ceramic Studio*!\n\nDear *${job.customer_name}*,\n\nThank you for choosing God of Ceramic for your vehicle *${vehicleStr}* (${job.reg_number || ''}).\n\n🧾 *Download Tax Invoice PDF:*\n${invoiceUrl}\n\nWe appreciate your trust in us. See you again! 🚗✨`;
     sendWhatsAppMessage(msg);
   };
 
@@ -1134,15 +1150,15 @@ export default function JobCardDetailPage() {
             <div className="space-y-3 pt-2">
               <button
                 onClick={() => {
-                  shareTrackingLink();
+                  shareJobCardLink();
                   setShowWhatsAppModal(false);
                 }}
                 className="w-full text-left p-4 rounded-xl bg-white/[0.03] border border-white/[0.07] hover:bg-white/[0.06] hover:border-performance-red/30 transition-all flex items-center gap-3 group"
               >
-                <span className="material-symbols-outlined text-[24px] text-cyan-400 group-hover:scale-110 transition-transform">monitoring</span>
+                <span className="material-symbols-outlined text-[24px] text-cyan-400 group-hover:scale-110 transition-transform">description</span>
                 <div className="flex-1">
-                  <p className="text-xs font-bold text-white uppercase tracking-wider">Share Live Tracking Link</p>
-                  <p className="text-[10px] text-tertiary/60 mt-0.5">Sends status, detailing photo feed, and live timeline link.</p>
+                  <p className="text-xs font-bold text-white uppercase tracking-wider">Send Job Card</p>
+                  <p className="text-[10px] text-tertiary/60 mt-0.5">Opens WhatsApp with job card details and view link.</p>
                 </div>
               </button>
 
@@ -1151,16 +1167,12 @@ export default function JobCardDetailPage() {
                   shareEstimateLink();
                   setShowWhatsAppModal(false);
                 }}
-                className="w-full text-left p-4 rounded-xl bg-white/[0.03] border border-white/[0.07] hover:bg-white/[0.06] hover:border-performance-red/30 transition-all flex items-center gap-3 group disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full text-left p-4 rounded-xl bg-white/[0.03] border border-white/[0.07] hover:bg-white/[0.06] hover:border-performance-red/30 transition-all flex items-center gap-3 group"
               >
                 <span className="material-symbols-outlined text-[24px] text-amber-400 group-hover:scale-110 transition-transform">receipt_long</span>
                 <div className="flex-1">
-                  <p className="text-xs font-bold text-white uppercase tracking-wider">Share Detailing Estimate</p>
-                  <p className="text-[10px] text-tertiary/60 mt-0.5">
-                    {invoiceData?.estimate?.pdf_url
-                      ? 'Sends pre-filled message with PDF download link.'
-                      : 'Disabled — generate estimate first by completing job.'}
-                  </p>
+                  <p className="text-xs font-bold text-white uppercase tracking-wider">Send Estimate</p>
+                  <p className="text-[10px] text-tertiary/60 mt-0.5">Opens WhatsApp with estimate PDF download link.</p>
                 </div>
               </button>
 
@@ -1169,16 +1181,12 @@ export default function JobCardDetailPage() {
                   shareInvoiceLink();
                   setShowWhatsAppModal(false);
                 }}
-                className="w-full text-left p-4 rounded-xl bg-white/[0.03] border border-white/[0.07] hover:bg-white/[0.06] hover:border-performance-red/30 transition-all flex items-center gap-3 group disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full text-left p-4 rounded-xl bg-white/[0.03] border border-white/[0.07] hover:bg-white/[0.06] hover:border-performance-red/30 transition-all flex items-center gap-3 group"
               >
                 <span className="material-symbols-outlined text-[24px] text-emerald-400 group-hover:scale-110 transition-transform">payments</span>
                 <div className="flex-1">
-                  <p className="text-xs font-bold text-white uppercase tracking-wider">Share Tax Invoice</p>
-                  <p className="text-[10px] text-tertiary/60 mt-0.5">
-                    {invoiceData?.invoice?.pdf_url
-                      ? 'Sends thank you note with tax invoice PDF link.'
-                      : 'Disabled — complete job to generate tax invoice.'}
-                  </p>
+                  <p className="text-xs font-bold text-white uppercase tracking-wider">Send Invoice</p>
+                  <p className="text-[10px] text-tertiary/60 mt-0.5">Opens WhatsApp with tax invoice PDF download link.</p>
                 </div>
               </button>
             </div>

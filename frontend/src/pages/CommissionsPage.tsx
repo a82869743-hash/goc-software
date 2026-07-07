@@ -19,7 +19,7 @@ export default function CommissionsPage() {
     full_name: '',
     phone: '',
     email: '',
-    commission_type: 'percentage' as 'percentage' | 'flat',
+    commission_type: 'percentage' as 'percentage' | 'fixed',
     commission_value: 10
   });
 
@@ -318,11 +318,11 @@ export default function CommissionsPage() {
                   <label className="font-label-caps text-[9px] text-tertiary/60 tracking-widest block mb-1">Commission Type</label>
                   <select
                     value={addForm.commission_type}
-                    onChange={e => setAddForm(p => ({ ...p, commission_type: e.target.value as 'percentage' | 'flat' }))}
+                    onChange={e => setAddForm(p => ({ ...p, commission_type: e.target.value as 'percentage' | 'fixed' }))}
                     className="w-full bg-[#0a0a0a] border border-white/[0.07] rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-performance-red/40"
                   >
                     <option value="percentage">Percentage (%)</option>
-                    <option value="flat">Flat Rate (₹)</option>
+                    <option value="fixed">Flat Rate (₹)</option>
                   </select>
                 </div>
                 <div>

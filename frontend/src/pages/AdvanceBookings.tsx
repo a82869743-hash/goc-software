@@ -318,7 +318,7 @@ export default function AdvanceBookings() {
                                 onClick={() => {
                                   const formattedDate = new Date(b.booking_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
                                   const vehicleStr = [b.car_make, b.car_model].filter(Boolean).join(' ') || 'your vehicle';
-                                  const message = `Hello ${b.customer_name}, thank you for choosing God of Ceramic Studio. Your advance slot for ${vehicleStr} is confirmed on ${formattedDate} at ${b.booking_time.substring(0, 5)}. Address: God of Ceramic Studio, Vadodara. We look forward to welcoming you!`;
+                                  const message = `🙏 Greetings from *God of Ceramic Studio*!\n\nDear *${b.customer_name}*,\n\nYour advance booking for *${vehicleStr}* is confirmed.\n\n📅 *Date:* ${formattedDate}\n⏰ *Time:* ${b.booking_time.substring(0, 5)}\n📍 *Address:* God of Ceramic Studio, Vadodara\n\nWe look forward to welcoming you! 🚗✨`;
                                   const waPhone = b.mobile.replace(/\D/g, '');
                                   const cleanPhone = waPhone.startsWith('91') && waPhone.length > 10 ? waPhone : `91${waPhone}`;
                                   const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;

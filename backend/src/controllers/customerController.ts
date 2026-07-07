@@ -22,7 +22,10 @@ export const getCustomers = async (req: Request, res: Response): Promise<void> =
 
     const [countR] = await pool.query<RowDataPacket[]>(`SELECT COUNT(*) as total FROM customers c WHERE ${where}`, params);
     const [rows] = await pool.query<RowDataPacket[]>(
-      `SELECT c.*, (SELECT COUNT(*) FROM vehicles v WHERE v.customer_id = c.id) as vehicle_count
+      `SELECT c.*, 
+              (SELECT COUNT(*) FROM vehicles v WHERE v.customer_id = c.id) as vehicle_count,
+              (SELECT GROUP_CONCAT(CONCAT_WS(':', l.lead_code, l.status, COALESCE(l.requirement, '')) SEPARATOR ';') 
+               FROM leads l WHERE (l.customer_id = c.id OR l.phone = c.phone) AND l.deleted_at IS NULL) as lead_tags
        FROM customers c WHERE ${where} ORDER BY c.created_at DESC LIMIT ? OFFSET ?`,
       [...params, Number(limit), offset]
     );
@@ -37,7 +40,11 @@ export const getCustomers = async (req: Request, res: Response): Promise<void> =
 /** GET /customers/:id — Single customer with vehicles */
 export const getCustomerById = async (req: Request, res: Response): Promise<void> => {
   try {
-    const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM customers WHERE id = ? AND deleted_at IS NULL', [req.params.id]);
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT c.*,
+              (SELECT GROUP_CONCAT(CONCAT_WS(':', l.lead_code, l.status, COALESCE(l.requirement, '')) SEPARATOR ';') 
+               FROM leads l WHERE (l.customer_id = c.id OR l.phone = c.phone) AND l.deleted_at IS NULL) as lead_tags
+       FROM customers c WHERE c.id = ? AND c.deleted_at IS NULL`, [req.params.id]);
     if (rows.length === 0) { res.status(404).json({ success: false, error: { code: ERROR_CODES.NOT_FOUND, message: 'Customer not found.' } }); return; }
 
     const [vehicles] = await pool.query<RowDataPacket[]>('SELECT * FROM vehicles WHERE customer_id = ? ORDER BY is_primary DESC, created_at DESC', [req.params.id]);

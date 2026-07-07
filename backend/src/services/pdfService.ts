@@ -134,7 +134,7 @@ export async function generateInvoicePDF(invoiceId: number): Promise<string> {
   const advancePaid = payments.filter((p: any) => p.payment_type === 'advance').reduce((sum: number, p: any) => sum + Number(p.amount), 0);
   const otherPaid = payments.filter((p: any) => p.payment_type !== 'advance').reduce((sum: number, p: any) => sum + Number(p.amount), 0);
 
-  const studioName = process.env.STUDIO_NAME || 'Pack Wolf Pvt Ltd';
+  const studioName = 'Pack Wolf Services Pvt. Ltd.';
   const studioAddress = process.env.STUDIO_ADDRESS || 'G-7, B.I.D.C Estate, Gorwa, Vadodara, Gujarat';
   const studioPhone = process.env.STUDIO_PHONE || '+91 9925566886';
   const studioGstin = process.env.STUDIO_GSTIN || '24AANCP8548A1ZB';
@@ -189,8 +189,8 @@ export async function generateInvoicePDF(invoiceId: number): Promise<string> {
           <div style="display: flex; align-items: center; border-bottom: 1px solid #000; padding: 4px 8px; box-sizing: border-box;">
             <div style="width: 20%;"></div>
             <div style="width: 60%; text-align: center;">
-              <strong style="font-size: 12px; letter-spacing: 1px;">${inv.invoice_type === 'tax_invoice' ? 'TAX INVOICE' : inv.invoice_type === 'proforma' ? 'PROFORMA INVOICE' : 'BILL OF SUPPLY'}</strong>
-              ${inv.invoice_type !== 'tax_invoice' ? '<br/><span style="font-size: 8px; font-style: italic; font-weight: normal;">Composition taxableperson. Not eligible to collect tax on supplies</span>' : ''}
+              <strong style="font-size: 12px; letter-spacing: 1px;">${inv.invoice_type === 'tax_invoice' ? 'TAX INVOICE' : inv.invoice_type === 'proforma' ? 'PROFORMA INVOICE' : inv.invoice_type === 'estimate' ? 'ESTIMATE' : 'BILL OF SUPPLY'}</strong>
+              ${(inv.invoice_type !== 'tax_invoice' && inv.invoice_type !== 'estimate') ? '<br/><span style="font-size: 8px; font-style: italic; font-weight: normal;">Composition taxableperson. Not eligible to collect tax on supplies</span>' : ''}
             </div>
             <div style="width: 20%; text-align: right;">
               ${logoBase64 ? '<img src="data:image/png;base64,' + logoBase64 + '" style="height: 40px; vertical-align: middle;" />' : ''}
@@ -364,6 +364,26 @@ export async function generateInvoicePDF(invoiceId: number): Promise<string> {
                   <td></td>
                   <td></td>
                   <td style="text-align: right;"><strong>${formatCurrency(inv.sgst_amount)}</strong></td>
+                </tr>
+              ` : ''}
+              ${Number(inv.card_charges) > 0 ? `
+                <tr class="discount-row">
+                  <td></td>
+                  <td style="text-align: right;"><strong>Bill Amount (excl. card charges)</strong></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td style="text-align: right;"><strong>${formatCurrency(Number(inv.total_amount) - Number(inv.card_charges))}</strong></td>
+                </tr>
+                <tr class="discount-row">
+                  <td></td>
+                  <td style="text-align: right;"><strong>Card Charges (2.5%)</strong></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td style="text-align: right;"><strong>${formatCurrency(Number(inv.card_charges))}</strong></td>
                 </tr>
               ` : ''}
               <tr class="total-row">

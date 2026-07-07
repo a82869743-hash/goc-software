@@ -22,8 +22,8 @@ export const getJobCards = async (req: Request, res: Response): Promise<void> =>
     if (date_from) { conds.push('combined.created_at >= ?'); params.push(date_from); }
     if (date_to) { conds.push('combined.created_at <= ?'); params.push(`${date_to} 23:59:59`); }
     if (search) {
-      conds.push('(combined.customer_name LIKE ? OR combined.customer_phone LIKE ? OR combined.job_code LIKE ?)');
-      const t = `%${search}%`; params.push(t, t, t);
+      conds.push('(combined.customer_name LIKE ? OR combined.customer_phone LIKE ? OR combined.job_code LIKE ? OR combined.reg_number LIKE ?)');
+      const t = `%${search}%`; params.push(t, t, t, t);
     }
 
     const where = conds.length > 0 ? `WHERE ${conds.join(' AND ')}` : '';
@@ -273,7 +273,7 @@ export const updateJobCard = async (req: Request, res: Response): Promise<void> 
 
     // 1. Update job_cards table fields
     const fields: string[] = []; const vals: any[] = [];
-    const allowed = ['expected_out', 'qc_notes', 'delivery_notes', 'internal_notes', 'km_reading', 'insurance_company', 'insurance_expiry'];
+    const allowed = ['expected_out', 'qc_notes', 'delivery_notes', 'internal_notes', 'km_reading', 'insurance_company', 'insurance_expiry', 'certificate_url'];
     for (const f of allowed) {
       if (d[f] !== undefined) { fields.push(`${f} = ?`); vals.push(d[f]); }
     }
@@ -349,6 +349,14 @@ export const updateJobStatus = async (req: Request, res: Response): Promise<void
 
     const staffId = (req as any).staff?.id;
 
+    // Certificate required before final delivery
+    if (new_status === 'delivered') {
+      if (!existing[0].certificate_url) {
+        res.status(400).json({ success: false, error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'A certificate must be uploaded before final delivery. Please upload the warranty/ceramic certificate first.' } });
+        return;
+      }
+    }
+
     // Update status with timestamp for car_in and delivered
     const extras: string[] = ['status = ?'];
     const evals: any[] = [new_status];
@@ -357,6 +365,9 @@ export const updateJobStatus = async (req: Request, res: Response): Promise<void
 
     evals.push(req.params.id);
     await pool.query(`UPDATE job_cards SET ${extras.join(', ')} WHERE id = ?`, evals);
+
+    // Sync connector commission details
+    await syncJobCardCommission(pool, req.params.id);
 
     // Log the transition
     await pool.query(
@@ -494,55 +505,80 @@ export const updateJobStatus = async (req: Request, res: Response): Promise<void
   }
 };
 
-// Helper to recalculate job card totals and sync with invoices
 const recalculateJobCardTotals = async (jobId: string | number): Promise<void> => {
-  const [jcRows] = await pool.query<RowDataPacket[]>('SELECT gst_applicable, completion_type, amount_paid FROM job_cards WHERE id = ?', [jobId]);
+  const [jcRows] = await pool.query<RowDataPacket[]>('SELECT gst_applicable, completion_type, amount_paid, card_charges FROM job_cards WHERE id = ?', [jobId]);
   if (jcRows.length === 0) return;
   const jc = jcRows[0];
-  const useGST = jc.completion_type !== 'estimate' && jc.gst_applicable;
+  const useGST = jc.gst_applicable;
+  const isInvoice = jc.completion_type === 'invoice';
 
   const [allServices] = await pool.query<RowDataPacket[]>('SELECT * FROM job_services WHERE job_card_id = ?', [jobId]);
   const subtotal = allServices.reduce((s: number, sv: RowDataPacket) => s + Number(sv.line_total), 0);
   
   let gst_amount = 0;
   if (useGST) {
-    for (const sv of allServices) {
-      const itemGST = Number(sv.line_total) * (Number(sv.tax_pct !== undefined ? sv.tax_pct : 18.00) / 100);
-      gst_amount += itemGST;
+    if (isInvoice) {
+      // GST-inclusive: back-calculate tax from line_total
+      for (const sv of allServices) {
+        const taxPct = Number(sv.tax_pct !== undefined ? sv.tax_pct : 18.00);
+        gst_amount += Number(sv.line_total) - (Number(sv.line_total) / (1 + taxPct / 100));
+      }
+    } else {
+      // GST-exclusive: calculate tax on top of line_total
+      for (const sv of allServices) {
+        const taxPct = Number(sv.tax_pct !== undefined ? sv.tax_pct : 18.00);
+        gst_amount += Number(sv.line_total) * (taxPct / 100);
+      }
     }
     gst_amount = Math.round(gst_amount * 100) / 100;
   }
-  const finalTotal = subtotal + gst_amount;
+
+  const cardCharges = Number(jc.card_charges || 0);
+  const finalTotal = (isInvoice ? subtotal : (subtotal + gst_amount)) + cardCharges;
   const balance_due = finalTotal - Number(jc.amount_paid || 0);
 
   await pool.query('UPDATE job_cards SET total_amount = ?, balance_due = ? WHERE id = ?', [finalTotal, balance_due, jobId]);
 
   // Sync with invoices table if exists
-  const [invRows] = await pool.query<RowDataPacket[]>('SELECT id, invoice_type, apply_gst FROM invoices WHERE job_card_id = ? AND deleted_at IS NULL', [jobId]);
+  const [invRows] = await pool.query<RowDataPacket[]>('SELECT id, invoice_type, apply_gst, card_charges FROM invoices WHERE job_card_id = ? AND deleted_at IS NULL', [jobId]);
   if (invRows.length > 0) {
     for (const inv of invRows) {
-      const invUseGST = inv.invoice_type === 'tax_invoice' && inv.apply_gst;
+      const invUseGST = inv.apply_gst;
+      const invIsInvoice = inv.invoice_type === 'tax_invoice';
       let invGst = 0;
       let cgstAmount = 0;
       let sgstAmount = 0;
       if (invUseGST) {
-        for (const sv of allServices) {
-          invGst += Number(sv.line_total) * (Number(sv.tax_pct !== undefined ? sv.tax_pct : 18.00) / 100);
+        if (invIsInvoice) {
+          // GST-inclusive: back-calculate tax from line_total
+          for (const sv of allServices) {
+            const taxPct = Number(sv.tax_pct !== undefined ? sv.tax_pct : 18.00);
+            invGst += Number(sv.line_total) - (Number(sv.line_total) / (1 + taxPct / 100));
+          }
+        } else {
+          // GST-exclusive: calculate tax on top of line_total
+          for (const sv of allServices) {
+            const taxPct = Number(sv.tax_pct !== undefined ? sv.tax_pct : 18.00);
+            invGst += Number(sv.line_total) * (taxPct / 100);
+          }
         }
         invGst = Math.round(invGst * 100) / 100;
         cgstAmount = Math.round((invGst / 2) * 100) / 100;
         sgstAmount = Math.round((invGst / 2) * 100) / 100;
         invGst = cgstAmount + sgstAmount;
       }
-      const invTotal = subtotal + invGst;
-      const cgstRate = invUseGST && subtotal > 0 ? Math.round((cgstAmount / subtotal) * 100 * 100) / 100 : 0;
-      const sgstRate = invUseGST && subtotal > 0 ? Math.round((sgstAmount / subtotal) * 100 * 100) / 100 : 0;
+      
+      const invCardCharges = Number(inv.card_charges || 0);
+      const invTotal = (invIsInvoice ? subtotal : (subtotal + invGst)) + invCardCharges;
+      const invTaxable = invIsInvoice ? (subtotal - invGst) : subtotal;
+      const cgstRate = invUseGST && invTaxable > 0 ? Math.round((cgstAmount / invTaxable) * 100 * 100) / 100 : 0;
+      const sgstRate = invUseGST && invTaxable > 0 ? Math.round((sgstAmount / invTaxable) * 100 * 100) / 100 : 0;
 
       await pool.query(
         `UPDATE invoices SET subtotal = ?, taxable_amount = ?, cgst_rate = ?, cgst_amount = ?,
                 sgst_rate = ?, sgst_amount = ?, total_amount = ?, balance_due = ? - amount_paid
          WHERE id = ?`,
-        [subtotal, subtotal, cgstRate, cgstAmount, sgstRate, sgstAmount, invTotal, invTotal, inv.id]
+        [subtotal, invTaxable, cgstRate, cgstAmount, sgstRate, sgstAmount, invTotal, invTotal, inv.id]
       );
 
       // Update invoice_items too!
@@ -556,6 +592,9 @@ const recalculateJobCardTotals = async (jobId: string | number): Promise<void> =
       }
     }
   }
+
+  // Auto-sync connector commission for the job card
+  await syncJobCardCommission(pool, jobId);
 };
 
 // ─── ADD SERVICE ──────────────────────────────────
@@ -711,33 +750,52 @@ export const completeJob = async (req: Request, res: Response): Promise<void> =>
     );
 
     const subtotal = services.reduce((s: number, sv: RowDataPacket) => s + Number(sv.line_total), 0);
-    const useGST = completion_type === 'invoice' && gst_applicable;
-    
+    const isInvoice = completion_type === 'invoice';
+    const useGST = gst_applicable; // GST applied if checked
+
     let gst_amount = 0;
     let cgstAmount = 0;
     let sgstAmount = 0;
 
     if (useGST) {
-      for (const sv of services) {
-        const itemGST = Number(sv.line_total) * (Number(sv.tax_pct !== undefined ? sv.tax_pct : 18.00) / 100);
-        gst_amount += itemGST;
+      if (isInvoice) {
+        // GST-inclusive: back-calculate tax from line_total
+        for (const sv of services) {
+          const taxPct = Number(sv.tax_pct !== undefined ? sv.tax_pct : 18.00);
+          gst_amount += Number(sv.line_total) - (Number(sv.line_total) / (1 + taxPct / 100));
+        }
+      } else {
+        // GST-exclusive: calculate tax on top of line_total
+        for (const sv of services) {
+          const taxPct = Number(sv.tax_pct !== undefined ? sv.tax_pct : 18.00);
+          gst_amount += Number(sv.line_total) * (taxPct / 100);
+        }
       }
       gst_amount = Math.round(gst_amount * 100) / 100;
       cgstAmount = Math.round((gst_amount / 2) * 100) / 100;
       sgstAmount = Math.round((gst_amount / 2) * 100) / 100;
       gst_amount = cgstAmount + sgstAmount;
     }
-    const total_amount = subtotal + gst_amount;
+    // Total amount is subtotal for inclusive invoice, subtotal + GST for exclusive estimate
+    let total_amount = isInvoice ? subtotal : (subtotal + gst_amount);
+    const taxable_amount = isInvoice ? (subtotal - gst_amount) : subtotal;
+
+    // Apply 2.5% card charges if payment is made by card
+    let card_charges = 0;
+    if (payment_mode === 'card') {
+      card_charges = Math.round((total_amount * 0.025) * 100) / 100;
+      total_amount += card_charges;
+    }
 
     // Generate doc number
     const today = new Date();
     const yy = String(today.getFullYear()).slice(-2);
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const dd = String(today.getDate()).padStart(2, '0');
-    const prefix = completion_type === 'invoice' ? 'GOC-INV' : 'GOC-EST';
+    const prefix = isInvoice ? 'GOC-INV' : 'GOC-EST';
     const [lastDoc] = await conn.query<RowDataPacket[]>(
       `SELECT invoice_code FROM invoices WHERE invoice_type = ? ORDER BY id DESC LIMIT 1`,
-      [completion_type === 'invoice' ? 'tax_invoice' : 'estimate']
+      [isInvoice ? 'tax_invoice' : 'estimate']
     );
     let seq = 1;
     if (lastDoc.length > 0 && lastDoc[0].invoice_code) {
@@ -745,7 +803,7 @@ export const completeJob = async (req: Request, res: Response): Promise<void> =>
       seq = (parseInt(parts[parts.length - 1]) || 0) + 1;
     }
     const docNumber = `${prefix}-${yy}${mm}${dd}-${String(seq).padStart(3, '0')}`;
-    const invType = completion_type === 'invoice' ? 'tax_invoice' : 'estimate';
+    const invType = isInvoice ? 'tax_invoice' : 'estimate';
 
     const [existing] = await conn.query<RowDataPacket[]>(
       'SELECT id FROM invoices WHERE job_card_id = ? AND invoice_type = ? AND deleted_at IS NULL', [jobId, invType]
@@ -754,20 +812,20 @@ export const completeJob = async (req: Request, res: Response): Promise<void> =>
     let invoiceId: number;
 
     if (existing.length === 0) {
-      const cgstRate = useGST && subtotal > 0 ? Math.round((cgstAmount / subtotal) * 100 * 100) / 100 : 0;
-      const sgstRate = useGST && subtotal > 0 ? Math.round((sgstAmount / subtotal) * 100 * 100) / 100 : 0;
+      const cgstRate = useGST && taxable_amount > 0 ? Math.round((cgstAmount / taxable_amount) * 100 * 100) / 100 : 0;
+      const sgstRate = useGST && taxable_amount > 0 ? Math.round((sgstAmount / taxable_amount) * 100 * 100) / 100 : 0;
 
       const [result] = await conn.query<ResultSetHeader>(
         `INSERT INTO invoices (invoice_code, job_card_id, customer_id, invoice_type, invoice_date, due_date,
           subtotal, discount_amount, taxable_amount, cgst_rate, cgst_amount, sgst_rate, sgst_amount, igst_rate, igst_amount, apply_gst,
-          total_amount, amount_paid, balance_due, customer_gstin, status, notes, created_by)
-         VALUES (?, ?, ?, ?, CURDATE(), NULL, ?, 0, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, NULL, ?, ?, ?)`,
+          total_amount, amount_paid, balance_due, card_charges, customer_gstin, status, notes, created_by)
+         VALUES (?, ?, ?, ?, CURDATE(), NULL, ?, 0, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`,
         [
           docNumber, jobId, jc.customer_id, invType,
-          subtotal, subtotal,
+          subtotal, taxable_amount,
           cgstRate, cgstAmount, sgstRate, sgstAmount,
           useGST ? 1 : 0, total_amount, Number(jc.amount_paid || 0), total_amount - Number(jc.amount_paid || 0),
-          completion_type === 'invoice' ? 'paid' : 'draft', notes || null, staffId
+          card_charges, isInvoice ? 'paid' : 'draft', notes || null, staffId
         ]
       );
 
@@ -785,7 +843,7 @@ export const completeJob = async (req: Request, res: Response): Promise<void> =>
       invoiceId = existing[0].id;
     }
 
-    if (completion_type === 'invoice') {
+    if (isInvoice) {
       const remaining = total_amount - Number(jc.amount_paid || 0);
       if (remaining > 0) {
         await conn.query(
@@ -801,20 +859,23 @@ export const completeJob = async (req: Request, res: Response): Promise<void> =>
       );
 
       await conn.query(
-        `UPDATE job_cards SET completion_type = ?, gst_applicable = ?, total_amount = ?, amount_paid = total_amount, balance_due = 0 WHERE id = ?`,
-        [completion_type, useGST ? 1 : 0, total_amount, jobId]
+        `UPDATE job_cards SET completion_type = ?, gst_applicable = ?, total_amount = ?, amount_paid = total_amount, balance_due = 0, card_charges = ? WHERE id = ?`,
+        [completion_type, useGST ? 1 : 0, total_amount, card_charges, jobId]
       );
     } else {
       const balance_due = total_amount - Number(jc.amount_paid || 0);
       await conn.query(
-        `UPDATE job_cards SET completion_type = ?, gst_applicable = ?, total_amount = ?, balance_due = ? WHERE id = ?`,
-        [completion_type, useGST ? 1 : 0, total_amount, balance_due, jobId]
+        `UPDATE job_cards SET completion_type = ?, gst_applicable = ?, total_amount = ?, balance_due = ?, card_charges = ? WHERE id = ?`,
+        [completion_type, useGST ? 1 : 0, total_amount, balance_due, card_charges, jobId]
       );
     }
 
     if (completion_type === 'invoice') {
       await deductInventoryForJobCard(conn, jobId, false, staffId);
     }
+
+    // Auto-sync connector commission for the job card (under transaction context)
+    await syncJobCardCommission(conn, jobId);
 
     await conn.commit();
 
@@ -1050,4 +1111,86 @@ export const deductInventoryForJobCard = async (conn: any, jobId: number | strin
     console.error('❌ deductInventoryForJobCard error:', err);
   }
 };
+
+/**
+ * Automatically syncs connector commission details for a Job Card based on Customer's referral link.
+ */
+export const syncJobCardCommission = async (conn: any, jobId: string | number): Promise<void> => {
+  try {
+    // 1. Fetch Job Card and Customer's connector link
+    const [jcRows] = await conn.query(
+      `SELECT j.id, j.total_amount, j.customer_id, j.status, c.connector_id
+       FROM job_cards j
+       JOIN customers c ON j.customer_id = c.id
+       WHERE j.id = ? AND j.deleted_at IS NULL`,
+      [jobId]
+    );
+
+    if (jcRows.length === 0) return;
+    const jc = jcRows[0];
+
+    // 2. If customer has a connector
+    if (jc.connector_id) {
+      const [connectorRows] = await conn.query(
+        'SELECT commission_type, commission_value FROM connectors WHERE id = ? AND deleted_at IS NULL',
+        [jc.connector_id]
+      );
+
+      if (connectorRows.length === 0) return;
+      const connDetails = connectorRows[0];
+
+      let commPct: number | null = null;
+      let commAmount = 0;
+      const jobAmount = Number(jc.total_amount || 0);
+
+      if (connDetails.commission_type === 'percentage') {
+        commPct = Number(connDetails.commission_value || 0);
+        commAmount = Math.round((commPct / 100) * jobAmount * 100) / 100;
+      } else {
+        commAmount = Number(connDetails.commission_value || 0);
+      }
+
+      // Check if commission record already exists
+      const [existing] = await conn.query(
+        'SELECT id, status FROM connector_commissions WHERE job_card_id = ?',
+        [jobId]
+      );
+
+      let commStatus: 'pending' | 'approved' | 'paid' = 'pending';
+      if (jc.status === 'delivered') {
+        commStatus = 'approved';
+      }
+
+      if (existing.length > 0) {
+        const comm = existing[0];
+        // Only update if it hasn't been marked as paid
+        if (comm.status !== 'paid') {
+          const nextStatus = jc.status === 'delivered' ? 'approved' : comm.status;
+          await conn.query(
+            `UPDATE connector_commissions 
+             SET connector_id = ?, customer_id = ?, job_amount = ?, commission_pct = ?, commission_amount = ?, status = ? 
+             WHERE id = ?`,
+            [jc.connector_id, jc.customer_id, jobAmount, commPct, commAmount, nextStatus, comm.id]
+          );
+        }
+      } else {
+        // Create new pending/approved commission record
+        await conn.query(
+          `INSERT INTO connector_commissions (connector_id, job_card_id, customer_id, job_amount, commission_pct, commission_amount, status)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [jc.connector_id, jobId, jc.customer_id, jobAmount, commPct, commAmount, commStatus]
+        );
+      }
+    } else {
+      // Customer doesn't have a connector. Remove any unpaid commissions for this job card.
+      await conn.query(
+        'DELETE FROM connector_commissions WHERE job_card_id = ? AND status != "paid"',
+        [jobId]
+      );
+    }
+  } catch (err) {
+    console.error('❌ syncJobCardCommission error:', err);
+  }
+};
+
 

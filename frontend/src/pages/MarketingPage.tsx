@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { marketingAPI, WhatsAppLog, WhatsAppStats, Campaign } from '../api/marketing';
+import { marketingAPI, WhatsAppLog, WhatsAppStats, Campaign, PromotionalMaterial } from '../api/marketing';
+import { getBackendURL } from '../utils/helpers';
 import toast from 'react-hot-toast';
 
-type Tab = 'overview' | 'logs' | 'campaigns';
+type Tab = 'overview' | 'logs' | 'campaigns' | 'materials';
 
 const MarketingPage: React.FC = () => {
   const queryClient = useQueryClient();
@@ -15,6 +16,12 @@ const MarketingPage: React.FC = () => {
   const [showCampaignModal, setShowCampaignModal] = useState(false);
   const [campaignForm, setCampaignForm] = useState({ name: '', template_name: '', segment_type: 'all', notes: '' });
 
+  // Promotional materials state
+  const [showUploadMaterialModal, setShowUploadMaterialModal] = useState(false);
+  const [materialTitle, setMaterialTitle] = useState('');
+  const [materialDescription, setMaterialDescription] = useState('');
+  const [materialFile, setMaterialFile] = useState<File | null>(null);
+
   // Queries
   const { data: statsData } = useQuery({ queryKey: ['whatsapp-stats'], queryFn: () => marketingAPI.getStats() });
   const { data: logsData, isLoading: logsLoading } = useQuery({
@@ -25,10 +32,15 @@ const MarketingPage: React.FC = () => {
     queryKey: ['campaigns'],
     queryFn: () => marketingAPI.getCampaigns(),
   });
+  const { data: materialsData, refetch: refetchMaterials } = useQuery({
+    queryKey: ['promotional-materials'],
+    queryFn: () => marketingAPI.getMaterials(),
+  });
 
   const stats: WhatsAppStats = statsData?.data || { sent: 0, delivered: 0, read: 0, failed: 0, queued: 0, today: 0, this_week: 0, total: 0 };
   const logs: WhatsAppLog[] = logsData?.data || [];
   const campaigns: Campaign[] = campaignsData?.data || [];
+  const materials: PromotionalMaterial[] = materialsData?.data || [];
 
   // Mutations
   const quickSendMut = useMutation({
@@ -80,6 +92,45 @@ const MarketingPage: React.FC = () => {
       toast.error(err.response?.data?.error?.message || 'Failed to delete campaign');
     }
   });
+
+  const uploadMaterialMut = useMutation({
+    mutationFn: (formData: FormData) => marketingAPI.uploadMaterial(formData),
+    onSuccess: () => {
+      setShowUploadMaterialModal(false);
+      setMaterialTitle('');
+      setMaterialDescription('');
+      setMaterialFile(null);
+      toast.success('Material uploaded successfully');
+      refetchMaterials();
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error?.message || 'Failed to upload material');
+    }
+  });
+
+  const deleteMaterialMut = useMutation({
+    mutationFn: (id: number) => marketingAPI.deleteMaterial(id),
+    onSuccess: () => {
+      toast.success('Material deleted successfully');
+      refetchMaterials();
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error?.message || 'Failed to delete material');
+    }
+  });
+
+  const handleUploadMaterialSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!materialTitle || !materialFile) {
+      toast.error('Title and file are required');
+      return;
+    }
+    const formData = new FormData();
+    formData.append('title', materialTitle);
+    formData.append('description', materialDescription);
+    formData.append('file', materialFile);
+    uploadMaterialMut.mutate(formData);
+  };
 
   const getStatusBadge = (s: string) => {
     switch (s) {
@@ -137,12 +188,20 @@ const MarketingPage: React.FC = () => {
           </p>
         </div>
         <div className="flex flex-wrap sm:flex-nowrap gap-3 w-full md:w-auto">
-          <button className="btn-secondary px-5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:cursor-pointer flex-1 sm:flex-none justify-center" onClick={() => setShowQuickSend(true)}>
-            <span className="material-symbols-outlined text-[18px]">send</span>Quick Send
-          </button>
-          <button className="btn-primary px-5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:cursor-pointer flex-1 sm:flex-none justify-center" onClick={() => setShowCampaignModal(true)}>
-            <span className="material-symbols-outlined text-[18px]">campaign</span>New Campaign
-          </button>
+          {activeTab === 'materials' ? (
+            <button className="px-5 py-3 rounded-xl bg-gradient-to-r from-performance-red to-[#93000a] text-white hover:shadow-[0_0_20px_rgba(255,43,43,0.3)] border border-white/10 text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:cursor-pointer flex-1 sm:flex-none justify-center" onClick={() => setShowUploadMaterialModal(true)}>
+              <span className="material-symbols-outlined text-[18px]">cloud_upload</span>Upload Material
+            </button>
+          ) : (
+            <>
+              <button className="btn-secondary px-5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:cursor-pointer flex-1 sm:flex-none justify-center" onClick={() => setShowQuickSend(true)}>
+                <span className="material-symbols-outlined text-[18px]">send</span>Quick Send
+              </button>
+              <button className="btn-primary px-5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:cursor-pointer flex-1 sm:flex-none justify-center" onClick={() => setShowCampaignModal(true)}>
+                <span className="material-symbols-outlined text-[18px]">campaign</span>New Campaign
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -152,13 +211,14 @@ const MarketingPage: React.FC = () => {
           {([
             { id: 'overview', icon: 'monitoring', label: 'Overview' },
             { id: 'logs', icon: 'sms', label: 'Message Logs' },
-            { id: 'campaigns', icon: 'campaign', label: 'Campaigns' }
+            { id: 'campaigns', icon: 'campaign', label: 'Campaigns' },
+            { id: 'materials', icon: 'folder_open', label: 'Promotional Materials' }
           ] as const).map((tab) => (
             <button
               key={tab.id}
               className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-all hover:cursor-pointer shrink-0 ${
                 activeTab === tab.id 
-                  ? 'bg-performance-red/10 text-performance-red border border-performance-red/20 shadow-[0_0_15px_rgba(255,43,43,0.15)]' 
+                  ? 'bg-performance-red/10 text-performance-red border border-performance-red/20 shadow-[0_0_15px_rgba(255,43,43,0.15)] font-bold' 
                   : 'text-tertiary/60 hover:text-white'
               }`}
               onClick={() => setActiveTab(tab.id)}
@@ -509,6 +569,189 @@ const MarketingPage: React.FC = () => {
                 {createCampaignMut.isPending ? 'Registering...' : 'Build Campaign'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* ── PROMOTIONAL MATERIALS TAB ── */}
+      {activeTab === 'materials' && (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center flex-wrap gap-4">
+            <div>
+              <h3 className="font-label-caps text-xs text-white uppercase tracking-wider font-extrabold flex items-center gap-2">
+                <span className="w-1.5 h-4 bg-performance-red rounded-full" />
+                Asset Inventory ({materials.length} files)
+              </h3>
+              <p className="text-[10px] text-tertiary/50 uppercase tracking-widest font-mono mt-1">
+                Posters, banners, video clips, and print templates
+              </p>
+            </div>
+          </div>
+
+          {materials.length === 0 ? (
+            <div className="py-24 text-center border border-dashed border-white/10 rounded-2xl bg-[#0c0c0c]/20 backdrop-blur-sm flex flex-col items-center justify-center gap-3">
+              <span className="material-symbols-outlined text-4xl text-tertiary/30">folder_open</span>
+              <p className="text-xs font-bold text-tertiary/50 italic">No promotional materials uploaded yet.</p>
+              <button
+                onClick={() => setShowUploadMaterialModal(true)}
+                className="mt-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 text-white text-[10px] font-label-caps font-bold transition-all uppercase"
+              >
+                Upload first asset
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {materials.map((m) => {
+                const sizeMB = m.file_size ? (m.file_size / (1024 * 1024)).toFixed(2) : '0.00';
+                return (
+                  <div key={m.id} className="glass-panel rounded-2xl overflow-hidden border border-white/5 bg-[#0c0c0c]/40 backdrop-blur-2xl flex flex-col justify-between group shadow-lg">
+                    {/* Media Preview Box */}
+                    <div className="aspect-video bg-black flex items-center justify-center overflow-hidden border-b border-white/5 relative">
+                      {m.file_type === 'image' ? (
+                        <img
+                          src={getBackendURL(m.file_url)}
+                          alt={m.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                      ) : m.file_type === 'video' ? (
+                        <video
+                          src={getBackendURL(m.file_url)}
+                          controls
+                          className="w-full h-full object-contain"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center text-tertiary/40">
+                          <span className="material-symbols-outlined text-[48px] mb-1">
+                            {m.file_type === 'document' ? 'description' : 'draft'}
+                          </span>
+                          <span className="text-[10px] font-mono uppercase tracking-widest">{m.file_type}</span>
+                        </div>
+                      )}
+                      
+                      {/* Delete Overlay */}
+                      <button
+                        onClick={() => {
+                          if (confirm('Are you sure you want to delete this material?')) {
+                            deleteMaterialMut.mutate(m.id);
+                          }
+                        }}
+                        disabled={deleteMaterialMut.isPending}
+                        className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-black/60 hover:bg-performance-red/80 border border-white/10 text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 shadow-md cursor-pointer"
+                        title="Delete asset"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">delete</span>
+                      </button>
+                    </div>
+
+                    {/* Meta info */}
+                    <div className="p-4 space-y-2">
+                      <div className="flex justify-between items-start gap-2">
+                        <h4 className="font-extrabold text-sm text-white truncate uppercase tracking-wide">
+                          {m.title}
+                        </h4>
+                        <span className="text-[9px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-tertiary/60 font-mono font-bold">
+                          {sizeMB} MB
+                        </span>
+                      </div>
+                      
+                      <p className="text-xs text-tertiary/60 font-normal line-clamp-2">
+                        {m.description || 'No description provided.'}
+                      </p>
+
+                      <div className="flex justify-between items-center text-[9px] text-tertiary/40 pt-2 border-t border-white/5 font-mono">
+                        <span>Type: {m.file_type.toUpperCase()}</span>
+                        <span>{new Date(m.created_at).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* UPLOAD PROMOTIONAL MATERIAL MODAL */}
+      {showUploadMaterialModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-[#0e0e0e] border border-white/10 rounded-3xl w-full max-w-md p-6 relative overflow-hidden shadow-2xl space-y-4">
+            <div className="absolute top-0 left-0 w-full h-[3px] bg-performance-red"></div>
+
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="font-display-hero text-lg font-black text-white tracking-tight italic uppercase font-extrabold">
+                  UPLOAD PROMOTIONAL MATERIAL
+                </h3>
+                <p className="text-[10px] text-tertiary/50 font-label-caps tracking-widest uppercase font-bold">
+                  Image, Video, or Document Asset
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowUploadMaterialModal(false)}
+                className="text-tertiary hover:text-white p-1 hover:bg-white/5 rounded-lg transition-all"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleUploadMaterialSubmit} className="space-y-4">
+              <div>
+                <label className="block text-[10px] text-tertiary font-label-caps mb-1.5 uppercase tracking-wider font-bold">
+                  Asset Title *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Ceramic coating promo banner"
+                  value={materialTitle}
+                  onChange={e => setMaterialTitle(e.target.value)}
+                  className="w-full bg-black border border-white/10 focus:border-performance-red/50 focus:outline-none rounded-xl p-3 text-xs text-white font-bold font-body-lg"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-tertiary font-label-caps mb-1.5 uppercase tracking-wider font-bold">
+                  Asset Description
+                </label>
+                <textarea
+                  placeholder="Describe this promotional material..."
+                  rows={2}
+                  value={materialDescription}
+                  onChange={e => setMaterialDescription(e.target.value)}
+                  className="w-full bg-black border border-white/10 focus:border-performance-red/50 focus:outline-none rounded-xl px-3 py-2.5 text-xs text-white font-body-lg resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-tertiary font-label-caps mb-1.5 uppercase tracking-wider font-bold">
+                  Select File *
+                </label>
+                <input
+                  type="file"
+                  required
+                  accept="image/*,video/*,.pdf"
+                  onChange={e => setMaterialFile(e.target.files?.[0] || null)}
+                  className="w-full bg-black border border-white/10 focus:border-performance-red/50 focus:outline-none rounded-xl p-3 text-xs text-white font-mono"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowUploadMaterialModal(false)}
+                  className="flex-1 bg-white/5 border border-white/10 py-2.5 rounded-xl text-xs font-label-caps text-tertiary hover:text-white transition-all font-bold font-extrabold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={uploadMaterialMut.isPending}
+                  className="flex-1 bg-gradient-to-r from-performance-red to-[#93000a] py-2.5 rounded-xl text-xs font-label-caps text-white hover:shadow-[0_0_20px_rgba(255,43,43,0.3)] transition-all font-bold uppercase tracking-wider"
+                >
+                  {uploadMaterialMut.isPending ? 'Uploading...' : 'Confirm Upload'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

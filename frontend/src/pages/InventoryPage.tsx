@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { inventoryAPI, InventoryItem, InventoryUsage } from '../api/inventory';
 import toast from 'react-hot-toast';
+import apiClient from '../api/client';
 
 // Premium Stock Level Indicator
 function StockBar({ qty, min }: { qty: number; min: number }) {
@@ -30,6 +31,41 @@ export default function InventoryPage() {
 
   // Search states
   const [search, setSearch] = useState('');
+
+  // Scanning States
+  const [showScanModal, setShowScanModal] = useState(false);
+  const [extractedItems, setExtractedItems] = useState<any[] | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+
+  const handleScanBill = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsScanning(true);
+      setExtractedItems(null);
+      
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await apiClient.post('/inventory/scan-bill', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (res.data && res.data.success) {
+        toast.success('Purchase bill scanned successfully!');
+        setExtractedItems(res.data.data.extracted_items);
+        setShowScanModal(true);
+        queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.response?.data?.error?.message || 'Scanning failed');
+    } finally {
+      setIsScanning(false);
+      e.target.value = '';
+    }
+  };
 
   // Modals
   const [showAddModal, setShowAddModal] = useState(false);
@@ -210,14 +246,30 @@ export default function InventoryPage() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setShowAddModal(true)}
-          className="px-6 py-3 rounded-xl bg-gradient-to-r from-performance-red to-[#93000a] text-white hover:shadow-[0_0_25px_rgba(255,43,43,0.4)] transition-all font-label-caps text-label-caps tracking-wider flex items-center gap-2 active:scale-95 duration-300 border border-white/10 uppercase"
-        >
-          <span className="material-symbols-outlined text-[18px]">add_circle</span>
-          <span>Add PPF Brand</span>
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <label className="px-6 py-3 rounded-xl border border-white/10 bg-white/5 text-white hover:bg-white/10 hover:shadow-[0_0_20px_rgba(255,255,255,0.05)] transition-all font-label-caps text-label-caps tracking-wider flex items-center gap-2 active:scale-95 duration-300 uppercase cursor-pointer select-none">
+            <span className={`material-symbols-outlined text-[18px] ${isScanning ? 'animate-spin text-performance-red' : ''}`}>
+              {isScanning ? 'sync' : 'document_scanner'}
+            </span>
+            <span>{isScanning ? 'SCANNING BILL...' : 'SCAN PURCHASE BILL'}</span>
+            <input
+              type="file"
+              accept="image/*,.pdf"
+              disabled={isScanning}
+              onChange={handleScanBill}
+              className="hidden"
+            />
+          </label>
+
+          <button
+            type="button"
+            onClick={() => setShowAddModal(true)}
+            className="px-6 py-3 rounded-xl bg-gradient-to-r from-performance-red to-[#93000a] text-white hover:shadow-[0_0_25px_rgba(255,43,43,0.4)] transition-all font-label-caps text-label-caps tracking-wider flex items-center gap-2 active:scale-95 duration-300 border border-white/10 uppercase"
+          >
+            <span className="material-symbols-outlined text-[18px]">add_circle</span>
+            <span>Add PPF Brand</span>
+          </button>
+        </div>
       </div>
 
       {/* OVERVIEW telemetry widgets */}
@@ -683,6 +735,83 @@ export default function InventoryPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* SCAN BILL RESULT MODAL */}
+      {showScanModal && extractedItems && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-[#0e0e0e] border border-white/10 rounded-3xl w-full max-w-lg p-6 relative overflow-hidden shadow-2xl space-y-4">
+            <div className="absolute top-0 left-0 w-full h-[3px] bg-performance-red"></div>
+            
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="font-display-hero text-lg font-black text-white tracking-tight italic uppercase">
+                  BILL SCANNER EXTRACTOR
+                </h3>
+                <p className="text-[10px] text-tertiary/50 font-label-caps tracking-widest uppercase">
+                  AUTO-IMPORTED PURCHASE TELEMETRY
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowScanModal(false);
+                  setExtractedItems(null);
+                }}
+                className="text-tertiary hover:text-white p-1 hover:bg-white/5 rounded-lg transition-all"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-xs text-on-surface-variant/80">
+                The scanner successfully extracted the following items and updated the active inventory:
+              </p>
+
+              <div className="space-y-2.5 max-h-60 overflow-y-auto custom-scrollbar pr-1">
+                {extractedItems.map((item, idx) => (
+                  <div key={idx} className="p-3 bg-white/[0.02] border border-white/5 rounded-xl space-y-1 text-xs">
+                    <div className="flex justify-between items-start">
+                      <span className="font-bold text-white uppercase">{item.name}</span>
+                      <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20 font-label-caps">
+                        {item.status}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 font-mono text-[10px] text-tertiary/60 pt-1">
+                      <div>
+                        <span className="block text-[8px] font-label-caps uppercase text-tertiary/40">ITEM CODE</span>
+                        <span>{item.item_code}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[8px] font-label-caps uppercase text-tertiary/40">QTY ADDED</span>
+                        <span>{item.qty_added} pcs</span>
+                      </div>
+                      <div>
+                        <span className="block text-[8px] font-label-caps uppercase text-tertiary/40">PRICE</span>
+                        <span>₹{Number(item.purchase_price).toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
+                    <div className="text-[9px] text-tertiary/40 font-mono mt-1">
+                      Supplier: {item.supplier}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowScanModal(false);
+                setExtractedItems(null);
+              }}
+              className="w-full py-2.5 bg-gradient-to-r from-performance-red to-[#93000a] text-white rounded-xl text-xs font-label-caps tracking-widest font-bold border border-white/10 uppercase transition-all"
+            >
+              DONE
+            </button>
           </div>
         </div>
       )}

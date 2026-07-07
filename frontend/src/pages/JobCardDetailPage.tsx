@@ -5,6 +5,8 @@ import { jobsAPI, JobCard, JobService } from '../api/jobs';
 import { inventoryAPI, InventoryItem } from '../api/inventory';
 import toast from 'react-hot-toast';
 import { getBackendURL } from '../utils/helpers';
+import { useAuthStore } from '../stores/authStore';
+import JobCardMediaSection from '../components/ui/JobCardMediaSection';
 
 
 const STATUS_PIPELINE = ['in_progress', 'ready', 'estimate', 'delivered'] as const;
@@ -41,6 +43,7 @@ export default function JobCardDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const staff = useAuthStore((s) => s.staff);
   const [statusNotes, setStatusNotes] = useState('');
   const [showAddService, setShowAddService] = useState(false);
   const [newSvc, setNewSvc] = useState<{
@@ -326,7 +329,7 @@ export default function JobCardDetailPage() {
           <button onClick={() => dispatchMutation.mutate()} disabled={dispatchMutation.isPending} className="px-4 py-2 rounded-lg border border-green-500/20 text-green-400 hover:bg-green-500/10 font-label-caps text-xs tracking-widest transition-all flex items-center gap-2">
             <span className="material-symbols-outlined text-[16px]">send</span> WhatsApp
           </button>
-          {!['delivered', 'cancelled'].includes(job.status) && (
+          {!['delivered', 'cancelled'].includes(job.status) && staff?.role === 'admin' && (
             <button
               onClick={() => { if (window.confirm('Delete this job card?')) deleteMutation.mutate(); }}
               className="px-4 py-2 rounded-lg border border-red-500/20 text-red-400 hover:bg-red-500/10 font-label-caps text-xs tracking-widest transition-all flex items-center gap-2"
@@ -753,6 +756,12 @@ export default function JobCardDetailPage() {
             )}
           </div>
 
+          {/* Job Card Photos & Videos */}
+          <div className="glass-panel rounded-2xl p-6">
+            <h2 className="font-label-caps text-[10px] text-on-surface-variant/50 tracking-widest mb-4">JOB CARD MEDIA</h2>
+            <JobCardMediaSection jobCardId={Number(id)} jobType={job.job_type === 'quick' ? 'quick' : 'regular'} />
+          </div>
+
           {/* Status Timeline */}
           <div className="glass-panel rounded-2xl p-6">
             <h2 className="font-label-caps text-[10px] text-on-surface-variant/50 tracking-widest mb-4">STATUS HISTORY</h2>
@@ -820,9 +829,77 @@ export default function JobCardDetailPage() {
             ))}
           </div>
 
+          {/* Certificate */}
+          <div className="glass-panel rounded-2xl p-6 space-y-3">
+            <h2 className="font-label-caps text-[10px] text-on-surface-variant/50 tracking-widest">CERTIFICATE</h2>
+            {job.certificate_url ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-green-400 text-sm">
+                  <span className="material-symbols-outlined text-[16px]">verified</span>
+                  Certificate Uploaded
+                </div>
+                <a
+                  href={getBackendURL(job.certificate_url)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-xs text-performance-red hover:underline font-label-caps"
+                >
+                  <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                  View Certificate
+                </a>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-amber-400 text-sm">
+                  <span className="material-symbols-outlined text-[16px]">warning</span>
+                  No certificate uploaded
+                </div>
+                <p className="text-[10px] text-on-surface-variant/50">Required before final delivery</p>
+              </div>
+            )}
+            {!['delivered', 'cancelled'].includes(job.status) && (
+              <label className="block cursor-pointer">
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      const res = await jobsAPI.uploadCertificate(Number(id), file);
+                      if (res.success) {
+                        toast.success('Certificate uploaded!');
+                        queryClient.invalidateQueries({ queryKey: ['job-detail', id] });
+                      }
+                    } catch (err: any) {
+                      toast.error(err.response?.data?.error?.message || 'Failed to upload certificate');
+                    }
+                  }}
+                />
+                <span className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-white/10 text-on-surface-variant/60 hover:text-white font-label-caps text-[10px] tracking-widest transition-all cursor-pointer">
+                  <span className="material-symbols-outlined text-[14px]">upload</span>
+                  {job.certificate_url ? 'Replace Certificate' : 'Upload Certificate'}
+                </span>
+              </label>
+            )}
+          </div>
+
           {/* Financial */}
           <div className="glass-panel rounded-2xl p-6 space-y-3">
             <h2 className="font-label-caps text-[10px] text-on-surface-variant/50 tracking-widest">FINANCIAL</h2>
+            {Number((job as any).card_charges) > 0 && (
+              <>
+                <div className="flex justify-between text-xs text-on-surface-variant/70">
+                  <span>Base Amount</span>
+                  <span>₹{(Number(job.total_amount) - Number((job as any).card_charges)).toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex justify-between text-xs text-on-surface-variant/70">
+                  <span>Card Charges (2.5%)</span>
+                  <span>₹{Number((job as any).card_charges).toLocaleString('en-IN')}</span>
+                </div>
+              </>
+            )}
             <div className="flex justify-between">
               <span className="text-on-surface-variant/50 text-sm">Total</span>
               <span className="text-white font-bold">₹{Number(job.total_amount).toLocaleString('en-IN')}</span>

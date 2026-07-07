@@ -35,6 +35,27 @@ const JC_STAGE_CFG: Record<string, { label: string; bg: string; color: string }>
 export default function CustomersPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
+
+  const renderLeadTags = (leadTagsString: string | null | undefined) => {
+    if (!leadTagsString) return null;
+    const items = leadTagsString.split(';').filter(Boolean);
+    return (
+      <div className="flex flex-wrap gap-1 mt-1">
+        {items.map((item, idx) => {
+          const [code, status, req] = item.split(':');
+          return (
+            <span
+              key={idx}
+              className="bg-performance-red/10 border border-performance-red/20 text-performance-red text-[9px] px-1.5 py-0.5 rounded font-mono font-bold tracking-wider"
+              title={`Lead Code: ${code} | Status: ${status} | Req: ${req || 'N/A'}`}
+            >
+              {code} ({status.toUpperCase()}) {req ? ` - ${req}` : ''}
+            </span>
+          );
+        })}
+      </div>
+    );
+  };
   const [statusFilter, setStatusFilter] = useState<CustomerStatus | 'all'>('all');
   const [showAddVehicle, setShowAddVehicle] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
@@ -328,6 +349,7 @@ export default function CustomersPage() {
                               <p className="text-[10px] font-data-sm text-tertiary/40 mt-0.5">
                                 {c.customer_code}
                               </p>
+                              {renderLeadTags((c as any).lead_tags)}
                             </div>
                           </div>
                         </td>
@@ -421,6 +443,7 @@ export default function CustomersPage() {
                     <p className="text-xs font-data-sm text-tertiary/40 mt-1">
                       {customerDetail.customer_code}
                     </p>
+                    {renderLeadTags((customerDetail as any).lead_tags)}
                   </div>
                 </div>
 

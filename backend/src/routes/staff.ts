@@ -18,7 +18,10 @@ import {
   getStaffAdvances,
   createStaffAdvance,
   settleStaffAdvance,
-  kioskAttendance
+  kioskAttendance,
+  getPaymentRequests,
+  createPaymentRequest,
+  approvePaymentRequest
 } from '../controllers/staffController';
 import { authMiddleware } from '../middleware/auth';
 import { rbac } from '../middleware/rbac';
@@ -27,6 +30,11 @@ import { createStaffSchema, updateStaffSchema, staffFiltersSchema, markAttendanc
 
 const router = Router();
 router.use(authMiddleware);
+
+// Payment Requests (Advances, Salary, etc.)
+router.get('/payment-requests', getPaymentRequests);
+router.post('/payment-requests', createPaymentRequest);
+router.patch('/payment-requests/:id', approvePaymentRequest);
 
 // Staff CRUD
 router.get('/', validateQuery(staffFiltersSchema), getStaff);

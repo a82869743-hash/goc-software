@@ -46,6 +46,7 @@ export interface JobCard {
   qc_passed: number;
   qc_notes?: string | null;
   delivery_notes?: string | null;
+  certificate_url?: string | null;
   internal_notes?: string | null;
   created_by: number;
   completion_type?: 'invoice' | 'estimate' | null;
@@ -188,6 +189,15 @@ export const jobsAPI = {
 
   getInvoicePdf: async (id: number): Promise<ApiResponse<{ pdf_url: string }>> => {
     const { data } = await apiClient.get(`/jobs/${id}/invoice-html`, { timeout: 60000 });
+    return data;
+  },
+
+  uploadCertificate: async (id: number, file: File): Promise<ApiResponse<{ certificate_url: string }>> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const { data } = await apiClient.post(`/jobs/${id}/certificate`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
     return data;
   },
 };

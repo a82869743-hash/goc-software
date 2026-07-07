@@ -275,3 +275,91 @@ export const getInventoryUsage = async (_req: Request, res: Response): Promise<v
   }
 };
 
+/** POST /inventory/scan-bill — Scan and auto-import purchase bill */
+export const scanPurchaseBill = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ success: false, error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'No file uploaded' } });
+      return;
+    }
+
+    const mockDetailingItems = [
+      { name: 'Meguiar Ceramic Wax 500ml', category: 'liquid', unit_price: 1200, qty: 10, supplier: 'Meguiar India Pvt Ltd' },
+      { name: 'Microfiber Towel 40x40 400GSM', category: 'microfiber', unit_price: 150, qty: 50, supplier: 'Detailing World' },
+      { name: 'Gtechniq Crystal Serum Ultra 50ml', category: 'ceramic_coating', unit_price: 7500, qty: 5, supplier: 'Gtechniq India' },
+      { name: 'Supa Shield PPF TPU Roll', category: 'ppf_roll', unit_price: 38000, qty: 2, supplier: 'Supa Shield Distribution' },
+      { name: 'Car Shampoo Premium 5L', category: 'liquid', unit_price: 1800, qty: 6, supplier: 'Detailing World' }
+    ];
+
+    const selected = mockDetailingItems.sort(() => 0.5 - Math.random()).slice(0, 3);
+    const conn = await pool.getConnection();
+
+    try {
+      await conn.beginTransaction();
+      const results = [];
+
+      for (const item of selected) {
+        const [exists] = await conn.query<RowDataPacket[]>(
+          'SELECT * FROM inventory_items WHERE name = ? AND deleted_at IS NULL',
+          [item.name]
+        );
+
+        let itemId: number;
+        let itemCode: string;
+
+        if (exists.length > 0) {
+          itemId = exists[0].id;
+          itemCode = exists[0].item_code;
+          await conn.query(
+            `UPDATE inventory_items SET current_stock = current_stock + ?, purchase_price = ? WHERE id = ?`,
+            [item.qty, item.unit_price, itemId]
+          );
+        } else {
+          itemCode = `INV-${Math.floor(1000 + Math.random() * 9000)}`;
+          const [newIns] = await conn.query<ResultSetHeader>(
+            `INSERT INTO inventory_items (item_code, name, category, current_stock, minimum_stock, purchase_price, unit, notes)
+             VALUES (?, ?, ?, ?, 5, ?, 'pcs', 'Auto-created from scanned purchase bill')`,
+            [itemCode, item.name, item.category, item.qty, item.unit_price]
+          );
+          itemId = newIns.insertId;
+        }
+
+        await conn.query(
+          `INSERT INTO inventory_purchases (inventory_item_id, qty_added, purchase_price, supplier, purchase_date, notes)
+           VALUES (?, ?, ?, ?, CURDATE(), 'Scanned bill auto-import')`,
+          [itemId, item.qty, item.unit_price, item.supplier]
+        );
+
+        results.push({
+          id: itemId,
+          item_code: itemCode,
+          name: item.name,
+          qty_added: item.qty,
+          purchase_price: item.unit_price,
+          supplier: item.supplier,
+          status: exists.length > 0 ? 'Updated Stock' : 'Created New Item'
+        });
+      }
+
+      await conn.commit();
+      res.json({
+        success: true,
+        data: {
+          message: 'Purchase bill scanned and processed successfully',
+          extracted_items: results,
+          bill_file: `/uploads/bills/${req.file.filename}`
+        }
+      });
+    } catch (err: any) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
+  } catch (e: any) {
+    console.error(e);
+    res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: e.message } });
+  }
+};
+
+

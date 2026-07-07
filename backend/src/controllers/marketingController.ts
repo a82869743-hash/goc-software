@@ -3,6 +3,8 @@ import pool from '../utils/db';
 import { ERROR_CODES } from '../utils/constants';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { sendQuickWhatsApp, WhatsAppTemplates } from '../services/whatsappService';
+import fs from 'fs';
+import path from 'path';
 
 /**
  * GOC Studio — Marketing Controller
@@ -291,5 +293,92 @@ export const executeCampaign = async (req: Request, res: Response): Promise<void
   } catch (error) {
     console.error('Execute campaign error:', error);
     res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed to execute campaign.' } });
+  }
+};
+
+/** GET /marketing/materials — List all promotional materials */
+export const getPromotionalMaterials = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const [rows] = await pool.query<RowDataPacket[]>(
+      'SELECT * FROM promotional_materials ORDER BY created_at DESC'
+    );
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    console.error('Get promotional materials error:', error);
+    res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed to fetch materials.' } });
+  }
+};
+
+/** POST /marketing/materials — Upload promotional material */
+export const uploadPromotionalMaterial = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ success: false, error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'No file uploaded.' } });
+      return;
+    }
+
+    const { title, description } = req.body;
+    if (!title) {
+      res.status(400).json({ success: false, error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'Title is required.' } });
+      return;
+    }
+
+    const ext = path.extname(req.file.originalname).toLowerCase();
+    let fileType: 'image' | 'video' | 'document' | 'other' = 'other';
+    if (['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(ext)) {
+      fileType = 'image';
+    } else if (['.mp4', '.mov', '.avi', '.mkv'].includes(ext)) {
+      fileType = 'video';
+    } else if (['.pdf', '.doc', '.docx', '.xls', '.xlsx'].includes(ext)) {
+      fileType = 'document';
+    }
+
+    const fileUrl = `/uploads/materials/${req.file.filename}`;
+
+    const [result] = await pool.query<ResultSetHeader>(
+      `INSERT INTO promotional_materials (title, description, file_type, file_url, file_size)
+       VALUES (?, ?, ?, ?, ?)`,
+      [title, description || null, fileType, fileUrl, req.file.size]
+    );
+
+    const [newRow] = await pool.query<RowDataPacket[]>(
+      'SELECT * FROM promotional_materials WHERE id = ?',
+      [result.insertId]
+    );
+
+    res.status(201).json({ success: true, data: newRow[0] });
+  } catch (error) {
+    console.error('Upload promotional material error:', error);
+    res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed to upload material.' } });
+  }
+};
+
+/** DELETE /marketing/materials/:id — Delete promotional material */
+export const deletePromotionalMaterial = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const [existing] = await pool.query<RowDataPacket[]>(
+      'SELECT * FROM promotional_materials WHERE id = ?',
+      [id]
+    );
+
+    if (existing.length === 0) {
+      res.status(404).json({ success: false, error: { code: ERROR_CODES.NOT_FOUND, message: 'Material not found.' } });
+      return;
+    }
+
+    const material = existing[0];
+
+    const filePath = path.resolve(__dirname, '../../../', material.file_url.replace(/^\//, ''));
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
+    await pool.query('DELETE FROM promotional_materials WHERE id = ?', [id]);
+
+    res.json({ success: true, data: { message: 'Promotional material deleted.' } });
+  } catch (error) {
+    console.error('Delete promotional material error:', error);
+    res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed to delete material.' } });
   }
 };

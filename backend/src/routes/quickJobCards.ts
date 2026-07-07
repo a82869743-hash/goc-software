@@ -603,7 +603,7 @@ router.post('/:id/media', quickUpload.single('file'), async (req: Request, res: 
   try {
     const { id } = req.params;
     const { media_type } = req.body;
-    if (!['before_image', 'after_image', 'video'].includes(media_type)) {
+    if (!['before_image', 'during_image', 'after_image', 'qc_image', 'video'].includes(media_type)) {
       res.status(400).json({ success: false, error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'Invalid media_type' } });
       return;
     }
@@ -621,6 +621,29 @@ router.post('/:id/media', quickUpload.single('file'), async (req: Request, res: 
   } catch (e: any) {
     console.error(e);
     res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: e.message } });
+  }
+});
+
+router.post('/:id/media/:mediaId/rotate', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id, mediaId } = req.params;
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT rotation FROM job_card_media WHERE id=? AND job_card_id=? AND job_type='quick'`,
+      [mediaId, id]
+    );
+    if (rows.length === 0) {
+      res.status(404).json({ success: false, error: { code: ERROR_CODES.NOT_FOUND, message: 'Media item not found' } });
+      return;
+    }
+    const newRotation = ((rows[0].rotation || 0) + 90) % 360;
+    await pool.query(
+      `UPDATE job_card_media SET rotation=? WHERE id=? AND job_card_id=? AND job_type='quick'`,
+      [newRotation, mediaId, id]
+    );
+    res.json({ success: true, data: { rotation: newRotation, message: 'Rotated successfully' } });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Rotation failed' } });
   }
 });
 

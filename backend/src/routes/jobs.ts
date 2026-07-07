@@ -185,8 +185,8 @@ router.put('/:id/services/:serviceId', updateJobService);
 // Dispatch bill via WhatsApp/SMS
 router.post('/:id/dispatch', dispatchJobCard);
 
-// Delete job card — owner/manager only
-router.delete('/:id', rbac('admin', 'manager'), deleteJobCard);
+// Delete job card — admin only
+router.delete('/:id', rbac('admin'), deleteJobCard);
 
 // ─── Job Card Media Upload Setup ──────────────────
 const mediaUploadDir = path.resolve(__dirname, '../../../uploads/job-media');
@@ -215,7 +215,7 @@ router.post('/:id/media', mediaUpload.single('file'), async (req: Request, res: 
   try {
     const { id } = req.params;
     const { media_type } = req.body;
-    if (!['before_image', 'after_image', 'video'].includes(media_type)) {
+    if (!['before_image', 'during_image', 'after_image', 'qc_image', 'video'].includes(media_type)) {
       res.status(400).json({ success: false, error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'Invalid media_type' } });
       return;
     }
@@ -233,6 +233,29 @@ router.post('/:id/media', mediaUpload.single('file'), async (req: Request, res: 
   } catch (e) {
     console.error(e);
     res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Upload failed' } });
+  }
+});
+
+router.post('/:id/media/:mediaId/rotate', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id, mediaId } = req.params;
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT rotation FROM job_card_media WHERE id=? AND job_card_id=? AND job_type='regular'`,
+      [mediaId, id]
+    );
+    if (rows.length === 0) {
+      res.status(404).json({ success: false, error: { code: ERROR_CODES.NOT_FOUND, message: 'Media item not found' } });
+      return;
+    }
+    const newRotation = ((rows[0].rotation || 0) + 90) % 360;
+    await pool.query(
+      `UPDATE job_card_media SET rotation=? WHERE id=? AND job_card_id=? AND job_type='regular'`,
+      [newRotation, mediaId, id]
+    );
+    res.json({ success: true, data: { rotation: newRotation, message: 'Rotated successfully' } });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Rotation failed' } });
   }
 });
 
@@ -266,6 +289,23 @@ router.delete('/:id/media/:mediaId', async (req: Request, res: Response): Promis
   } catch (e) {
     console.error(e);
     res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Server error' } });
+  }
+});
+
+// ─── Certificate Upload ────────────────────────────
+router.post('/:id/certificate', mediaUpload.single('file'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    if (!req.file) {
+      res.status(400).json({ success: false, error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'No file uploaded' } });
+      return;
+    }
+    const file_path = `/uploads/job-media/${req.file.filename}`;
+    await pool.query('UPDATE job_cards SET certificate_url = ? WHERE id = ?', [file_path, id]);
+    res.json({ success: true, data: { certificate_url: file_path, message: 'Certificate uploaded successfully' } });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Certificate upload failed' } });
   }
 });
 

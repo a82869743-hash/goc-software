@@ -48,6 +48,17 @@ export interface Campaign {
   created_at: string;
 }
 
+export interface PromotionalMaterial {
+  id: number;
+  title: string;
+  description: string | null;
+  file_type: 'image' | 'video' | 'document' | 'other';
+  file_url: string;
+  file_size: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export const marketingAPI = {
   // WhatsApp logs
   getLogs: async (filters: Record<string, any> = {}): Promise<ApiResponse<WhatsAppLog[]>> => {
@@ -92,6 +103,24 @@ export const marketingAPI = {
 
   executeCampaign: async (id: number) => {
     const { data } = await apiClient.post(`/marketing/campaigns/${id}/execute`);
+    return data;
+  },
+
+  // Promotional Materials
+  getMaterials: async (): Promise<ApiResponse<PromotionalMaterial[]>> => {
+    const { data } = await apiClient.get('/marketing/materials');
+    return data;
+  },
+
+  uploadMaterial: async (formData: FormData): Promise<ApiResponse<PromotionalMaterial>> => {
+    const { data } = await apiClient.post('/marketing/materials', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return data;
+  },
+
+  deleteMaterial: async (id: number): Promise<ApiResponse<{ message: string }>> => {
+    const { data } = await apiClient.delete(`/marketing/materials/${id}`);
     return data;
   },
 };

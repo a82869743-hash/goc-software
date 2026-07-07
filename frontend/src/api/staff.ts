@@ -7,7 +7,7 @@ export interface StaffMember {
   full_name: string;
   phone: string;
   email?: string | null;
-  role: 'admin' | 'technician' | 'receptionist' | 'manager' | 'staff';
+  role: 'admin' | 'technician' | 'receptionist' | 'manager' | 'staff' | 'hr';
   salary_type: 'monthly' | 'daily';
   salary_amount: number;
   join_date: string;
@@ -24,6 +24,23 @@ export interface AttendanceRecord {
 export interface TodayAttendanceRow {
   staff_id: number; staff_code: string; full_name: string; role: string;
   attendance_id: number | null; att_status: string | null; check_in_time?: string; check_out_time?: string; notes?: string;
+}
+
+export interface PaymentRequest {
+  id: number;
+  staff_id: number;
+  staff_name?: string;
+  staff_role?: string;
+  staff_code?: string;
+  amount: number;
+  request_type: 'advance' | 'salary' | 'incentive' | 'reimbursement';
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  approved_by: number | null;
+  approved_by_name?: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export const staffAPI = {
@@ -53,8 +70,8 @@ export const staffAPI = {
     const { data } = await apiClient.post('/staff/attendance', payload);
     return data;
   },
-  todayAttendance: async (): Promise<ApiResponse<TodayAttendanceRow[]>> => {
-    const { data } = await apiClient.get('/staff/attendance/today');
+  todayAttendance: async (date?: string): Promise<ApiResponse<TodayAttendanceRow[]>> => {
+    const { data } = await apiClient.get('/staff/attendance/today', { params: date ? { date } : {} });
     return data;
   },
   checkIn: async (payload: { latitude: number; longitude: number; selfie_url?: string; notes?: string }): Promise<ApiResponse<{ message: string }>> => {
@@ -83,6 +100,18 @@ export const staffAPI = {
   },
   kioskAttendance: async (payload: { staff_id: number; type: 'check-in' | 'check-out'; photo: string }): Promise<ApiResponse<{ message: string; status?: string; is_late?: boolean; working_hours?: number }>> => {
     const { data } = await apiClient.post('/staff/kiosk-attendance', payload);
+    return data;
+  },
+  getPaymentRequests: async (params?: { staff_id?: number; status?: string }): Promise<ApiResponse<PaymentRequest[]>> => {
+    const { data } = await apiClient.get('/staff/payment-requests', { params });
+    return data;
+  },
+  createPaymentRequest: async (payload: { amount: number; request_type: string; reason: string; notes?: string }): Promise<ApiResponse<{ message: string }>> => {
+    const { data } = await apiClient.post('/staff/payment-requests', payload);
+    return data;
+  },
+  approvePaymentRequest: async (id: number, payload: { status: 'approved' | 'rejected'; notes?: string }): Promise<ApiResponse<{ message: string }>> => {
+    const { data } = await apiClient.patch(`/staff/payment-requests/${id}`, payload);
     return data;
   },
 };

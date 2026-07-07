@@ -125,7 +125,7 @@ export default function JobCardsPage() {
           <input
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1); }}
-            placeholder="Search by name, phone, job code…"
+            placeholder="Search by name, phone, job code, car number…"
             className="bg-transparent border-none outline-none text-white text-sm flex-1 placeholder-on-surface-variant/40 font-data-sm"
           />
         </div>

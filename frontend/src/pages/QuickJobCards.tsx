@@ -193,10 +193,15 @@ export default function QuickJobCards() {
   const WASH_PRESETS = [
     { service_name: 'Foam Wash', rate: 500 },
     { service_name: 'Ceramic Wash', rate: 800 },
-    { service_name: 'Interior Wash', rate: 600 },
-    { service_name: 'Detailing Wash', rate: 1200 },
-    { service_name: 'Basic Wash', rate: 350 },
-    { service_name: 'Custom Wash', rate: '' },
+    { service_name: 'Interior Cleaning', rate: 1500 },
+    { service_name: 'Exterior Detailing', rate: 2500 },
+    { service_name: 'Full Detailing', rate: 4000 },
+    { service_name: 'Rubbing & Polish', rate: 3000 },
+    { service_name: 'Engine Bay Cleaning', rate: 1000 },
+    { service_name: 'AC Vent Sanitization', rate: 800 },
+    { service_name: 'Headlight Restoration', rate: 1500 },
+    { service_name: 'Ceramic Coating (Basic)', rate: 8000 },
+    { service_name: 'Custom Service', rate: '' },
   ];
 
   return (

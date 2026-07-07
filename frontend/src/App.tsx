@@ -12,6 +12,8 @@ import QuotationsPage from './pages/QuotationsPage';
 import InvoicesPage from './pages/InvoicesPage';
 import InventoryPage from './pages/InventoryPage';
 import StaffPage from './pages/StaffPage';
+import StaffDetailPage from './pages/StaffDetailPage';
+import StaffAttendancePaymentsPage from './pages/StaffAttendancePaymentsPage';
 import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
 import CommissionsPage from './pages/CommissionsPage';
@@ -25,6 +27,8 @@ import StaffManagementPage from './pages/admin/StaffManagementPage';
 import StaffPermissionsPage from './pages/admin/StaffPermissionsPage';
 import SystemLogsPage from './pages/admin/SystemLogsPage';
 import KioskAttendancePage from './pages/KioskAttendancePage';
+import WarrantiesPage from './pages/WarrantiesPage';
+import PublicWarrantyCheck from './pages/PublicWarrantyCheck';
 
 
 
@@ -79,10 +83,13 @@ function App() {
         <Route path="/invoices" element={<InvoicesPage />} />
         <Route path="/inventory" element={<InventoryPage />} />
         <Route path="/staff" element={<StaffPage />} />
+        <Route path="/staff/:id" element={<StaffDetailPage />} />
+        <Route path="/staff/attendance-payments" element={<StaffAttendancePaymentsPage />} />
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/marketing" element={<MarketingPage />} />
         <Route path="/commissions" element={<CommissionsPage />} />
+        <Route path="/warranties" element={<WarrantiesPage />} />
         <Route path="/admin/staff" element={<StaffManagementPage />} />
         <Route path="/admin/staff/:id/permissions" element={<StaffPermissionsPage />} />
         <Route path="/admin/logs" element={<SystemLogsPage />} />
@@ -98,6 +105,7 @@ function App() {
       />
 
       <Route path="/track/:token" element={<PublicTrackingPage />} />
+      <Route path="/warranty-check" element={<PublicWarrantyCheck />} />
 
       <Route
         path="/kiosk-attendance"

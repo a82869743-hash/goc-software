@@ -536,6 +536,52 @@ pool.getConnection()
       });
     }
 
+    // Ensure staff table role ENUM includes 'hr'
+    await conn.query(`
+      ALTER TABLE staff MODIFY COLUMN role ENUM('admin','technician','receptionist','manager','staff','hr') NOT NULL DEFAULT 'technician'
+    `).catch(err => console.error('❌ Failed to update staff role enum:', err.message));
+
+    // Auto-migrate staff_payment_requests table
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS staff_payment_requests (
+        id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        staff_id        INT UNSIGNED NOT NULL,
+        amount          DECIMAL(10,2) NOT NULL,
+        request_type    ENUM('advance','salary','incentive','reimbursement') NOT NULL DEFAULT 'advance',
+        reason          VARCHAR(255) NOT NULL,
+        status          ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+        approved_by     INT UNSIGNED NULL,
+        notes           TEXT,
+        created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (staff_id) REFERENCES staff(id) ON DELETE CASCADE,
+        FOREIGN KEY (approved_by) REFERENCES staff(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `).catch(err => console.error('❌ Failed to auto-migrate staff_payment_requests:', err.message));
+
+    // Auto-migrate promotional_materials table
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS promotional_materials (
+        id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        title           VARCHAR(150) NOT NULL,
+        description     VARCHAR(255),
+        file_type       ENUM('image','video','document','other') NOT NULL DEFAULT 'image',
+        file_url        VARCHAR(500) NOT NULL,
+        file_size       INT UNSIGNED,
+        created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `).catch(err => console.error('❌ Failed to auto-migrate promotional_materials:', err.message));
+
+    // Ensure staff table has token_version column
+    await conn.query(`
+      ALTER TABLE staff ADD COLUMN token_version INT UNSIGNED NOT NULL DEFAULT 0
+    `).catch(err => {
+      if (err.code !== 'ER_DUP_FIELDNAME') {
+        console.error('❌ Failed to run staff token_version migration:', err.message);
+      }
+    });
+
     // Run quick job card migration
     await migrateQuickJobCards(conn);
 

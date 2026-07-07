@@ -142,9 +142,9 @@ export const markAttendance = async (req: Request, res: Response): Promise<void>
 };
 
 // ─── TODAY'S ATTENDANCE ───────────────────────────
-export const getTodayAttendance = async (_req: Request, res: Response): Promise<void> => {
+export const getTodayAttendance = async (req: Request, res: Response): Promise<void> => {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = (req.query.date as string) || getISTDate();
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT s.id as staff_id, s.staff_code, s.full_name, s.role, a.id as attendance_id, a.status as att_status, a.check_in_time, a.check_out_time, a.notes
        FROM staff s LEFT JOIN attendance a ON s.id = a.staff_id AND a.date = ?
@@ -697,5 +697,133 @@ export const kioskAttendance = async (req: Request, res: Response): Promise<void
   } catch (error) {
     console.error('Kiosk attendance error:', error);
     res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed to record kiosk attendance.' } });
+  }
+};
+
+/** GET /staff/payment-requests — List all payment requests */
+export const getPaymentRequests = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { staff_id, status } = req.query;
+    const conds = [];
+    const params = [];
+    
+    if (staff_id) {
+      conds.push('pr.staff_id = ?');
+      params.push(Number(staff_id));
+    }
+    if (status) {
+      conds.push('pr.status = ?');
+      params.push(status);
+    }
+    
+    const where = conds.length > 0 ? `WHERE ${conds.join(' AND ')}` : '';
+    
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT pr.*, s.full_name as staff_name, s.role as staff_role, s.staff_code,
+              app.full_name as approved_by_name
+       FROM staff_payment_requests pr
+       JOIN staff s ON pr.staff_id = s.id
+       LEFT JOIN staff app ON pr.approved_by = app.id
+       ${where}
+       ORDER BY pr.created_at DESC`,
+      params
+    );
+    
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    console.error('Get payment requests error:', error);
+    res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed to fetch payment requests.' } });
+  }
+};
+
+/** POST /staff/payment-requests — Create new payment request */
+export const createPaymentRequest = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { amount, request_type, reason, notes } = req.body;
+    const staffId = (req as any).user?.id;
+    
+    if (!staffId) {
+      res.status(401).json({ success: false, error: { code: ERROR_CODES.AUTH_REQUIRED, message: 'Unauthorized.' } });
+      return;
+    }
+    
+    if (!amount || !reason) {
+      res.status(400).json({ success: false, error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'Amount and reason are required.' } });
+      return;
+    }
+    
+    await pool.query(
+      `INSERT INTO staff_payment_requests (staff_id, amount, request_type, reason, notes, status)
+       VALUES (?, ?, ?, ?, ?, 'pending')`,
+      [staffId, Number(amount), request_type || 'advance', reason, notes || null]
+    );
+    
+    res.status(201).json({ success: true, data: { message: 'Payment request submitted successfully.' } });
+  } catch (error) {
+    console.error('Create payment request error:', error);
+    res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed to submit payment request.' } });
+  }
+};
+
+/** PATCH /staff/payment-requests/:id — Approve/Reject payment request (HR, Manager, Admin) */
+export const approvePaymentRequest = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { status, notes } = req.body;
+    const approvedBy = (req as any).user?.id;
+    const userRole = (req as any).user?.role;
+    
+    if (!['hr', 'manager', 'admin'].includes(userRole)) {
+      res.status(403).json({ success: false, error: { code: ERROR_CODES.FORBIDDEN, message: 'Only HR, Manager, or Admin can approve payment requests.' } });
+      return;
+    }
+    
+    if (!['approved', 'rejected'].includes(status)) {
+      res.status(400).json({ success: false, error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'Status must be approved or rejected.' } });
+      return;
+    }
+    
+    const [existing] = await pool.query<RowDataPacket[]>(
+      'SELECT * FROM staff_payment_requests WHERE id = ?',
+      [id]
+    );
+    
+    if (existing.length === 0) {
+      res.status(404).json({ success: false, error: { code: ERROR_CODES.NOT_FOUND, message: 'Payment request not found.' } });
+      return;
+    }
+    
+    const request = existing[0];
+    const conn = await pool.getConnection();
+    
+    try {
+      await conn.beginTransaction();
+      
+      await conn.query(
+        `UPDATE staff_payment_requests
+         SET status = ?, approved_by = ?, notes = ?
+         WHERE id = ?`,
+         [status, approvedBy, notes || null, id]
+      );
+      
+      if (status === 'approved' && request.request_type === 'advance') {
+        await conn.query(
+          `INSERT INTO staff_advances (staff_id, amount, notes, advance_date, status)
+           VALUES (?, ?, ?, NOW(), 'unpaid')`,
+          [request.staff_id, request.amount, `Approved Request: ${request.reason}`]
+        );
+      }
+      
+      await conn.commit();
+      res.json({ success: true, data: { message: `Payment request successfully ${status}.` } });
+    } catch (err: any) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
+  } catch (error) {
+    console.error('Approve payment request error:', error);
+    res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed to process payment request.' } });
   }
 };

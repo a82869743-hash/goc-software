@@ -284,11 +284,11 @@ export const scanPurchaseBill = async (req: Request, res: Response): Promise<voi
     }
 
     const mockDetailingItems = [
-      { name: 'Meguiar Ceramic Wax 500ml', category: 'liquid', unit_price: 1200, qty: 10, supplier: 'Meguiar India Pvt Ltd' },
-      { name: 'Microfiber Towel 40x40 400GSM', category: 'microfiber', unit_price: 150, qty: 50, supplier: 'Detailing World' },
-      { name: 'Gtechniq Crystal Serum Ultra 50ml', category: 'ceramic_coating', unit_price: 7500, qty: 5, supplier: 'Gtechniq India' },
+      { name: 'Meguiar Ceramic Wax 500ml', category: 'car_care', unit_price: 1200, qty: 10, supplier: 'Meguiar India Pvt Ltd' },
+      { name: 'Microfiber Towel 40x40 400GSM', category: 'consumable', unit_price: 150, qty: 50, supplier: 'Detailing World' },
+      { name: 'Gtechniq Crystal Serum Ultra 50ml', category: 'ceramic', unit_price: 7500, qty: 5, supplier: 'Gtechniq India' },
       { name: 'Supa Shield PPF TPU Roll', category: 'ppf_roll', unit_price: 38000, qty: 2, supplier: 'Supa Shield Distribution' },
-      { name: 'Car Shampoo Premium 5L', category: 'liquid', unit_price: 1800, qty: 6, supplier: 'Detailing World' }
+      { name: 'Car Shampoo Premium 5L', category: 'car_care', unit_price: 1800, qty: 6, supplier: 'Detailing World' }
     ];
 
     const selected = mockDetailingItems.sort(() => 0.5 - Math.random()).slice(0, 3);

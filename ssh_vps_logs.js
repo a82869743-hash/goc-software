@@ -2,15 +2,13 @@ const { Client } = require('ssh2');
 
 const conn = new Client();
 conn.on('ready', () => {
-  console.log('✅ SSH Client Ready');
-  // Check latest Nginx error logs
-  const command = 'tail -n 10 /var/log/nginx/error.log';
-  
-  conn.exec(command, (err, stream) => {
+  console.log('✅ SSH Client Connected. Fetching PM2 logs...');
+
+  conn.exec('tail -n 150 /root/.pm2/logs/goc-backend-out.log; tail -n 150 /root/.pm2/logs/goc-backend-error.log', (err, stream) => {
     if (err) throw err;
     let output = '';
     stream.on('close', (code, signal) => {
-      console.log('--- NEW NGINX ERROR LOGS ---');
+      console.log('--- VPS PM2 LOGS ---');
       console.log(output);
       conn.end();
     });
@@ -22,5 +20,5 @@ conn.on('ready', () => {
   port: 22,
   username: 'root',
   password: 'PremSingh123@',
-  readyTimeout: 15000,
+  readyTimeout: 30000,
 });

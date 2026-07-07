@@ -258,17 +258,62 @@ export default function JobCardDetailPage() {
     onError: () => toast.error('Failed to dispatch.'),
   });
 
-  const openWhatsApp = () => {
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+
+  const { data: invoiceDataRes } = useQuery({
+    queryKey: ['job-invoice-data', id],
+    queryFn: () => jobsAPI.getInvoiceData(Number(id)),
+    enabled: !!id,
+  });
+  const invoiceData = invoiceDataRes?.data;
+
+  const getWhatsAppNumber = (phone: string) => {
+    const clean = phone.replace(/\D/g, '');
+    return clean.length === 10 ? `91${clean}` : clean;
+  };
+
+  const sendWhatsAppMessage = (message: string) => {
+    if (!job) return;
+    const phone = getWhatsAppNumber(job.customer_phone || '');
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  };
+
+  const shareTrackingLink = () => {
     if (!job) return;
     const vehicleStr = `${job.vehicle_name || ''}`.trim() || 'your vehicle';
-    const trackingUrl = `https://godofceramic.cloud/track/${job.job_code}`;
     const statusLabel = STATUS_CONFIG[job.status]?.label || job.status;
-    const message = `Dear ${job.customer_name}, your vehicle ${vehicleStr} (${job.reg_number || ''}) is currently in "${statusLabel}" stage at Pack Wolf Services Pvt. Ltd. You can track its live status, view estimates, and invoices here: ${trackingUrl}`;
-    const customerPhone = job.customer_phone || '';
-    const waPhone = customerPhone.replace(/\D/g, '');
-    const cleanPhone = waPhone.startsWith('91') && waPhone.length > 10 ? waPhone : `91${waPhone}`;
-    const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
-    window.open(url, '_blank');
+    const trackingUrl = `${window.location.origin}/track/${job.job_code}`;
+    const msg = `Dear *${job.customer_name}*, your vehicle *${vehicleStr}* (${job.reg_number || ''}) is currently in *${statusLabel}* stage at God of Ceramic Studio. You can track its live status, view detailing photo feed, and access documents here: ${trackingUrl}`;
+    sendWhatsAppMessage(msg);
+  };
+
+  const shareEstimateLink = () => {
+    if (!job) return;
+    if (!invoiceData?.estimate?.pdf_url) {
+      toast.error('Please generate an estimate first by completing the job as Estimate.');
+      return;
+    }
+    const vehicleStr = `${job.vehicle_name || ''}`.trim() || 'your vehicle';
+    const estimateUrl = getBackendURL(invoiceData.estimate.pdf_url);
+    const msg = `Dear *${job.customer_name}*, please find the detailing estimate for your vehicle *${vehicleStr}* (${job.reg_number || ''}) from God of Ceramic Studio. You can view or download the estimate PDF here: ${estimateUrl}`;
+    sendWhatsAppMessage(msg);
+  };
+
+  const shareInvoiceLink = () => {
+    if (!job) return;
+    if (!invoiceData?.invoice?.pdf_url) {
+      toast.error('Please complete the job and generate a tax invoice first.');
+      return;
+    }
+    const vehicleStr = `${job.vehicle_name || ''}`.trim() || 'your vehicle';
+    const invoiceUrl = getBackendURL(invoiceData.invoice.pdf_url);
+    const msg = `Dear *${job.customer_name}*, thank you for detaling your vehicle *${vehicleStr}* (${job.reg_number || ''}) with us! Please find your Tax Invoice PDF here: ${invoiceUrl}`;
+    sendWhatsAppMessage(msg);
+  };
+
+  const openWhatsApp = () => {
+    setShowWhatsAppModal(true);
   };
 
   const deleteMutation = useMutation({
@@ -1058,6 +1103,83 @@ export default function JobCardDetailPage() {
                 className="performance-gradient text-white font-label-caps text-xs px-5 py-2.5 rounded-lg border border-white/10"
               >
                 OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── WhatsApp Sharing Options Modal ── */}
+      {showWhatsAppModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="glass-panel w-full max-w-md p-6 rounded-2xl relative space-y-4 border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="font-display-hero text-lg font-black text-white tracking-tight italic uppercase">
+                  Share Details via WhatsApp
+                </h3>
+                <p className="text-[10px] text-tertiary/50 font-label-caps tracking-widest uppercase">
+                  Direct client-side redirection
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowWhatsAppModal(false)}
+                className="text-tertiary hover:text-white p-1 hover:bg-white/5 rounded-lg transition-all"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            <div className="space-y-3 pt-2">
+              <button
+                onClick={() => {
+                  shareTrackingLink();
+                  setShowWhatsAppModal(false);
+                }}
+                className="w-full text-left p-4 rounded-xl bg-white/[0.03] border border-white/[0.07] hover:bg-white/[0.06] hover:border-performance-red/30 transition-all flex items-center gap-3 group"
+              >
+                <span className="material-symbols-outlined text-[24px] text-cyan-400 group-hover:scale-110 transition-transform">monitoring</span>
+                <div className="flex-1">
+                  <p className="text-xs font-bold text-white uppercase tracking-wider">Share Live Tracking Link</p>
+                  <p className="text-[10px] text-tertiary/60 mt-0.5">Sends status, detailing photo feed, and live timeline link.</p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  shareEstimateLink();
+                  setShowWhatsAppModal(false);
+                }}
+                className="w-full text-left p-4 rounded-xl bg-white/[0.03] border border-white/[0.07] hover:bg-white/[0.06] hover:border-performance-red/30 transition-all flex items-center gap-3 group disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="material-symbols-outlined text-[24px] text-amber-400 group-hover:scale-110 transition-transform">receipt_long</span>
+                <div className="flex-1">
+                  <p className="text-xs font-bold text-white uppercase tracking-wider">Share Detailing Estimate</p>
+                  <p className="text-[10px] text-tertiary/60 mt-0.5">
+                    {invoiceData?.estimate?.pdf_url
+                      ? 'Sends pre-filled message with PDF download link.'
+                      : 'Disabled — generate estimate first by completing job.'}
+                  </p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  shareInvoiceLink();
+                  setShowWhatsAppModal(false);
+                }}
+                className="w-full text-left p-4 rounded-xl bg-white/[0.03] border border-white/[0.07] hover:bg-white/[0.06] hover:border-performance-red/30 transition-all flex items-center gap-3 group disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="material-symbols-outlined text-[24px] text-emerald-400 group-hover:scale-110 transition-transform">payments</span>
+                <div className="flex-1">
+                  <p className="text-xs font-bold text-white uppercase tracking-wider">Share Tax Invoice</p>
+                  <p className="text-[10px] text-tertiary/60 mt-0.5">
+                    {invoiceData?.invoice?.pdf_url
+                      ? 'Sends thank you note with tax invoice PDF link.'
+                      : 'Disabled — complete job to generate tax invoice.'}
+                  </p>
+                </div>
               </button>
             </div>
           </div>

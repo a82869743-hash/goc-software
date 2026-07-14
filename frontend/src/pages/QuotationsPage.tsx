@@ -142,6 +142,288 @@ function CanvasToolbar({
   );
 }
 
+// ── Manual Quotation Items Editor Modal ───────────────────
+interface ManualEditorModalProps {
+  editingId: number | null;
+  initialItems: any[];
+  initialGST: boolean;
+  initialDiscountType: 'fixed' | 'percentage';
+  initialDiscountValue: number;
+  customerHeader: {
+    customerName: string;
+    customerPhone: string;
+    vehicleDescription: string;
+    validUntil: string;
+    notes: string;
+  };
+  onSave: (payload: any) => void;
+  onDiscard: () => void;
+  onClose: () => void;
+  isSaving: boolean;
+}
+
+function ManualEditorModal({
+  initialItems,
+  initialGST,
+  initialDiscountType,
+  initialDiscountValue,
+  customerHeader,
+  onSave,
+  onDiscard,
+  onClose,
+  isSaving,
+}: ManualEditorModalProps) {
+  const [items, setItems] = useState<Array<{ description: string; qty: number; rate: number; amount: number }>>(
+    initialItems && initialItems.length > 0 ? initialItems : [{ description: '', qty: 1, rate: 0, amount: 0 }]
+  );
+  const [applyGST, setApplyGST] = useState(initialGST);
+  const [discountType, setDiscountType] = useState<'fixed' | 'percentage'>(initialDiscountType);
+  const [discountValue, setDiscountValue] = useState(initialDiscountValue);
+
+  const addItemRow = () => {
+    setItems([...items, { description: '', qty: 1, rate: 0, amount: 0 }]);
+  };
+
+  const removeItemRow = (index: number) => {
+    const next = [...items];
+    next.splice(index, 1);
+    setItems(next.length === 0 ? [{ description: '', qty: 1, rate: 0, amount: 0 }] : next);
+  };
+
+  const handleItemChange = (index: number, field: string, val: any) => {
+    const next = [...items];
+    const item = { ...next[index], [field]: val };
+    if (field === 'qty' || field === 'rate') {
+      const q = field === 'qty' ? Number(val) : Number(item.qty);
+      const r = field === 'rate' ? Number(val) : Number(item.rate);
+      item.amount = Math.round(q * r * 100) / 100;
+    }
+    next[index] = item;
+    setItems(next);
+  };
+
+  // Calculations
+  const subtotal = useMemo(() => {
+    return items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  }, [items]);
+
+  const discountAmount = useMemo(() => {
+    if (discountType === 'percentage') {
+      return Math.round((subtotal * (Number(discountValue) / 100)) * 100) / 100;
+    }
+    return Number(discountValue) || 0;
+  }, [subtotal, discountType, discountValue]);
+
+  const taxableAmount = Math.max(0, subtotal - discountAmount);
+  const gstAmount = applyGST ? Math.round((taxableAmount * 0.18) * 100) / 100 : 0;
+  const grandTotal = taxableAmount + gstAmount;
+
+  const handleConfirmSave = () => {
+    const validItems = items.filter(it => it.description.trim() !== '');
+    if (validItems.length === 0) {
+      toast.error('Please add at least one item with description.');
+      return;
+    }
+    onSave({
+      is_manual: 1,
+      manual_items: JSON.stringify(validItems),
+      subtotal,
+      discount_type: discountType,
+      discount_value: discountValue,
+      discount_amount: discountAmount,
+      apply_gst: applyGST ? 1 : 0,
+      gst_amount: gstAmount,
+      grand_total: grandTotal,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-[#111111] border border-white/10 rounded-2xl p-6 w-full max-w-4xl shadow-2xl space-y-4 max-h-[95vh] overflow-y-auto custom-scrollbar flex flex-col">
+        {/* Header */}
+        <div className="flex justify-between items-center pb-2 border-b border-white/5">
+          <div>
+            <h3 className="font-label-caps text-sm text-white tracking-widest">EDIT MANUAL QUOTATION ITEMS</h3>
+            <p className="text-xs text-on-surface-variant/50 font-data-sm">
+              Customer: {customerHeader.customerName} | Vehicle: {customerHeader.vehicleDescription}
+            </p>
+          </div>
+          <button onClick={onClose} className="text-on-surface-variant/40 hover:text-white transition-colors">
+            <span className="material-symbols-outlined">close</span>
+          </button>
+        </div>
+
+        {/* Form fields */}
+        <div className="flex-grow overflow-x-auto min-h-[200px] py-2">
+          <table className="w-full text-left border-collapse min-w-[600px] text-xs">
+            <thead>
+              <tr className="bg-black/30 text-on-surface-variant/60 font-label-caps uppercase tracking-wider border-b border-white/5">
+                <th className="py-2.5 px-3">Description</th>
+                <th className="py-2.5 px-3 w-20 text-center">Qty</th>
+                <th className="py-2.5 px-3 w-32 text-right">Rate (₹)</th>
+                <th className="py-2.5 px-3 w-36 text-right">Amount (₹)</th>
+                <th className="py-2.5 px-3 w-16 text-center">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/[0.02] text-white">
+              {items.map((item, index) => (
+                <tr key={index} className="hover:bg-white/[0.01]">
+                  <td className="py-2 px-2">
+                    <input
+                      value={item.description}
+                      onChange={e => handleItemChange(index, 'description', e.target.value)}
+                      placeholder="e.g. PPF wrap bonnet"
+                      className="w-full bg-white/[0.02] border border-white/[0.07] rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-performance-red/40"
+                    />
+                  </td>
+                  <td className="py-2 px-2 text-center">
+                    <input
+                      type="number"
+                      value={item.qty}
+                      onChange={e => handleItemChange(index, 'qty', e.target.value)}
+                      min="0.01"
+                      step="any"
+                      className="w-full bg-white/[0.02] border border-white/[0.07] rounded-lg px-2 py-1.5 text-xs text-white outline-none focus:border-performance-red/40 text-center"
+                    />
+                  </td>
+                  <td className="py-2 px-2 text-right">
+                    <input
+                      type="number"
+                      value={item.rate}
+                      onChange={e => handleItemChange(index, 'rate', e.target.value)}
+                      min="0"
+                      step="any"
+                      className="w-full bg-white/[0.02] border border-white/[0.07] rounded-lg px-2 py-1.5 text-xs text-white outline-none focus:border-performance-red/40 text-right font-mono"
+                    />
+                  </td>
+                  <td className="py-2 px-2 text-right font-mono font-medium pr-4">
+                    ₹{Number(item.amount).toLocaleString('en-IN')}
+                  </td>
+                  <td className="py-2 px-2 text-center">
+                    <button
+                      type="button"
+                      onClick={() => removeItemRow(index)}
+                      className="p-1 rounded bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-colors"
+                      title="Remove Row"
+                    >
+                      <span className="material-symbols-outlined text-base">delete</span>
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="pt-2">
+          <button
+            type="button"
+            onClick={addItemRow}
+            className="px-4 py-2 border border-dashed border-white/10 rounded-xl text-xs text-on-surface hover:text-white hover:border-white/20 transition-all flex items-center gap-1.5 font-label-caps"
+          >
+            <span className="material-symbols-outlined text-sm">add</span>
+            Add Item Row
+          </button>
+        </div>
+
+        {/* Calculations / Summary */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-white/5">
+          {/* Discount & GST Controls */}
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block font-label-caps text-[9px] text-on-surface-variant/60 uppercase tracking-wider mb-1">
+                  Discount Type
+                </label>
+                <select
+                  value={discountType}
+                  onChange={e => { setDiscountType(e.target.value as any); setDiscountValue(0); }}
+                  className="w-full bg-[#0a0a0a] border border-white/[0.07] rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-performance-red/40"
+                >
+                  <option value="fixed">Fixed Amount (₹)</option>
+                  <option value="percentage">Percentage (%)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block font-label-caps text-[9px] text-on-surface-variant/60 uppercase tracking-wider mb-1">
+                  Discount Value
+                </label>
+                <input
+                  type="number"
+                  value={discountValue}
+                  onChange={e => setDiscountValue(Number(e.target.value))}
+                  min="0"
+                  className="w-full bg-white/[0.02] border border-white/[0.07] rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-performance-red/40 font-mono"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="apply-gst-checkbox"
+                checked={applyGST}
+                onChange={e => setApplyGST(e.target.checked)}
+                className="w-4 h-4 rounded border-white/10 bg-white/5 text-performance-red focus:ring-0 focus:ring-offset-0"
+              />
+              <label htmlFor="apply-gst-checkbox" className="text-xs text-on-surface-variant/80 select-none cursor-pointer">
+                Apply GST (18% CGST/SGST)
+              </label>
+            </div>
+          </div>
+
+          {/* Pricing Totals */}
+          <div className="bg-[#151515] p-4 rounded-xl space-y-2 border border-white/5 text-xs">
+            <div className="flex justify-between text-on-surface-variant">
+              <span>Subtotal:</span>
+              <span className="font-mono text-white">₹{subtotal.toLocaleString('en-IN')}</span>
+            </div>
+            {discountAmount > 0 && (
+              <div className="flex justify-between text-red-400">
+                <span>Discount:</span>
+                <span className="font-mono">-₹{discountAmount.toLocaleString('en-IN')}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-on-surface-variant border-t border-white/5 pt-2">
+              <span>Taxable Value:</span>
+              <span className="font-mono text-white">₹{taxableAmount.toLocaleString('en-IN')}</span>
+            </div>
+            {applyGST && (
+              <div className="flex justify-between text-on-surface-variant">
+                <span>GST (18%):</span>
+                <span className="font-mono text-white">₹{gstAmount.toLocaleString('en-IN')}</span>
+              </div>
+            )}
+            <div className="flex justify-between border-t border-white/10 pt-2 text-sm font-bold">
+              <span className="text-performance-red">Grand Total:</span>
+              <span className="font-mono text-performance-red">₹{grandTotal.toLocaleString('en-IN')}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-3 justify-end pt-2 border-t border-white/5 animate-fade-in">
+          <button
+            type="button"
+            onClick={onDiscard}
+            className="px-4 py-2 border border-white/10 rounded-xl text-xs text-on-surface font-label-caps hover:bg-white/5 transition-colors"
+          >
+            Discard
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirmSave}
+            disabled={isSaving}
+            className="px-5 py-2 performance-gradient text-white rounded-xl text-xs font-label-caps tracking-widest hover:shadow-[0_0_15px_rgba(255,43,43,0.3)] disabled:opacity-50 transition-all uppercase"
+          >
+            {isSaving ? 'Saving…' : 'Save Quotation'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Whiteboard Editor Modal ───────────────────────────────
 interface WhiteboardModalProps {
   editingId: number | null;
@@ -430,6 +712,14 @@ export default function QuotationsPage() {
   const [showWhiteboard, setShowWhiteboard] = useState(false);
   const [pendingQuotationId, setPendingQuotationId] = useState<number | null>(null);
 
+  // Manual Quotation States
+  const [quotationMode, setQuotationMode] = useState<'whiteboard' | 'manual'>('whiteboard');
+  const [showManualEditor, setShowManualEditor] = useState(false);
+  const [manualItems, setManualItems] = useState<Array<{ description: string; qty: number; rate: number; amount: number }>>([]);
+  const [manualGST, setManualGST] = useState(true);
+  const [manualDiscountType, setManualDiscountType] = useState<'fixed' | 'percentage'>('fixed');
+  const [manualDiscountValue, setManualDiscountValue] = useState(0);
+
   // ── Queries ──
   const { data: quotationsRes, isLoading } = useQuery({
     queryKey: ['quotations', activeTab, search, page, showRecycleBin],
@@ -462,25 +752,36 @@ export default function QuotationsPage() {
   const createMutation = useMutation({
     mutationFn: (payload: CreateQuotationPayload) => quotationsAPI.create(payload),
     onSuccess: (res) => {
-      toast.success(`Draft Quotation ${res.data.quotation_code} created! Opening whiteboard…`);
-      setPendingQuotationId(res.data.id);
-      setEditingCanvasData(null);
-      setShowWhiteboard(true);
       queryClient.invalidateQueries({ queryKey: ['quotations'] });
+      setPendingQuotationId(res.data.id);
+      setEditingId(res.data.id);
+      if (res.data.is_manual === 1) {
+        toast.success(`Draft Quotation ${res.data.quotation_code} created! Opening items editor…`);
+        setManualItems([]);
+        setManualGST(true);
+        setManualDiscountType('fixed');
+        setManualDiscountValue(0);
+        setShowManualEditor(true);
+      } else {
+        toast.success(`Draft Quotation ${res.data.quotation_code} created! Opening whiteboard…`);
+        setEditingCanvasData(null);
+        setShowWhiteboard(true);
+      }
     },
     onError: () => toast.error('Failed to create quotation.'),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: any }) => quotationsAPI.update(id, payload),
-    onSuccess: (data, variables) => {
-      toast.success('Whiteboard drawing saved successfully!');
+    onSuccess: (res, variables) => {
+      toast.success('Quotation updated successfully!');
+      setShowManualEditor(false);
       queryClient.invalidateQueries({ queryKey: ['quotations'] });
       if (variables.id) {
         generatePDFMutation.mutate(variables.id);
       }
     },
-    onError: () => toast.error('Failed to save whiteboard.'),
+    onError: () => toast.error('Failed to save quotation.'),
   });
 
   const deleteMutation = useMutation({
@@ -532,13 +833,19 @@ export default function QuotationsPage() {
   });
 
   // ── Handlers ──
-  const handleCreateNew = () => {
+  const handleCreateNew = (defaultMode: 'whiteboard' | 'manual' = 'whiteboard') => {
     setEditingId(null);
     setPendingQuotationId(null);
     setEditingCanvasData(null);
     setSelectedCustomer(null);
     setSelectedVehicle(null);
     setCustSearch('');
+    setQuotationMode(defaultMode);
+    setShowManualEditor(false);
+    setManualItems([]);
+    setManualGST(true);
+    setManualDiscountType('fixed');
+    setManualDiscountValue(0);
     setHeaderForm({
       customerName: '',
       customerPhone: '',
@@ -548,6 +855,47 @@ export default function QuotationsPage() {
       validUntil: (() => { const d = new Date(); d.setDate(d.getDate() + 15); return d.toISOString().split('T')[0]; })(),
       notes: '',
       grandTotal: '',
+    });
+    setShowForm(true);
+  };
+
+  const handleEditHeader = (qt: WhiteboardQuotation) => {
+    setEditingId(qt.id);
+    setPendingQuotationId(null);
+    setEditingCanvasData(qt.canvas_data);
+    setSelectedCustomer(qt.customer_id ? { id: qt.customer_id, full_name: qt.customer_name || '', phone: qt.customer_phone || '' } as any : null);
+    setSelectedVehicle(qt.vehicle_id ? { id: qt.vehicle_id, make: qt.vehicle_make || '', model: qt.vehicle_model || '', reg_number: qt.reg_number || '' } as any : null);
+    setCustSearch('');
+    setQuotationMode(qt.is_manual === 1 ? 'manual' : 'whiteboard');
+    
+    let brand = qt.vehicle_make || '';
+    let model = qt.vehicle_model || '';
+    let regNum = qt.reg_number || '';
+
+    if (!qt.vehicle_id && qt.vehicle_description) {
+      try {
+        if (qt.vehicle_description.trim().startsWith('{')) {
+          const parsed = JSON.parse(qt.vehicle_description);
+          brand = parsed.brand || '';
+          model = parsed.model || '';
+          regNum = parsed.reg_number || '';
+        } else {
+          brand = qt.vehicle_description;
+        }
+      } catch (e) {
+        brand = qt.vehicle_description;
+      }
+    }
+
+    setHeaderForm({
+      customerName: qt.customer_name || qt.customer_name_override || '',
+      customerPhone: qt.customer_phone || qt.customer_phone_override || '',
+      carBrand: brand,
+      carModel: model,
+      carNumber: regNum,
+      validUntil: qt.valid_until?.split('T')[0] || '',
+      notes: qt.notes || '',
+      grandTotal: qt.grand_total ? String(qt.grand_total) : '',
     });
     setShowForm(true);
   };
@@ -589,7 +937,55 @@ export default function QuotationsPage() {
     setShowWhiteboard(true);
   };
 
-  const handleProceedToWhiteboard = (e: React.FormEvent) => {
+  const handleOpenManualEditorForExisting = (qt: WhiteboardQuotation) => {
+    setEditingId(qt.id);
+    setPendingQuotationId(qt.id);
+    
+    let items = [];
+    try {
+      items = typeof qt.manual_items === 'string' ? JSON.parse(qt.manual_items) : (qt.manual_items || []);
+    } catch (e) {
+      items = [];
+    }
+    setManualItems(items);
+    setManualGST(qt.apply_gst);
+    setManualDiscountType(qt.discount_type || 'fixed');
+    setManualDiscountValue(qt.discount_value || 0);
+
+    let brand = qt.vehicle_make || '';
+    let model = qt.vehicle_model || '';
+    let regNum = qt.reg_number || '';
+
+    if (!qt.vehicle_id && qt.vehicle_description) {
+      try {
+        if (qt.vehicle_description.trim().startsWith('{')) {
+          const parsed = JSON.parse(qt.vehicle_description);
+          brand = parsed.brand || '';
+          model = parsed.model || '';
+          regNum = parsed.reg_number || '';
+        } else {
+          brand = qt.vehicle_description;
+        }
+      } catch (e) {
+        brand = qt.vehicle_description;
+      }
+    }
+
+    setHeaderForm({
+      customerName: qt.customer_name || qt.customer_name_override || '',
+      customerPhone: qt.customer_phone || qt.customer_phone_override || '',
+      carBrand: brand,
+      carModel: model,
+      carNumber: regNum,
+      validUntil: qt.valid_until?.split('T')[0] || '',
+      notes: qt.notes || '',
+      grandTotal: qt.grand_total ? String(qt.grand_total) : '',
+    });
+    
+    setShowManualEditor(true);
+  };
+
+  const handleSaveHeader = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCustomer && (!headerForm.customerName || !headerForm.customerPhone)) {
       toast.error('Please input customer name and phone contact details.');
@@ -599,21 +995,34 @@ export default function QuotationsPage() {
       toast.error('Please input Car Brand, Car Model, and Car Number.');
       return;
     }
-    const payload: CreateQuotationPayload = {
-      customer_id: selectedCustomer?.id || undefined,
-      vehicle_id: selectedVehicle?.id || undefined,
-      customer_name_override: !selectedCustomer ? headerForm.customerName : undefined,
-      customer_phone_override: !selectedCustomer ? headerForm.customerPhone : undefined,
+
+    const isEdit = !!editingId;
+
+    const payload: any = {
+      customer_id: selectedCustomer?.id || null,
+      vehicle_id: selectedVehicle?.id || null,
+      customer_name_override: !selectedCustomer ? headerForm.customerName : null,
+      customer_phone_override: !selectedCustomer ? headerForm.customerPhone : null,
       vehicle_description: JSON.stringify({
         brand: headerForm.carBrand,
         model: headerForm.carModel,
         reg_number: headerForm.carNumber
       }),
       valid_until: headerForm.validUntil,
-      notes: headerForm.notes || undefined,
-      grand_total: headerForm.grandTotal ? Number(headerForm.grandTotal) : 0,
+      notes: headerForm.notes || null,
+      is_manual: quotationMode === 'manual' ? 1 : 0,
     };
-    createMutation.mutate(payload);
+
+    if (!isEdit) {
+      payload.grand_total = quotationMode === 'whiteboard' ? (headerForm.grandTotal ? Number(headerForm.grandTotal) : 0) : 0;
+      payload.manual_items = quotationMode === 'manual' ? '[]' : null;
+      createMutation.mutate(payload);
+    } else {
+      if (quotationMode === 'whiteboard') {
+        payload.grand_total = headerForm.grandTotal ? Number(headerForm.grandTotal) : 0;
+      }
+      updateMutation.mutate({ id: editingId, payload });
+    }
     setShowForm(false);
   };
 
@@ -665,14 +1074,54 @@ export default function QuotationsPage() {
         />
       )}
 
+      {/* ── Manual items editor modal ── */}
+      {showManualEditor && (
+        <ManualEditorModal
+          editingId={pendingQuotationId || editingId}
+          initialItems={manualItems}
+          initialGST={manualGST}
+          initialDiscountType={manualDiscountType}
+          initialDiscountValue={manualDiscountValue}
+          customerHeader={{
+            customerName: headerForm.customerName,
+            customerPhone: headerForm.customerPhone,
+            vehicleDescription: `${headerForm.carBrand} ${headerForm.carModel} ${headerForm.carNumber ? `[${headerForm.carNumber}]` : ''}`.trim(),
+            validUntil: headerForm.validUntil,
+            notes: headerForm.notes,
+          }}
+          onSave={(payload) => {
+            const id = pendingQuotationId || editingId;
+            if (id) {
+              updateMutation.mutate({ id, payload });
+            }
+          }}
+          onDiscard={() => {
+            const isNew = !editingId;
+            const id = pendingQuotationId || editingId;
+            if (isNew && id) deleteMutation.mutate(id);
+            setShowManualEditor(false);
+            setPendingQuotationId(null);
+            setEditingId(null);
+          }}
+          onClose={() => {
+            setShowManualEditor(false);
+            setPendingQuotationId(null);
+            setEditingId(null);
+          }}
+          isSaving={updateMutation.isPending}
+        />
+      )}
+
       {/* ── New Quotation customer header modal ── */}
       {showForm && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-[#111111] border border-white/10 rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-4 max-h-[95vh] overflow-y-auto custom-scrollbar">
             <div className="flex justify-between items-center">
               <div>
-                <h3 className="font-label-caps text-sm text-white tracking-widest">NEW WHITEBOARD QUOTATION</h3>
-                <p className="text-xs text-on-surface-variant/50 font-data-sm">Set customer context first, then draw details</p>
+                <h3 className="font-label-caps text-sm text-white tracking-widest">
+                  {editingId ? 'EDIT QUOTATION DETAILS' : 'NEW QUOTATION'}
+                </h3>
+                <p className="text-xs text-on-surface-variant/50 font-data-sm">Set customer context first, then input details</p>
               </div>
               <button
                 onClick={() => setShowForm(false)}
@@ -682,7 +1131,37 @@ export default function QuotationsPage() {
               </button>
             </div>
 
-            <form onSubmit={handleProceedToWhiteboard} className="space-y-4">
+            <form onSubmit={handleSaveHeader} className="space-y-4">
+              {/* Quotation Mode Selection */}
+              <div className="space-y-1">
+                <label className="block font-label-caps text-[10px] text-on-surface-variant/60 uppercase tracking-wider mb-1">
+                  Quotation Mode
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setQuotationMode('whiteboard')}
+                    className={`flex-1 py-2 rounded-xl text-xs font-label-caps border transition-all ${
+                      quotationMode === 'whiteboard'
+                        ? 'bg-performance-red border-performance-red text-white'
+                        : 'bg-white/5 border-white/10 text-on-surface-variant/70 hover:text-white'
+                    }`}
+                  >
+                    Whiteboard (Draw)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuotationMode('manual')}
+                    className={`flex-1 py-2 rounded-xl text-xs font-label-caps border transition-all ${
+                      quotationMode === 'manual'
+                        ? 'bg-performance-red border-performance-red text-white'
+                        : 'bg-white/5 border-white/10 text-on-surface-variant/70 hover:text-white'
+                    }`}
+                  >
+                    Manual (Add Items)
+                  </button>
+                </div>
+              </div>
               {/* Dynamic Customer Search */}
               <div>
                 <label className="block font-label-caps text-[10px] text-on-surface-variant/60 uppercase tracking-wider mb-1">
@@ -849,16 +1328,18 @@ export default function QuotationsPage() {
                     className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-performance-red/40"
                   />
                 </div>
-                <div>
-                  <label className="block font-label-caps text-[10px] text-on-surface-variant/60 uppercase tracking-wider mb-1">Estimated Total (₹)</label>
-                  <input
-                    type="number"
-                    value={headerForm.grandTotal}
-                    onChange={e => setHeaderForm(prev => ({ ...prev, grandTotal: e.target.value }))}
-                    placeholder="e.g. 75000"
-                    className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-performance-red/40"
-                  />
-                </div>
+                {quotationMode === 'whiteboard' && (
+                  <div>
+                    <label className="block font-label-caps text-[10px] text-on-surface-variant/60 uppercase tracking-wider mb-1">Estimated Total (₹)</label>
+                    <input
+                      type="number"
+                      value={headerForm.grandTotal}
+                      onChange={e => setHeaderForm(prev => ({ ...prev, grandTotal: e.target.value }))}
+                      placeholder="e.g. 75000"
+                      className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-performance-red/40"
+                    />
+                  </div>
+                )}
               </div>
 
               <div>
@@ -884,7 +1365,7 @@ export default function QuotationsPage() {
                   disabled={createMutation.isPending}
                   className="px-5 py-2 performance-gradient text-white rounded-xl text-xs font-label-caps tracking-widest hover:shadow-[0_0_15px_rgba(255,43,43,0.3)] disabled:opacity-50 transition-all uppercase"
                 >
-                  {createMutation.isPending ? 'Proceeding…' : 'Proceed to Whiteboard'}
+                  {createMutation.isPending ? 'Proceeding…' : (quotationMode === 'manual' ? 'Proceed to Items Editor' : 'Proceed to Whiteboard')}
                 </button>
               </div>
             </form>
@@ -922,13 +1403,22 @@ export default function QuotationsPage() {
             {showRecycleBin ? 'Active Quotes' : 'Recycle Bin'}
           </button>
           {!showRecycleBin && (
-            <button
-              onClick={handleCreateNew}
-              className="performance-gradient text-white font-label-caps text-label-caps px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl flex items-center gap-2 hover:shadow-[0_0_25px_rgba(255,43,43,0.35)] transition-all border border-white/10 uppercase tracking-widest text-[10px] sm:text-xs flex-grow sm:flex-grow-0 justify-center"
-            >
-              <span className="material-symbols-outlined text-[18px]">add</span>
-              New Quotation
-            </button>
+            <div className="flex gap-2 flex-grow sm:flex-grow-0">
+              <button
+                onClick={() => handleCreateNew('whiteboard')}
+                className="bg-white/5 border border-white/10 text-white font-label-caps text-xs px-4 py-2.5 sm:py-3 rounded-xl flex items-center gap-2 hover:bg-white/10 active:scale-[0.98] transition-all uppercase tracking-widest text-[10px] sm:text-xs justify-center cursor-pointer font-bold"
+              >
+                <span className="material-symbols-outlined text-[18px]">stylus</span>
+                Whiteboard
+              </button>
+              <button
+                onClick={() => handleCreateNew('manual')}
+                className="performance-gradient text-white font-label-caps text-xs px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl flex items-center gap-2 hover:shadow-[0_0_25px_rgba(255,43,43,0.35)] active:scale-[0.98] transition-all border border-white/10 uppercase tracking-widest text-[10px] sm:text-xs justify-center cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">list_alt</span>
+                Manual Quote
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -998,8 +1488,39 @@ export default function QuotationsPage() {
             return (
               <div key={qt.id} className="glass-panel rounded-2xl flex flex-col overflow-hidden border border-white/5 bg-white/[0.01] hover:border-white/10 transition-all group">
                 {/* Visual Snapshot Preview */}
-                <div className="relative h-36 bg-[#161616] flex items-center justify-center border-b border-white/5 overflow-hidden">
-                  {qt.canvas_snapshot ? (
+                <div className="relative h-36 bg-[#161616] flex flex-col justify-between border-b border-white/5 overflow-hidden p-3.5">
+                  {qt.is_manual === 1 ? (
+                    <div className="space-y-1 overflow-hidden h-full flex flex-col justify-center">
+                      <div className="flex items-center gap-1 text-[9px] font-label-caps text-on-surface-variant/60 tracking-wider mb-1">
+                        <span className="material-symbols-outlined text-xs">list_alt</span>
+                        Manual Quotation Items
+                      </div>
+                      {(() => {
+                        let items = [];
+                        try {
+                          items = typeof qt.manual_items === 'string' ? JSON.parse(qt.manual_items) : (qt.manual_items || []);
+                        } catch(e) {}
+                        if (!Array.isArray(items) || items.length === 0) {
+                          return <p className="text-[10px] text-on-surface-variant/40 italic">No items added yet.</p>;
+                        }
+                        return (
+                          <div className="space-y-1 overflow-hidden">
+                            {items.slice(0, 2).map((item: any, idx: number) => (
+                              <div key={idx} className="flex justify-between items-center text-[11px] text-white/80 font-data-sm">
+                                <span className="truncate pr-2">{item.description}</span>
+                                <span className="shrink-0 font-mono text-[10px] text-on-surface-variant">₹{Number(item.amount).toLocaleString('en-IN')}</span>
+                              </div>
+                            ))}
+                            {items.length > 2 && (
+                              <p className="text-[9px] text-performance-red font-label-caps uppercase tracking-wider mt-1">
+                                + {items.length - 2} more item(s)
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  ) : qt.canvas_snapshot ? (
                     <img
                       src={qt.canvas_snapshot}
                       alt="Canvas Snapshot"
@@ -1087,13 +1608,32 @@ export default function QuotationsPage() {
                   </div>
                 ) : (
                   <div className="p-3 bg-black/30 border-t border-white/5 flex gap-2">
+                    {qt.is_manual === 1 ? (
+                      <button
+                        onClick={() => handleOpenManualEditorForExisting(qt)}
+                        className="flex-grow flex items-center justify-center gap-1 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-xl text-xs text-white font-label-caps tracking-widest transition-all cursor-pointer"
+                        title="Edit Quotation Items"
+                      >
+                        <span className="material-symbols-outlined text-sm">list_alt</span>
+                        Items
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleOpenWhiteboardForExisting(qt)}
+                        className="flex-grow flex items-center justify-center gap-1 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-xl text-xs text-white font-label-caps tracking-widest transition-all cursor-pointer"
+                        title="Edit Whiteboard Drawing"
+                      >
+                        <span className="material-symbols-outlined text-sm">stylus</span>
+                        Draw
+                      </button>
+                    )}
+
                     <button
-                      onClick={() => handleOpenWhiteboardForExisting(qt)}
-                      className="flex-grow flex items-center justify-center gap-1 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 rounded-xl text-xs text-white font-label-caps tracking-widest transition-all cursor-pointer"
-                      title="Edit Whiteboard Drawing"
+                      onClick={() => handleEditHeader(qt)}
+                      className="p-2 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-on-surface-variant/80 hover:text-white transition-colors cursor-pointer"
+                      title="Edit Details / Mode"
                     >
-                      <span className="material-symbols-outlined text-sm">stylus</span>
-                      Draw
+                      <span className="material-symbols-outlined text-base">edit</span>
                     </button>
 
                     <button

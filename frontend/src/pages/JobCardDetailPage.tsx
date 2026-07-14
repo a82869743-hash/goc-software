@@ -415,7 +415,7 @@ export default function JobCardDetailPage() {
           <button onClick={openWhatsApp} className="px-4 py-2 rounded-lg border border-green-500/20 text-green-400 hover:bg-green-500/10 font-label-caps text-xs tracking-widest transition-all flex items-center gap-2">
             <span className="material-symbols-outlined text-[16px]">send</span> WhatsApp
           </button>
-          {!['delivered', 'cancelled'].includes(job.status) && staff?.role === 'admin' && (
+          {staff?.role === 'admin' && (
             <button
               onClick={() => { if (window.confirm('Delete this job card?')) deleteMutation.mutate(); }}
               className="px-4 py-2 rounded-lg border border-red-500/20 text-red-400 hover:bg-red-500/10 font-label-caps text-xs tracking-widest transition-all flex items-center gap-2"

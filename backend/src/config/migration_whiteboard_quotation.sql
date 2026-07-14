@@ -18,4 +18,6 @@ ALTER TABLE quotations
 -- 3. Ensure all required columns exist on quotations
 ALTER TABLE quotations
   MODIFY COLUMN customer_id INT UNSIGNED NULL,
-  MODIFY COLUMN vehicle_id INT UNSIGNED NULL;
+  MODIFY COLUMN vehicle_id INT UNSIGNED NULL,
+  ADD COLUMN IF NOT EXISTS is_manual TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1 if manual itemized, 0 if whiteboard',
+  ADD COLUMN IF NOT EXISTS manual_items JSON NULL COMMENT 'JSON array of manual quote items';

@@ -50,6 +50,22 @@ pool.getConnection()
       WHERE staff_code = 'GOC-STF-01' AND (full_name = 'Ravi Patel' OR full_name = 'Ravi Sharma');
     `).catch(err => console.error('❌ Failed to auto-update default staff name:', err));
 
+    // Auto-migrate system_logs table if not exists
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS system_logs (
+        id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        staff_id        INT UNSIGNED NULL,
+        action_type     VARCHAR(100) NOT NULL,
+        entity_type     VARCHAR(100) NULL,
+        entity_id       INT UNSIGNED NULL,
+        description     TEXT NOT NULL,
+        ip_address      VARCHAR(45) NULL,
+        user_agent      TEXT NULL,
+        created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (staff_id) REFERENCES staff(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `).catch(err => console.error('❌ Failed to auto-migrate system_logs table:', err));
+
     // Auto-migrate quotation_revisions table if not exists
     await conn.query(`
       CREATE TABLE IF NOT EXISTS quotation_revisions (
@@ -597,6 +613,45 @@ pool.getConnection()
     `).catch(err => {
       if (err.code !== 'ER_DUP_FIELDNAME') {
         console.error('❌ Failed to run staff token_version migration:', err.message);
+      }
+    });
+
+    // Ensure vehicles has chassis_number and engine_number columns
+    const addVehCols = [
+      "ALTER TABLE vehicles ADD COLUMN chassis_number VARCHAR(100) NULL",
+      "ALTER TABLE vehicles ADD COLUMN engine_number VARCHAR(100) NULL"
+    ];
+    for (const sql of addVehCols) {
+      await conn.query(sql).catch(err => {
+        if (err.code !== 'ER_DUP_FIELDNAME') {
+          console.error(`❌ Failed to run vehicles migration (${sql}):`, err.message);
+        }
+      });
+    }
+
+    // Ensure job_cards has card_charges column
+    await conn.query("ALTER TABLE job_cards ADD COLUMN card_charges DECIMAL(10,2) NOT NULL DEFAULT 0.00").catch(err => {
+      if (err.code !== 'ER_DUP_FIELDNAME') {
+        console.error('❌ Failed to run job_cards card_charges migration:', err.message);
+      }
+    });
+
+    // Ensure invoices has card_charges column
+    await conn.query("ALTER TABLE invoices ADD COLUMN card_charges DECIMAL(10,2) NOT NULL DEFAULT 0.00").catch(err => {
+      if (err.code !== 'ER_DUP_FIELDNAME') {
+        console.error('❌ Failed to run invoices card_charges migration:', err.message);
+      }
+    });
+
+    // Ensure quotations has is_manual and manual_items columns
+    await conn.query("ALTER TABLE quotations ADD COLUMN is_manual TINYINT(1) NOT NULL DEFAULT 0").catch(err => {
+      if (err.code !== 'ER_DUP_FIELDNAME') {
+        console.error('❌ Failed to run quotations is_manual migration:', err.message);
+      }
+    });
+    await conn.query("ALTER TABLE quotations ADD COLUMN manual_items JSON NULL").catch(err => {
+      if (err.code !== 'ER_DUP_FIELDNAME') {
+        console.error('❌ Failed to run quotations manual_items migration:', err.message);
       }
     });
 

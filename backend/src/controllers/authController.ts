@@ -96,7 +96,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       staff_code: staff.staff_code,
       role: staff.role,
       full_name: staff.full_name,
-      token_version: staff.token_version || 1,
+      token_version: staff.token_version ?? 1,
     });
 
     await logActivity(

@@ -23,6 +23,8 @@ export interface WhiteboardQuotation {
   status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
   pdf_url: string | null;
   notes: string | null;
+  is_manual?: number;
+  manual_items?: string | null;
   customer_name?: string;
   customer_phone?: string;
   vehicle_name?: string;
@@ -50,6 +52,8 @@ export interface CreateQuotationPayload {
   grand_total?: number;
   valid_until?: string;
   notes?: string;
+  is_manual?: number;
+  manual_items?: string | null;
 }
 
 export const quotationsAPI = {

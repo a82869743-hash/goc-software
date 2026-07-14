@@ -1415,8 +1415,8 @@ export default function ModulePage() {
 ## 18. LOGIN & TEST CREDENTIALS
 
 ```
-Phone:    9999999999
-Password: Admin@2024
+Phone:    9925566886
+Password: hiru@123
 ```
 
 This maps to the default staff record:

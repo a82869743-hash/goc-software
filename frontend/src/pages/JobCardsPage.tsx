@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { jobsAPI, JobCard } from '../api/jobs';
 import toast from 'react-hot-toast';
+import { useAuthStore } from '../stores/authStore';
 
 type JobStatus = 'scheduled' | 'car_in' | 'washing' | 'in_progress' | 'qc' | 'rework' | 'ready' | 'delivered' | 'cancelled' | 'estimate';
 
@@ -31,6 +32,8 @@ const PIPELINE_TABS: Array<{ value: string; label: string }> = [
 export default function JobCardsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const staff = useAuthStore(s => s.staff);
+  const isAdmin = staff?.role === 'admin';
   const [activeTab, setActiveTab] = useState('all');
   const [search, setSearch] = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -249,7 +252,7 @@ export default function JobCardsPage() {
                           <Link to={`/jobs/${job.id}/edit`} className="p-1.5 rounded-lg hover:bg-white/5 text-on-surface-variant/30 hover:text-white transition-colors" title="Edit">
                             <span className="material-symbols-outlined text-[16px]">edit</span>
                           </Link>
-                          {!['delivered', 'cancelled'].includes(job.status) && (
+                          {isAdmin && (
                             <button
                               onClick={() => {
                                 if (window.confirm(`Delete job card ${job.job_code}? This cannot be undone.`)) {

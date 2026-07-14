@@ -107,9 +107,9 @@ INSERT IGNORE INTO quick_services
 
 -- ── 7. ALTER EXISTING job_cards TABLE ────────────────────────────
 -- IMPORTANT: Add column logic for MySQL compatibility.
-ALTER TABLE job_cards ADD COLUMN IF NOT EXISTS public_token VARCHAR(64) UNIQUE DEFAULT NULL;
-ALTER TABLE job_cards ADD COLUMN IF NOT EXISTS insurance_company VARCHAR(150) DEFAULT NULL;
-ALTER TABLE job_cards ADD COLUMN IF NOT EXISTS insurance_expiry DATE DEFAULT NULL;
+ALTER TABLE job_cards ADD COLUMN public_token VARCHAR(64) UNIQUE DEFAULT NULL;
+ALTER TABLE job_cards ADD COLUMN insurance_company VARCHAR(150) DEFAULT NULL;
+ALTER TABLE job_cards ADD COLUMN insurance_expiry DATE DEFAULT NULL;
 
 -- ── 8. JOB CARD MEDIA (before/after images + videos) ─────────────
 CREATE TABLE IF NOT EXISTS job_card_media (

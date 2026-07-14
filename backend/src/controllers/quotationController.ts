@@ -111,8 +111,8 @@ export const createQuotation = async (req: Request, res: Response): Promise<void
          canvas_data, canvas_snapshot,
          subtotal, discount_type, discount_value, discount_amount,
          apply_gst, gst_amount, grand_total,
-         valid_until, status, notes, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?)`,
+         valid_until, status, notes, created_by, is_manual, manual_items)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?)`,
       [
         code,
         d.customer_id || null,
@@ -132,7 +132,9 @@ export const createQuotation = async (req: Request, res: Response): Promise<void
         d.grand_total || 0,
         validUntil,
         d.notes || null,
-        staffId
+        staffId,
+        d.is_manual ? 1 : 0,
+        d.manual_items ? (typeof d.manual_items === 'string' ? d.manual_items : JSON.stringify(d.manual_items)) : null
       ]
     );
 
@@ -180,6 +182,8 @@ export const updateQuotation = async (req: Request, res: Response): Promise<void
       status: d.status,
       notes: d.notes,
       pdf_url: d.pdf_url,
+      is_manual: d.is_manual !== undefined ? (d.is_manual ? 1 : 0) : undefined,
+      manual_items: d.manual_items !== undefined ? (typeof d.manual_items === 'string' ? d.manual_items : JSON.stringify(d.manual_items)) : undefined,
     };
 
     for (const [key, val] of Object.entries(allowed)) {
@@ -339,6 +343,87 @@ export const generateQuotationPDF = async (req: Request, res: Response): Promise
       ? (qt.canvas_snapshot.startsWith('data:') ? qt.canvas_snapshot : `data:image/png;base64,${qt.canvas_snapshot}`)
       : '';
 
+    let detailsHtml = '';
+    if (qt.is_manual) {
+      let items = [];
+      try {
+        items = typeof qt.manual_items === 'string' ? JSON.parse(qt.manual_items) : (qt.manual_items || []);
+      } catch (e) {
+        items = [];
+      }
+
+      let rowsHtml = '';
+      for (const item of items) {
+        const desc = item.description || '';
+        const qty = Number(item.qty || 1);
+        const rate = Number(item.rate || 0);
+        const amt = Number(item.amount || (qty * rate));
+        rowsHtml += `
+          <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: left;">${desc}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: center;">${qty}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">₹${rate.toLocaleString('en-IN')}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">₹${amt.toLocaleString('en-IN')}</td>
+          </tr>
+        `;
+      }
+
+      const subtotal = Number(qt.subtotal || 0);
+      const discount = Number(qt.discount_amount || 0);
+      const gst = Number(qt.gst_amount || 0);
+      const grandTotal = Number(qt.grand_total || 0);
+
+      detailsHtml = `
+        <div style="padding: 24px 32px;">
+          <h3 style="font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: #888; margin-bottom: 12px;">Quotation Items</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13px;">
+            <thead>
+              <tr style="background: #f8f8f8; border-bottom: 2px solid #ddd;">
+                <th style="padding: 10px; text-align: left; font-weight: bold; color: #555;">Description</th>
+                <th style="padding: 10px; text-align: center; font-weight: bold; color: #555; width: 80px;">Qty</th>
+                <th style="padding: 10px; text-align: right; font-weight: bold; color: #555; width: 120px;">Rate</th>
+                <th style="padding: 10px; text-align: right; font-weight: bold; color: #555; width: 120px;">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml || '<tr><td colspan="4" style="padding: 20px; text-align: center; color: #999;">No items added.</td></tr>'}
+            </tbody>
+          </table>
+          
+          <div style="width: 320px; margin-left: auto; font-size: 13px; line-height: 1.6;">
+            <div style="display: flex; justify-content: space-between; padding: 4px 0;">
+              <span style="color: #666;">Subtotal:</span>
+              <span style="font-weight: 600;">₹${subtotal.toLocaleString('en-IN')}</span>
+            </div>
+            ${discount > 0 ? `
+            <div style="display: flex; justify-content: space-between; padding: 4px 0; color: #c00;">
+              <span>Discount:</span>
+              <span>-₹${discount.toLocaleString('en-IN')}</span>
+            </div>` : ''}
+            ${qt.apply_gst ? `
+            <div style="display: flex; justify-content: space-between; padding: 4px 0;">
+              <span style="color: #666;">GST:</span>
+              <span style="font-weight: 600;">₹${gst.toLocaleString('en-IN')}</span>
+            </div>` : ''}
+            <div style="display: flex; justify-content: space-between; padding: 8px 0; border-top: 1px solid #ddd; margin-top: 4px; font-size: 15px;">
+              <strong style="color: #CC0000;">Grand Total:</strong>
+              <strong style="color: #CC0000;">₹${grandTotal.toLocaleString('en-IN')}</strong>
+            </div>
+          </div>
+        </div>
+      `;
+    } else {
+      detailsHtml = `
+        <div class="canvas-section">
+          <h3>Quotation Details (Handwritten)</h3>
+          ${snapshotSrc
+            ? `<img class="canvas-img" src="${snapshotSrc}" alt="Quotation Canvas"/>`
+            : `<div class="canvas-blank">No canvas drawing saved for this quotation.</div>`
+          }
+        </div>
+      `;
+    }
+
     const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -381,13 +466,7 @@ export const generateQuotationPDF = async (req: Request, res: Response): Promise
   <div class="info-item"><label>Car Number</label><span>${regNumber || '—'}</span></div>
 </div>
 
-<div class="canvas-section">
-  <h3>Quotation Details (Handwritten)</h3>
-  ${snapshotSrc
-    ? `<img class="canvas-img" src="${snapshotSrc}" alt="Quotation Canvas"/>`
-    : `<div class="canvas-blank">No canvas drawing saved for this quotation.</div>`
-  }
-</div>
+${detailsHtml}
 
 ${qt.notes ? `<div style="padding:0 32px 16px;font-size:13px;color:#555;"><strong>Notes:</strong> ${qt.notes}</div>` : ''}
 

@@ -58,6 +58,7 @@ export interface JobCard {
   customer_address?: string | null;
   customer_city?: string | null;
   customer_notes?: string | null;
+  public_token?: string | null;
   insurance_company?: string | null;
   insurance_expiry?: string | null;
   km_reading?: number | null;

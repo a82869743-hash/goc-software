@@ -233,6 +233,7 @@ export interface JobCard {
   delivery_notes: string | null;
   internal_notes: string | null;
   created_by: number;
+  public_token?: string | null;
   created_at: string;
   completion_type?: 'invoice' | 'estimate' | null;
   services?: JobService[];

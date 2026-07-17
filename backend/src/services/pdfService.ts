@@ -553,9 +553,17 @@ export async function generateQuotationPDF(quotationId: number): Promise<string>
 
   const [zones] = await pool.query<RowDataPacket[]>('SELECT * FROM quotation_zones WHERE quotation_id = ?', [quotationId]);
 
-  const studioName = process.env.STUDIO_NAME || 'Pack Wolf Pvt Ltd';
+  const studioName = process.env.STUDIO_NAME || 'God of Ceramic';
   const studioAddress = process.env.STUDIO_ADDRESS || 'Near Akshar Chowk, Alkapuri, Vadodara, Gujarat 390007';
   const studioPhone = process.env.STUDIO_PHONE || '+91 9925566886';
+
+  let logoBase64 = '';
+  try {
+    const logoPath = path.resolve(__dirname, '../../../uploads/logo.png');
+    if (fs.existsSync(logoPath)) {
+      logoBase64 = fs.readFileSync(logoPath, 'base64');
+    }
+  } catch (e) {}
 
   const html = `
     <!DOCTYPE html>
@@ -569,7 +577,7 @@ export async function generateQuotationPDF(quotationId: number): Promise<string>
       <div class="page">
         <div class="header">
           <div class="brand">
-            <div class="brand-mark">G</div>
+            ${logoBase64 ? '<img src="data:image/png;base64,' + logoBase64 + '" style="height: 48px; vertical-align: middle; margin-right: 12px;" />' : '<div class="brand-mark">G</div>'}
             <div class="brand-text">
               <h1>${studioName.toUpperCase()}</h1>
               <p>${studioAddress}</p>

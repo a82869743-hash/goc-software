@@ -268,7 +268,10 @@ export default function JobCardDetailPage() {
   const invoiceData = invoiceDataRes?.data;
 
   const getWhatsAppNumber = (phone: string) => {
-    const clean = phone.replace(/\D/g, '');
+    let clean = phone.replace(/\D/g, '');
+    if (clean.startsWith('0')) {
+      clean = clean.slice(1);
+    }
     return clean.length === 10 ? `91${clean}` : clean;
   };
 

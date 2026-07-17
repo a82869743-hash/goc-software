@@ -15,7 +15,16 @@ conn.on('ready', () => {
     cd /root/goc-software/backend
     npm run build
 
-    echo "=== 3. Restarting Backend Server ==="
+    echo "=== 3. Building Frontend ==="
+    cd /root/goc-software/frontend
+    npm run build
+    
+    echo "=== 4. Updating Frontend deployment directory ==="
+    mkdir -p /var/www/goc-studio
+    rm -rf /var/www/goc-studio/*
+    cp -r dist/* /var/www/goc-studio/
+
+    echo "=== 5. Restarting Backend Server ==="
     pm2 restart goc-backend
     echo "=== Deployment Successful! ==="
   `;
@@ -36,5 +45,5 @@ conn.on('ready', () => {
   port: 22,
   username: 'root',
   password: 'PremSingh123@',
-  readyTimeout: 60000
+  readyTimeout: 90000
 });

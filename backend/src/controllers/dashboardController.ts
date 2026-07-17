@@ -9,7 +9,7 @@ import { RowDataPacket } from 'mysql2';
  */
 export const getDashboardKPIs = async (_req: Request, res: Response): Promise<void> => {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
     // Today's revenue (payments received today)
     const [revQ] = await pool.query<RowDataPacket[]>(
@@ -94,7 +94,7 @@ export const getRecentJobs = async (_req: Request, res: Response): Promise<void>
  */
 export const getRevenueChart = async (_req: Request, res: Response): Promise<void> => {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
     const monthStart = `${today.substring(0, 7)}-01`;
 
     const [rows] = await pool.query<RowDataPacket[]>(
@@ -105,7 +105,12 @@ export const getRevenueChart = async (_req: Request, res: Response): Promise<voi
       [monthStart, today]
     );
 
-    res.json({ success: true, data: rows });
+    const formattedRows = rows.map(r => ({
+      date: r.date,
+      revenue: Number(r.revenue)
+    }));
+
+    res.json({ success: true, data: formattedRows });
   } catch (error) { console.error('Revenue chart error:', error); res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed.' } }); }
 };
 
@@ -156,7 +161,7 @@ export const getLowStockItems = async (_req: Request, res: Response): Promise<vo
 /** GET /dashboard/extended-stats — Extended analytics for charts */
 export const getExtendedDashboardStats = async (_req: Request, res: Response): Promise<void> => {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
     const thisMonth = today.substring(0, 7);
     const lastMonthDate = new Date();
     lastMonthDate.setMonth(lastMonthDate.getMonth() - 1);

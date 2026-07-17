@@ -48,8 +48,7 @@ export default function PublicTrackingPage() {
         const baseApiUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
           ? 'http://localhost:4000/api/v1'
           : `${window.location.origin}/api/v1`;
-        const backendBase = baseApiUrl.replace('/api/v1', '');
-        const res = await axios.get(`${backendBase}/public/job-card/${token}`);
+        const res = await axios.get(`${baseApiUrl}/public/job-card/${token}`);
         if (res.data && res.data.success) {
           setData(res.data.data);
         } else {

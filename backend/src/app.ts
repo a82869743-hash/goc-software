@@ -101,7 +101,7 @@ app.use(`${API_PREFIX}/integrations`, integrationsRoutes);
 app.use(`${API_PREFIX}/staff-management`, staffManagementRoutes);
 app.use(`${API_PREFIX}/system-logs`, systemLogsRoutes);
 app.use(`${API_PREFIX}/warranties`, warrantiesRoutes);
-app.use(`/public`, publicTrackingRoutes);
+app.use(`${API_PREFIX}/public`, publicTrackingRoutes);
 // ── Initialize Cron Jobs ────────────────────────────────────
 if (process.env.NODE_ENV !== 'test') {
   initCronJobs();

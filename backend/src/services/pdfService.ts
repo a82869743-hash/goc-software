@@ -755,7 +755,7 @@ export async function generateJobCardPDF(jobId: number): Promise<string> {
     <head>
       <meta charset="utf-8">
       <style>
-        \${sharedStyles}
+        ${sharedStyles}
         body { font-family: 'Inter', -apple-system, sans-serif; color: #1a1a1a; font-size: 11px; }
         .concern-item { padding: 6px 10px; background: #fff3cd; border: 1px solid #ffeeba; border-radius: 6px; margin-bottom: 6px; }
         .owner-avatar { width: 100px; height: 100px; border-radius: 8px; border: 1px solid #ddd; object-fit: cover; }
@@ -765,59 +765,59 @@ export async function generateJobCardPDF(jobId: number): Promise<string> {
       <div class="page">
         <div class="header">
           <div class="brand">
-            \${logoBase64 ? '<img src="data:image/png;base64,' + logoBase64 + '" style="height: 48px; vertical-align: middle; margin-right: 12px;" />' : '<div class="brand-mark">G</div>'}
+            ${logoBase64 ? '<img src="data:image/png;base64,' + logoBase64 + '" style="height: 48px; vertical-align: middle; margin-right: 12px;" />' : '<div class="brand-mark">G</div>'}
             <div class="brand-text">
-              <h1>\${studioName.toUpperCase()}</h1>
-              <p>\${studioAddress}</p>
-              <p>Phone: \${studioPhone}</p>
+              <h1>${studioName.toUpperCase()}</h1>
+              <p>${studioAddress}</p>
+              <p>Phone: ${studioPhone}</p>
             </div>
           </div>
           <div class="doc-type">
             <h2>JOB CARD</h2>
-            <div class="doc-number">\${job.job_code}</div>
-            <div class="doc-date">Date In: \${job.date_in ? formatDate(job.date_in) : formatDate(job.created_at)}</div>
-            \${job.expected_out ? \`<div class="doc-date" style="color:#CC0000; font-weight:600;">Expected Out: \${formatDate(job.expected_out)}</div>\` : ''}
+            <div class="doc-number">${job.job_code}</div>
+            <div class="doc-date">Date In: ${job.date_in ? formatDate(job.date_in) : formatDate(job.created_at)}</div>
+            ${job.expected_out ? `<div class="doc-date" style="color:#CC0000; font-weight:600;">Expected Out: ${formatDate(job.expected_out)}</div>` : ''}
           </div>
         </div>
 
         <div style="display:flex; justify-content:space-between; gap:20px; margin-bottom:20px;">
           <div class="info-box" style="flex:1;">
             <h3>Customer Details</h3>
-            <div class="info-row"><span class="info-label">Name</span><span class="info-value">\${job.customer_name || '-'}</span></div>
-            <div class="info-row"><span class="info-label">Phone</span><span class="info-value">\${job.customer_phone || '-'}</span></div>
-            <div class="info-row"><span class="info-label">Email</span><span class="info-value">\${job.customer_email || '-'}</span></div>
-            <div class="info-row"><span class="info-label">Address</span><span class="info-value">\${job.customer_address || '-'}, \${job.customer_city || ''}</span></div>
+            <div class="info-row"><span class="info-label">Name</span><span class="info-value">${job.customer_name || '-'}</span></div>
+            <div class="info-row"><span class="info-label">Phone</span><span class="info-value">${job.customer_phone || '-'}</span></div>
+            <div class="info-row"><span class="info-label">Email</span><span class="info-value">${job.customer_email || '-'}</span></div>
+            <div class="info-row"><span class="info-label">Address</span><span class="info-value">${job.customer_address || '-'}, ${job.customer_city || ''}</span></div>
           </div>
           
           <div class="info-box" style="flex:1;">
             <h3>Vehicle Details</h3>
-            <div class="info-row"><span class="info-label">Vehicle</span><span class="info-value">\${job.vehicle_name || '-'}</span></div>
-            <div class="info-row"><span class="info-label">Reg No.</span><span class="info-value">\${job.reg_number || '-'}</span></div>
-            <div class="info-row"><span class="info-label">Color</span><span class="info-value">\${job.vehicle_color || '-'}</span></div>
-            <div class="info-row"><span class="info-label">Year</span><span class="info-value">\${job.vehicle_year || '-'}</span></div>
-            \${job.chassis_number ? \`<div class="info-row"><span class="info-label">Chassis No</span><span class="info-value">\${job.chassis_number}</span></div>\` : ''}
+            <div class="info-row"><span class="info-label">Vehicle</span><span class="info-value">${job.vehicle_name || '-'}</span></div>
+            <div class="info-row"><span class="info-label">Reg No.</span><span class="info-value">${job.reg_number || '-'}</span></div>
+            <div class="info-row"><span class="info-label">Color</span><span class="info-value">${job.vehicle_color || '-'}</span></div>
+            <div class="info-row"><span class="info-label">Year</span><span class="info-value">${job.vehicle_year || '-'}</span></div>
+            ${job.chassis_number ? `<div class="info-row"><span class="info-label">Chassis No</span><span class="info-value">${job.chassis_number}</span></div>` : ''}
           </div>
 
-          \${ownerImgBase64 ? \`
+          ${ownerImgBase64 ? `
             <div style="text-align:center;">
               <h3 style="font-size:9px; font-weight:700; color:#CC0000; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">Owner Image</h3>
-              <img src="data:image/png;base64,\${ownerImgBase64}" class="owner-avatar" />
+              <img src="data:image/png;base64,${ownerImgBase64}" class="owner-avatar" />
             </div>
-          \` : ''}
+          ` : ''}
         </div>
 
-        \${concerns.length > 0 ? \`
+        ${concerns.length > 0 ? `
           <div style="margin-bottom:20px;">
             <h3 style="font-size:10px; font-weight:700; color:#CC0000; text-transform:uppercase; letter-spacing:1.5px; margin-bottom:8px;">Customer Concerns / Requirements</h3>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-              \${concerns.map(c => \`
+              ${concerns.map(c => `
                 <div class="concern-item">
-                  <strong>\${c.concern_type.toUpperCase()}:</strong> \${c.description}
+                  <strong>${c.concern_type.toUpperCase()}:</strong> ${c.description}
                 </div>
-              \`).join('')}
+              `).join('')}
             </div>
           </div>
-        \` : ''}
+        ` : ''}
 
         <h3 style="font-size:10px; font-weight:700; color:#CC0000; text-transform:uppercase; letter-spacing:1.5px; margin-bottom:8px;">Job Card Services</h3>
         <table>
@@ -831,28 +831,28 @@ export async function generateJobCardPDF(jobId: number): Promise<string> {
             </tr>
           </thead>
           <tbody>
-            \${services.length === 0 ? \`
+            ${services.length === 0 ? `
               <tr><td colspan="5" style="text-align:center; color:#999; font-style:italic;">No services added yet</td></tr>
-            \` : services.map((s, idx) => \`
+            ` : services.map((s, idx) => `
               <tr>
-                <td>\${idx + 1}</td>
-                <td><strong>\${s.service_name}</strong>\${s.description ? \`<br/><small style="color:#666">\${s.description}</small>\` : ''}</td>
-                <td style="text-transform:uppercase">\${s.service_type}</td>
-                <td style="text-transform:uppercase">\${s.package_tier}</td>
-                <td style="text-align:right; font-weight:600;">\${formatCurrency(s.line_total)}</td>
+                <td>${idx + 1}</td>
+                <td><strong>${s.service_name}</strong>${s.description ? `<br/><small style="color:#666">${s.description}</small>` : ''}</td>
+                <td style="text-transform:uppercase">${s.service_type}</td>
+                <td style="text-transform:uppercase">${s.package_tier}</td>
+                <td style="text-align:right; font-weight:600;">${formatCurrency(s.line_total)}</td>
               </tr>
-            \`).join('')}
+            `).join('')}
           </tbody>
         </table>
 
         <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-top:20px;">
           <div style="flex:1; max-width:60%;">
-            \${job.internal_notes ? \`
+            ${job.internal_notes ? `
               <div style="margin-bottom:12px;">
                 <strong>Remarks / Notes:</strong>
-                <p style="color:#666; font-size:10px; margin-top:4px;">\${job.internal_notes}</p>
+                <p style="color:#666; font-size:10px; margin-top:4px;">${job.internal_notes}</p>
               </div>
-            \` : ''}
+            ` : ''}
             <div>
               <strong>Terms & Conditions:</strong>
               <ul style="padding-left:14px; font-size:9px; color:#666; margin-top:4px; line-height:1.4;">
@@ -867,15 +867,15 @@ export async function generateJobCardPDF(jobId: number): Promise<string> {
             <div style="background:#f8f8f8; border:1px solid #e5e5e5; border-radius:8px; padding:10px 14px; margin-bottom:20px;">
               <div class="info-row" style="margin-bottom:6px;">
                 <span class="info-label">Estimated Total</span>
-                <span class="info-value" style="font-size:13px; font-weight:700; color:#CC0000;">\${formatCurrency(job.total_amount)}</span>
+                <span class="info-value" style="font-size:13px; font-weight:700; color:#CC0000;">${formatCurrency(job.total_amount)}</span>
               </div>
               <div class="info-row" style="margin-bottom:6px;">
                 <span class="info-label">Advance Paid</span>
-                <span class="info-value" style="font-weight:600; color:#2e7d32;">\${formatCurrency(job.amount_paid)}</span>
+                <span class="info-value" style="font-weight:600; color:#2e7d32;">${formatCurrency(job.amount_paid)}</span>
               </div>
               <div class="info-row" style="border-top:1px solid #ddd; padding-top:6px; margin-top:6px;">
                 <span class="info-label">Balance Due</span>
-                <span class="info-value" style="font-weight:700;">\${formatCurrency(job.balance_due)}</span>
+                <span class="info-value" style="font-weight:700;">${formatCurrency(job.balance_due)}</span>
               </div>
             </div>
             
@@ -886,8 +886,8 @@ export async function generateJobCardPDF(jobId: number): Promise<string> {
         </div>
 
         <div class="footer">
-          <span>This is an official GOC Studio Job Card. Created by: \${job.creator_name || 'Admin'}</span>
-          <span>\thttp://godofceramic.cloud | \${studioPhone}</span>
+          <span>This is an official GOC Studio Job Card. Created by: ${job.creator_name || 'Admin'}</span>
+          <span>\thttp://godofceramic.cloud | ${studioPhone}</span>
         </div>
       </div>
     </body>

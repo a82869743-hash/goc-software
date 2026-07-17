@@ -637,6 +637,13 @@ pool.getConnection()
       }
     });
 
+    // Ensure job_cards has pdf_url column (needed for Job Card PDF generation / WhatsApp sharing)
+    await conn.query("ALTER TABLE job_cards ADD COLUMN pdf_url VARCHAR(500) NULL").catch(err => {
+      if (err.code !== 'ER_DUP_FIELDNAME') {
+        console.error('❌ Failed to run job_cards pdf_url migration:', err.message);
+      }
+    });
+
     // Ensure invoices has card_charges column
     await conn.query("ALTER TABLE invoices ADD COLUMN card_charges DECIMAL(10,2) NOT NULL DEFAULT 0.00").catch(err => {
       if (err.code !== 'ER_DUP_FIELDNAME') {

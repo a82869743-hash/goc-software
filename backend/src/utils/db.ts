@@ -26,6 +26,7 @@ const pool = mysql.createPool({
   queueLimit: 0,
   enableKeepAlive: true,
   keepAliveInitialDelay: 0,
+  connectTimeout: 30000,
   timezone: '+05:30',
   dateStrings: true,
 });
@@ -660,9 +661,22 @@ pool.getConnection()
 
     conn.release();
   })
-  .catch((err) => {
-    console.error('❌ MySQL connection failed:', err.message);
-    process.exit(1);
+  .catch(async (err) => {
+    console.error('❌ MySQL initial connection failed:', err.message);
+    console.log('🔄 Retrying database connection...');
+    // Retry up to 3 times with 3-second delay
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      try {
+        const retryConn = await pool.getConnection();
+        console.log(`✅ MySQL connected on retry ${attempt} — database:`, process.env.DB_NAME);
+        retryConn.release();
+        return;
+      } catch (retryErr: any) {
+        console.error(`❌ Retry ${attempt}/3 failed:`, retryErr.message);
+      }
+    }
+    console.error('❌ All MySQL connection attempts failed. Server will continue but DB queries will fail.');
   });
 
 async function migrateQuickJobCards(conn: mysql.PoolConnection) {

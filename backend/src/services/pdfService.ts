@@ -894,7 +894,7 @@ export async function generateJobCardPDF(jobId: number): Promise<string> {
     </html>
   `;
 
-  const fileName = `jobcard_\${job.job_code}.pdf`;
+  const fileName = `jobcard_${job.job_code}.pdf`;
   const filePath = path.join(PDF_DIR, fileName);
 
   try {
@@ -915,12 +915,12 @@ export async function generateJobCardPDF(jobId: number): Promise<string> {
     const htmlFileName = fileName.replace('.pdf', '.html');
     const htmlPath = path.join(PDF_DIR, htmlFileName);
     fs.writeFileSync(htmlPath, html, 'utf-8');
-    const pdfUrl = `/uploads/pdfs/\${htmlFileName}`;
+    const pdfUrl = `/uploads/pdfs/${htmlFileName}`;
     await pool.query('UPDATE job_cards SET pdf_url = ? WHERE id = ?', [pdfUrl, jobId]);
     return pdfUrl;
   }
 
-  const pdfUrl = `/uploads/pdfs/\${fileName}`;
+  const pdfUrl = `/uploads/pdfs/${fileName}`;
   await pool.query('UPDATE job_cards SET pdf_url = ? WHERE id = ?', [pdfUrl, jobId]);
   return pdfUrl;
 }

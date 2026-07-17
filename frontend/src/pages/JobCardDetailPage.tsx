@@ -282,6 +282,13 @@ export default function JobCardDetailPage() {
     window.open(url, '_blank');
   };
 
+  const getTrackingUrl = () => {
+    if (!job) return '';
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const base = isLocal ? 'http://localhost:5173' : window.location.origin;
+    return job.public_token ? `${base}/track/${job.public_token}` : '';
+  };
+
   const shareJobCardLink = async () => {
     if (!job) return;
     const vehicleStr = `${job.vehicle_name || ''}`.trim() || 'your vehicle';
@@ -298,7 +305,9 @@ export default function JobCardDetailPage() {
       toast.error('Failed to generate Job Card PDF.');
       return;
     }
-    const msg = `🙏 Greetings from *God of Ceramic Studio*!\n\nDear *${job.customer_name}*,\n\nThis is your Job Card for *${vehicleStr}* (${job.reg_number || ''}).\n\n📋 *Job Code:* ${job.job_code}\n📄 *Download Job Card PDF:*\n${jobCardPdfUrl}\n\nFor any queries, feel free to contact us.\nThank you for choosing God of Ceramic! 🚗✨`;
+    const trackingUrl = getTrackingUrl();
+    const trackingLine = trackingUrl ? `\n🔗 *Track Live Status:*\n${trackingUrl}\n` : '';
+    const msg = `🙏 Greetings from *God of Ceramic Studio*!\n\nDear *${job.customer_name}*,\n\nThis is your Job Card for *${vehicleStr}* (${job.reg_number || ''}).\n\n📋 *Job Code:* ${job.job_code}\n📄 *Download Job Card PDF:*\n${jobCardPdfUrl}\n${trackingLine}\nFor any queries, feel free to contact us.\nThank you for choosing God of Ceramic! 🚗✨`;
     sendWhatsAppMessage(msg);
   };
 
@@ -319,7 +328,9 @@ export default function JobCardDetailPage() {
       toast.error('Please generate an estimate first by completing the job.');
       return;
     }
-    const msg = `🙏 Greetings from *God of Ceramic Studio*!\n\nDear *${job.customer_name}*,\n\nPlease find the detailing estimate for your vehicle *${vehicleStr}* (${job.reg_number || ''}).\n\n📄 *Download Estimate PDF:*\n${estimateUrl}\n\nKindly review and let us know if you'd like to proceed.\nThank you! 🚗✨`;
+    const trackingUrl = getTrackingUrl();
+    const trackingLine = trackingUrl ? `\n🔗 *Track Live Status:*\n${trackingUrl}\n` : '';
+    const msg = `🙏 Greetings from *God of Ceramic Studio*!\n\nDear *${job.customer_name}*,\n\nPlease find the detailing estimate for your vehicle *${vehicleStr}* (${job.reg_number || ''}).\n\n📄 *Download Estimate PDF:*\n${estimateUrl}\n${trackingLine}\nKindly review and let us know if you'd like to proceed.\nThank you! 🚗✨`;
     sendWhatsAppMessage(msg);
   };
 
@@ -339,7 +350,9 @@ export default function JobCardDetailPage() {
       toast.error('Please complete the job and generate a tax invoice first.');
       return;
     }
-    const msg = `🙏 Greetings from *God of Ceramic Studio*!\n\nDear *${job.customer_name}*,\n\nThank you for choosing God of Ceramic for your vehicle *${vehicleStr}* (${job.reg_number || ''}).\n\n🧾 *Download Tax Invoice PDF:*\n${invoiceUrl}\n\nWe appreciate your trust in us. See you again! 🚗✨`;
+    const trackingUrl = getTrackingUrl();
+    const trackingLine = trackingUrl ? `\n🔗 *Track Live Status:*\n${trackingUrl}\n` : '';
+    const msg = `🙏 Greetings from *God of Ceramic Studio*!\n\nDear *${job.customer_name}*,\n\nThank you for choosing God of Ceramic for your vehicle *${vehicleStr}* (${job.reg_number || ''}).\n\n🧾 *Download Tax Invoice PDF:*\n${invoiceUrl}\n${trackingLine}\nWe appreciate your trust in us. See you again! 🚗✨`;
     sendWhatsAppMessage(msg);
   };
 

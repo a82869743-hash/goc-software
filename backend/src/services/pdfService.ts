@@ -134,7 +134,7 @@ export async function generateInvoicePDF(invoiceId: number): Promise<string> {
   const advancePaid = payments.filter((p: any) => p.payment_type === 'advance').reduce((sum: number, p: any) => sum + Number(p.amount), 0);
   const otherPaid = payments.filter((p: any) => p.payment_type !== 'advance').reduce((sum: number, p: any) => sum + Number(p.amount), 0);
 
-  const studioName = 'Pack Wolf Services Pvt. Ltd.';
+  const studioName = process.env.STUDIO_NAME || 'Packwolf Services Pvt Ltd';
   const studioAddress = process.env.STUDIO_ADDRESS || 'G-7, B.I.D.C Estate, Gorwa, Vadodara, Gujarat';
   const studioPhone = process.env.STUDIO_PHONE || '+91 9925566886';
   const studioGstin = process.env.STUDIO_GSTIN || '24AANCP8548A1ZB';

@@ -553,7 +553,7 @@ export async function generateQuotationPDF(quotationId: number): Promise<string>
 
   const [zones] = await pool.query<RowDataPacket[]>('SELECT * FROM quotation_zones WHERE quotation_id = ?', [quotationId]);
 
-  const studioName = process.env.STUDIO_NAME || 'God of Ceramic';
+  const studioName = process.env.STUDIO_NAME || 'Packwolf Services Pvt Ltd';
   const studioAddress = process.env.STUDIO_ADDRESS || 'Near Akshar Chowk, Alkapuri, Vadodara, Gujarat 390007';
   const studioPhone = process.env.STUDIO_PHONE || '+91 9925566886';
 
@@ -727,7 +727,7 @@ export async function generateJobCardPDF(jobId: number): Promise<string> {
   const [services] = await pool.query<RowDataPacket[]>('SELECT * FROM job_services WHERE job_card_id = ?', [jobId]);
   const [concerns] = await pool.query<RowDataPacket[]>('SELECT * FROM customer_concerns WHERE job_card_id = ?', [jobId]);
 
-  const studioName = process.env.STUDIO_NAME || 'GOC Studio';
+  const studioName = process.env.STUDIO_NAME || 'Packwolf Services Pvt Ltd';
   const studioAddress = process.env.STUDIO_ADDRESS || 'Near Akshar Chowk, Alkapuri, Vadodara, Gujarat 390007';
   const studioPhone = process.env.STUDIO_PHONE || '+91 9925566886';
 
@@ -857,7 +857,7 @@ export async function generateJobCardPDF(jobId: number): Promise<string> {
               <strong>Terms & Conditions:</strong>
               <ul style="padding-left:14px; font-size:9px; color:#666; margin-top:4px; line-height:1.4;">
                 <li>The vehicle is accepted for detailing/wash at owner's risk.</li>
-                <li>Please remove all valuables before leaving the vehicle. GOC is not responsible for lost items.</li>
+                <li>Please remove all valuables before leaving the vehicle. Packwolf Services is not responsible for lost items.</li>
                 <li>Estimated delivery times are subject to change based on detailing queue and paint corrections needed.</li>
               </ul>
             </div>
@@ -886,8 +886,8 @@ export async function generateJobCardPDF(jobId: number): Promise<string> {
         </div>
 
         <div class="footer">
-          <span>This is an official GOC Studio Job Card. Created by: ${job.creator_name || 'Admin'}</span>
-          <span>\thttp://godofceramic.cloud | ${studioPhone}</span>
+          <span>This is an official Packwolf Services Job Card. Created by: ${job.creator_name || 'Admin'}</span>
+          <span>\tpackwolfservices.com | ${studioPhone}</span>
         </div>
       </div>
     </body>

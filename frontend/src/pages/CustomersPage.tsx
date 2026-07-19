@@ -182,6 +182,19 @@ export default function CustomersPage() {
     },
   });
 
+  // Delete customer mutation
+  const deleteCustomerMutation = useMutation({
+    mutationFn: (id: number) => customersAPI.delete(id),
+    onSuccess: () => {
+      toast.success('Customer moved to recycle bin');
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      setSelectedCustomerId(null);
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error?.message || 'Failed to delete customer');
+    },
+  });
+
   const totalRevenue = customers.reduce((s, c) => s + (Number(c.total_revenue) || 0), 0);
   const vipCount = customers.filter((c) => c.status === 'vip').length;
 
@@ -464,6 +477,20 @@ export default function CustomersPage() {
                     </button>
                   ))}
                 </div>
+
+                {/* Delete button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm(`Are you sure you want to delete ${customerDetail.full_name}? This will move them to the recycle bin.`)) {
+                      deleteCustomerMutation.mutate(customerDetail.id);
+                    }
+                  }}
+                  className="ml-2 p-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all duration-300"
+                  title="Delete Customer"
+                >
+                  <span className="material-symbols-outlined text-[16px]">delete</span>
+                </button>
               </div>
 
               {/* CRM Info fields */}

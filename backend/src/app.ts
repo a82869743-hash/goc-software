@@ -35,6 +35,7 @@ import integrationsRoutes from './routes/integrations';
 import staffManagementRoutes from './routes/staffManagement';
 import systemLogsRoutes from './routes/systemLogs';
 import warrantiesRoutes from './routes/warranties';
+import recycleBinRoutes from './routes/recycleBin';
 
 const app = express();
 
@@ -101,6 +102,7 @@ app.use(`${API_PREFIX}/integrations`, integrationsRoutes);
 app.use(`${API_PREFIX}/staff-management`, staffManagementRoutes);
 app.use(`${API_PREFIX}/system-logs`, systemLogsRoutes);
 app.use(`${API_PREFIX}/warranties`, warrantiesRoutes);
+app.use(`${API_PREFIX}/recycle-bin`, recycleBinRoutes);
 app.use(`${API_PREFIX}/public`, publicTrackingRoutes);
 // ── Initialize Cron Jobs ────────────────────────────────────
 if (process.env.NODE_ENV !== 'test') {

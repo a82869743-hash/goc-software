@@ -106,7 +106,7 @@ export default function InvoiceTemplate({
   invoice,
   estimate,
   type,
-  studioName = 'Pack Wolf Pvt Ltd',
+  studioName = 'Packwolf Services Pvt Ltd',
   studioAddress = 'G-7, B.I.D.C Estate, Gorwa, Vadodara, Gujarat',
   studioPhone = '+91 9925566886',
   studioGstin = '24AANCP8548A1ZB'

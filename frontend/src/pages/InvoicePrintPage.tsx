@@ -264,7 +264,7 @@ export default function InvoicePrintPage() {
             concerns={data.concerns}
             type={printType}
             source={type === 'quick' ? 'quick' : 'regular'}
-            studioName="Pack Wolf Pvt Ltd"
+            studioName="Packwolf Services Pvt Ltd"
             studioPhone="+91 9925566886"
           />
         </div>

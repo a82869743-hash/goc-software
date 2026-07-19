@@ -29,6 +29,7 @@ import SystemLogsPage from './pages/admin/SystemLogsPage';
 import KioskAttendancePage from './pages/KioskAttendancePage';
 import WarrantiesPage from './pages/WarrantiesPage';
 import PublicWarrantyCheck from './pages/PublicWarrantyCheck';
+import RecycleBinPage from './pages/RecycleBinPage';
 
 
 
@@ -93,6 +94,7 @@ function App() {
         <Route path="/admin/staff" element={<StaffManagementPage />} />
         <Route path="/admin/staff/:id/permissions" element={<StaffPermissionsPage />} />
         <Route path="/admin/logs" element={<SystemLogsPage />} />
+        <Route path="/recycle-bin" element={<RecycleBinPage />} />
       </Route>
 
       <Route

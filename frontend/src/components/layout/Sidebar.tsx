@@ -35,6 +35,7 @@ const otherItems: NavItem[] = [
   { to: '/reports', icon: 'bar_chart', label: 'REPORTS', permKey: 'perm_reports' },
   { to: '/admin/staff', icon: 'admin_panel_settings', label: 'STAFF & PERMISSIONS', permKey: 'perm_staff_management' },
   { to: '/admin/logs', icon: 'history', label: 'SYSTEM LOGS', permKey: 'perm_staff_management' },
+  { to: '/recycle-bin', icon: 'delete_sweep', label: 'RECYCLE BIN', permKey: 'perm_staff_management' },
 ];
 
 interface SidebarProps {

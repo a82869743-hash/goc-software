@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../api/client';
 import toast from 'react-hot-toast';
+import { usePermissions } from '../utils/usePermissions';
 
 interface DeletedItem {
   id: number;
@@ -39,6 +40,7 @@ const recycleBinAPI = {
 
 export default function RecycleBinPage() {
   const queryClient = useQueryClient();
+  const { canDelete } = usePermissions();
   const [typeFilter, setTypeFilter] = useState<string>('all');
 
   const { data: response, isLoading } = useQuery({
@@ -203,18 +205,20 @@ export default function RecycleBinPage() {
                             <span className="material-symbols-outlined text-[14px]">restore</span>
                             Restore
                           </button>
-                          <button
-                            onClick={() => {
-                              if (window.confirm(`PERMANENTLY delete this ${item.type_label}? This action cannot be undone.`)) {
-                                permanentDeleteMutation.mutate({ type: item.record_type, id: item.id });
-                              }
-                            }}
-                            disabled={permanentDeleteMutation.isPending}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all duration-300 text-[10px] font-label-caps uppercase tracking-wider"
-                          >
-                            <span className="material-symbols-outlined text-[14px]">delete_forever</span>
-                            Delete
-                          </button>
+                          {canDelete && (
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`PERMANENTLY delete this ${item.type_label}? This action cannot be undone.`)) {
+                                  permanentDeleteMutation.mutate({ type: item.record_type, id: item.id });
+                                }
+                              }}
+                              disabled={permanentDeleteMutation.isPending}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all duration-300 text-[10px] font-label-caps uppercase tracking-wider"
+                            >
+                              <span className="material-symbols-outlined text-[14px]">delete_forever</span>
+                              Delete
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

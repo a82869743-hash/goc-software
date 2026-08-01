@@ -1,6 +1,6 @@
 # GOC SOFTWARE CONTEXT — GOD OF CERAMIC STUDIO MANAGEMENT SYSTEM v2.0
 
-> **Last Updated:** 5 June 2026
+> **Last Updated:** 31 July 2026
 > **Purpose:** Single-source-of-truth context document for any AI agent working on this codebase.
 > **Location:** Vadodara, Gujarat, India | Business: God of Ceramic (Car PPF, Ceramic Coating, Detailing Studio)
 
@@ -65,9 +65,11 @@
 | Routing | React Router DOM | 7.x |
 | Charts | Recharts | 3.x |
 | HTTP Client | Axios | 1.x |
-| Whiteboard | @tldraw/tldraw | 5.x |
+| Whiteboard / Canvas | @excalidraw/excalidraw | ^0.18.0 |
 | Icons | Google Material Symbols (CDN) | — |
 | Toasts | react-hot-toast | 2.x |
+
+> **Note:** `@tldraw/tldraw` has been **replaced** by `@excalidraw/excalidraw` as the drawing canvas library for the Whiteboard Quotation system. The Excalidraw library provides similar freehand drawing and stylus support. Old `canvas_data` JSON stored in the database may reference tldraw format; new quotations save in Excalidraw format.
 
 ### Backend
 | Layer | Technology | Version |
@@ -122,7 +124,7 @@ goc-studio/
 │       │   ├── smsEvents.ts               # SMS_EVENTS constants + SmsEventKey type + SMS_EVENT_VARIABLES
 │       │   ├── run_migration.ts
 │       │   └── run_jobcard_migration.ts
-│       ├── controllers/          # 23 controller files (business logic)
+│       ├── controllers/          # 25 controller files (business logic)
 │       │   ├── authController.ts
 │       │   ├── jobCardController.ts       # ★ CRITICAL — largest controller (31KB)
 │       │   ├── bookingController.ts
@@ -139,18 +141,20 @@ goc-studio/
 │       │   ├── staffController.ts
 │       │   ├── integrationsController.ts  # Meta integration settings, validation, test diagnostics
 │       │   ├── smsAdminController.ts      # SMS templates, stats, logs, and queue retries endpoints
-│       │   ├── staffManagementController.ts # Staff CRUD, status, password resets (admin only)
+│       │   ├── staffManagementController.ts # Staff CRUD, status, password resets, delete (admin only)
 │       │   ├── staffPermissionsController.ts # Permissions fetch and updates (admin / self)
 │       │   ├── vehicleController.ts
 │       │   ├── webhookController.ts       # Meta & WhatsApp webhook handlers
-│       │   └── commissionController.ts
+│       │   ├── commissionController.ts
+│       │   ├── recycleBinController.ts    # Soft-delete recovery: list, restore, permanent delete
+│       │   └── systemLogsController.ts    # Paginated audit log retrieval with filters
 │       ├── middleware/
 │       │   ├── auth.ts            # JWT authentication middleware
 │       │   ├── rbac.ts            # Role-based access control
 │       │   ├── upload.ts          # Multer file upload config
 │       │   └── validate.ts        # Zod validation middleware
 │       ├── models/                # (mostly empty — raw SQL queries used)
-│       ├── routes/                # 25 route files
+│       ├── routes/                # 28 route files
 │       │   ├── auth.ts
 │       │   ├── jobs.ts            # ★ CRITICAL — job card CRUD + status + services + photos + completion
 │       │   ├── quickJobCards.ts   # ★ Quick wash/service job cards (26KB)
@@ -173,8 +177,11 @@ goc-studio/
 │       │   ├── integrations.ts    # /api/v1/integrations — Meta settings + validation (admin only)
 │       │   ├── smsAdmin.ts        # /api/v1/sms — SMS templates, stats, logs management
 │       │   ├── webhooks.ts        # /api/v1/webhooks — Meta webhook + WhatsApp inbound
-│       │   ├── staffManagement.ts # /api/v1/staff-management — Staff CRUD and permissions (admin/auth)
-│       │   └── vehicles.ts
+│       │   ├── staffManagement.ts # /api/v1/staff-management — Staff CRUD, delete, and permissions (admin/auth)
+│       │   ├── vehicles.ts
+│       │   ├── warranties.ts      # /api/v1/warranties — Warranty registration, claims, public check
+│       │   ├── recycleBin.ts      # /api/v1/recycle-bin — Soft-delete recovery (admin/manager)
+│       │   └── systemLogs.ts      # /api/v1/system-logs — Audit log retrieval (admin only)
 │       ├── services/
 │       │   ├── cronJobs.ts         # Scheduled tasks (birthday, follow-ups, SMS worker, booking reminders)
 │       │   ├── notificationService.ts
@@ -193,10 +200,11 @@ goc-studio/
 │       │   └── meta.ts            # TypeScript interfaces for Meta webhook payloads and responses
 │       ├── utils/
 │       │   ├── db.ts              # ★ MySQL pool + auto-migrations on startup
-│       │   ├── constants.ts       # ★ JOB_STATUS, JOB_STATUS_FLOW, all enums
+│       │   ├── constants.ts       # ★ JOB_STATUS, JOB_STATUS_FLOW, STAFF_ROLES (includes 'hr'), all enums
 │       │   ├── codes.ts           # Sequential code generator (GOC-CUST-0001, GOC-JC-0001, etc.)
 │       │   ├── encryption.ts      # AES-256-CBC encrypt/decrypt for sensitive credentials (Meta tokens)
-│       │   └── jwt.ts             # JWT sign/verify helpers
+│       │   ├── jwt.ts             # JWT sign/verify helpers
+│       │   └── auditLogger.ts     # System audit logger — logActivity() inserts into system_logs table
 │       └── validations/           # 10 Zod validation schema files
 │           ├── jobCardValidation.ts
 │           ├── authValidation.ts
@@ -218,7 +226,7 @@ goc-studio/
 │       ├── main.tsx               # React entry — QueryClient, BrowserRouter, Toaster
 │       ├── App.tsx                # ★ All routes defined here
 │       ├── vite-env.d.ts
-│       ├── api/                   # 23 API module files
+│       ├── api/                   # 24 API module files
 │       │   ├── client.ts          # ★ Axios instance with JWT interceptor + auto-logout on 401
 │       │   ├── jobs.ts            # ★ jobsAPI — all job card API functions
 │       │   ├── quickJobs.ts
@@ -235,8 +243,9 @@ goc-studio/
 │       │   ├── reports.ts
 │       │   ├── settings.ts
 │       │   ├── staff.ts
-│       │   ├── staffManagement.ts # staffManagementAPI — Staff list, CRUD, permissions get/update
-│       │   └── commissions.ts
+│       │   ├── staffManagement.ts # staffManagementAPI — Staff list, CRUD, delete, permissions get/update
+│       │   ├── commissions.ts
+│       │   └── systemLogs.ts      # systemLogsAPI — getLogs(params) for audit log retrieval
 │       ├── components/
 │       │   ├── layout/
 │       │   │   ├── AppShell.tsx    # Sidebar + Topbar + Outlet wrapper (mobile responsive)
@@ -244,7 +253,7 @@ goc-studio/
 │       │   │   └── Topbar.tsx      # Hamburger menu (mobile), notifications, search, profile
 │       │   ├── modules/
 │       │   └── ui/
-│       ├── pages/                 # 29 page components
+│       ├── pages/                 # 36 page components
 │       │   ├── LoginPage.tsx
 │       │   ├── DashboardPage.tsx   # KPIs, charts, job progress bars
 │       │   ├── JobCardsPage.tsx    # ★ Job card list with pipeline tabs
@@ -256,11 +265,17 @@ goc-studio/
 │       │   ├── LeadsPage.tsx
 │       │   ├── CustomersPage.tsx
 │       │   ├── BookingsPage.tsx
-│       │   ├── QuotationsPage.tsx  # Whiteboard freehand canvas drawing system (tldraw-powered)
+│       │   ├── QuotationsPage.tsx  # Whiteboard freehand canvas drawing system (Excalidraw-powered)
 │       │   ├── InvoicesPage.tsx
 │       │   ├── InvoicePrintPage.tsx
 │       │   ├── InventoryPage.tsx
 │       │   ├── StaffPage.tsx
+│       │   ├── StaffDetailPage.tsx        # Individual staff member profile page (/staff/:id)
+│       │   ├── StaffAttendancePaymentsPage.tsx # Consolidated attendance & salary/payment management
+│       │   ├── KioskAttendancePage.tsx    # Full-screen kiosk mode for attendance check-in/out
+│       │   ├── WarrantiesPage.tsx         # Internal warranty management (issue/claims tabs)
+│       │   ├── PublicWarrantyCheck.tsx     # Public-facing warranty check + claim filing (no auth)
+│       │   ├── RecycleBinPage.tsx          # Admin/manager tool to view/restore/delete soft-deleted records
 │       │   ├── ReportsPage.tsx
 │       │   ├── SettingsPage.tsx
 │       │   ├── MetaIntegrationPage.tsx  # Meta Lead Ads management panel (3 tabs: setup/settings/logs)
@@ -271,7 +286,8 @@ goc-studio/
 │       │   ├── NewBookingPage.tsx
 │       │   └── admin/
 │       │       ├── StaffManagementPage.tsx  # Staff list, create modal, password resets, active toggles
-│       │       └── StaffPermissionsPage.tsx # Module level toggles + granular action permissions edit grid
+│       │       ├── StaffPermissionsPage.tsx # Module level toggles + granular action permissions edit grid
+│       │       └── SystemLogsPage.tsx       # Admin-only audit log viewer with filters & pagination
 │       ├── stores/
 │       │   ├── authStore.ts       # Zustand persisted auth (token, staff, isAuthenticated)
 │       │   ├── permissionsStore.ts # Zustand persisted permissions store (permissions list, fetch, clear)
@@ -288,7 +304,8 @@ goc-studio/
 ├── database/                      # SQL seed files
 │   └── migrations/
 │       ├── 005_webhook_integrations.sql    # webhook_configs, webhook_events tables + leads table columns
-│       └── 006_meta_integration_settings.sql  # meta_integration_settings table (singleton)
+│       ├── 006_meta_integration_settings.sql  # meta_integration_settings table (singleton)
+│       └── 007_add_manual_quotation_columns.sql  # is_manual + manual_items columns on quotations
 └── uploads/                       # File upload directory
 ```
 
@@ -359,7 +376,7 @@ MSG91_SMS_FLOW_IDS={}           # JSON map of flow IDs (managed via SMSSettingsP
 
 | Table | Purpose | Key Columns |
 |-------|---------|-------------|
-| `staff` | All employees, login accounts | `staff_code`, `full_name`, `phone`, `password_hash`, `role`, `status` |
+| `staff` | All employees, login accounts | `staff_code`, `full_name`, `phone`, `password_hash`, `role` (ENUM: admin, technician, receptionist, manager, staff, hr), `status` |
 | `staff_permissions` | Granular role-based page and action permission controls for staff. | `staff_id` (foreign key to `staff(id) ON DELETE CASCADE`, unique), `perm_dashboard`, `perm_leads`, `perm_customers`, `perm_bookings`, `perm_advance_bookings`, `perm_job_cards`, `perm_quick_jobs`, `perm_quotations`, `perm_invoices`, `perm_payments`, `perm_inventory`, `perm_reports`, `perm_marketing`, `perm_commissions`, `perm_settings`, `perm_staff_management`, `perm_job_cards_edit`, `perm_job_cards_delete`, `perm_job_cards_complete`, `perm_invoices_create`, `perm_payments_record`, `perm_leads_delete`, `perm_leads_assign`, `perm_customers_delete`, `perm_inventory_edit`, `perm_reports_revenue`, `perm_reports_accounts`, `perm_reports_salary` |
 | `customers` | Customer records | `customer_code`, `full_name`, `phone`, `city`, `lead_source`, `total_revenue`, `total_visits` |
 | `vehicles` | Customer vehicles | `vehicle_code`, `customer_id`, `make`, `model`, `reg_number`, `fuel_type` |
@@ -371,7 +388,7 @@ MSG91_SMS_FLOW_IDS={}           # JSON map of flow IDs (managed via SMSSettingsP
 | `job_status_log` | Status change history | `job_card_id`, `old_status`, `new_status`, `changed_by`, `notes` |
 | `job_photos` | Before/during/after photos | `job_card_id`, `stage`, `file_url` |
 | `customer_concerns` | Customer concerns per job | `job_card_id`, `concern_text` |
-| `quotations` | Whiteboard drawing quotations | `quotation_code`, `customer_id`, `vehicle_id`, `canvas_data`, `canvas_snapshot`, `customer_name_override`, `customer_phone_override`, `vehicle_description`, `grand_total`, `status` |
+| `quotations` | Whiteboard drawing quotations | `quotation_code`, `customer_id`, `vehicle_id`, `canvas_data`, `canvas_snapshot`, `customer_name_override`, `customer_phone_override`, `vehicle_description`, `grand_total`, `status`, `is_manual`, `manual_items` |
 | `quotation_revisions` | Revision history | `quotation_id`, `revision_number`, `canvas_data`, `grand_total` |
 | `invoices` | Tax invoices & estimates | `invoice_code`, `job_card_id`, `invoice_type`, `total_amount`, `status` |
 | `invoice_items` | Line items on invoice | `invoice_id`, `description`, `hsn_sac`, `qty`, `rate`, `amount` |
@@ -386,6 +403,9 @@ MSG91_SMS_FLOW_IDS={}           # JSON map of flow IDs (managed via SMSSettingsP
 | `settings` | App settings (key-value) | `setting_key`, `setting_value` |
 | `service_catalog` | Pre-defined services | `name`, `category`, `service_type`, `default_rate`, `hsn_sac` |
 | `campaigns` | WhatsApp marketing campaigns | `name`, `template_name`, `segment_type`, `status` |
+| `warranties` | Service warranties issued to customers | `customer_id`, `vehicle_id`, `job_card_id`, `service_name`, `warranty_card_no`, `duration_months`, `start_date`, `expiry_date`, `status` (ENUM: active/expired/void) |
+| `warranty_claims` | Customer warranty claim requests | `warranty_id`, `claim_code`, `issue_description`, `status` (ENUM: pending/approved/rejected/in_progress/completed) |
+| `system_logs` | System-wide audit log for all critical actions | `staff_id` (FK → staff, ON DELETE SET NULL), `action_type`, `entity_type`, `entity_id`, `description`, `ip_address`, `user_agent`, `created_at` |
 
 ### Meta Integration Tables
 | Table | Purpose | Key Columns |
@@ -418,6 +438,9 @@ MSG91_SMS_FLOW_IDS={}           # JSON map of flow IDs (managed via SMSSettingsP
 | `advance_bookings` | Advance booking records (separate from regular bookings) |
 | `concern_presets` | Pre-defined concern options |
 | `job_card_media` | Media files for both regular and quick jobs |
+| `staff_advances` | Staff salary advance records |
+| `staff_payment_requests` | Staff payment/advance/incentive request management |
+| `promotional_materials` | Marketing promotional material uploads |
 
 ### Leads Table — Additional Columns (from migration 005)
 The `leads` table has these columns added via migration:
@@ -427,25 +450,36 @@ The `leads` table has these columns added via migration:
 - `auto_captured TINYINT(1) DEFAULT 0` — Flag: 1 = auto-captured from webhook
 - `raw_payload JSON` — Full incoming payload stored for debugging
 
+### Quotations Table — Manual Quotation Columns (from migration 007)
+- `is_manual TINYINT(1) NOT NULL DEFAULT 0` — `1` if manual itemized quotation, `0` if whiteboard/canvas mode
+- `manual_items JSON NULL` — JSON array of manual quote items (used when `is_manual = 1`)
+
 ### Auto-Migrations (in `db.ts`)
 On every server startup, `db.ts` runs the following migrations automatically:
 1. Auto-updates default staff name to "Hiren Patel"
-2. Creates `quotation_revisions` table if not exists
-3. Creates `inventory_purchases` table if not exists
-4. Creates `leave_requests` table if not exists
-5. Creates `campaigns` table if not exists
-6. Alters `job_cards.status` enum to include `estimate`, default `in_progress`
-7. Creates `service_catalog` table if not exists + seeds 18 GOC services
-8. Adds `completion_type`, `gst_applicable`, `dispatch_whatsapp`, `dispatch_sms` columns to `job_cards`
-9. Adds `hsn_sac`, `tax_pct`, `discount_pct` columns to `job_services`
-10. Drops `quotation_zones` table, alters `quotations` to add `canvas_data`, `canvas_snapshot`, override fields, and makes linked IDs nullable
-11. Creates `sms_templates` table and seeds the 7 GOC system event templates
-12. Creates `sms_queue` and `sms_logs` tables (safely dropping old logs schema if detected)
-13. Seeds default SMS settings (`SMS_ENABLED`, `MSG91_SMS_AUTH_KEY`, etc.) in `app_settings`
-14. Creates `webhook_logs` table (Meta audit log)
-15. Creates `meta_integration_settings` table with singleton row id=1
-16. Seeds `webhook_configs` with default entries for facebook, instagram, whatsapp platforms
-17. Creates `staff_permissions` table (roles, modules, and granular action gates).
+2. Creates `system_logs` table if not exists (staff_id FK, action_type, entity_type, entity_id, description, ip_address, user_agent)
+3. Creates `quotation_revisions` table if not exists
+4. Creates `inventory_purchases` table if not exists
+5. Creates `leave_requests` table if not exists
+6. Creates `campaigns` table if not exists
+7. Creates `staff_advances` table if not exists
+8. Creates `staff_payment_requests` table if not exists
+9. Creates and seeds `sms_templates` table (7 GOC system event templates)
+10. Creates `sms_queue` and `sms_logs` tables (safely dropping old logs schema if detected)
+11. Seeds default SMS settings (`SMS_ENABLED`, `MSG91_SMS_AUTH_KEY`, etc.) in `app_settings`
+12. Seeds `attendance_kiosk_passcode = '1234'` into `app_settings` if key does not exist
+13. Alters `job_cards.status` enum to include `estimate`, default `in_progress`
+14. Creates `service_catalog` table if not exists + seeds 18 GOC services
+15. Adds `completion_type`, `gst_applicable`, `dispatch_whatsapp`, `dispatch_sms` columns to `job_cards`
+16. Adds `hsn_sac`, `tax_pct`, `discount_pct` columns to `job_services`
+17. Drops `quotation_zones` table, alters `quotations` to add `canvas_data`, `canvas_snapshot`, override fields, and makes linked IDs nullable
+18. Creates `webhook_logs` table (Meta audit log)
+19. Creates `meta_integration_settings` table with singleton row id=1
+20. Seeds `webhook_configs` with default entries for facebook, instagram, whatsapp platforms
+21. Creates `staff_permissions` table (roles, modules, and granular action gates)
+22. Alters `staff.role` ENUM to add `'hr'` value: `ALTER TABLE staff MODIFY COLUMN role ENUM('admin','technician','receptionist','manager','staff','hr') NOT NULL DEFAULT 'technician'`
+23. Creates `promotional_materials` table if not exists
+24. Adds `is_manual` and `manual_items` columns to `quotations` table
 
 ---
 
@@ -471,7 +505,7 @@ src/app.ts → loads middleware → mounts all routes under /api/v1 → initiali
 
 ### Route Mounting
 All routes mount at `/api/v1/<resource>` except:
-- `/public/track/:token` — Public job tracking (NO auth required)
+- `/api/v1/public` — Public job tracking (NO auth required)
 - `/api/health` — Health check endpoint
 
 ```typescript
@@ -479,7 +513,6 @@ app.use(`${API_PREFIX}/auth`, authRoutes);
 app.use(`${API_PREFIX}/leads`, leadsRoutes);
 app.use(`${API_PREFIX}/customers`, customersRoutes);
 app.use(`${API_PREFIX}/vehicles`, vehiclesRoutes);
-app.use(`${API_PREFIX}/bookings`, bookingsRoutes);
 app.use(`${API_PREFIX}/jobs`, jobsRoutes);
 app.use(`${API_PREFIX}/quotations`, quotationsRoutes);
 app.use(`${API_PREFIX}/invoices`, invoicesRoutes);
@@ -498,7 +531,10 @@ app.use(`${API_PREFIX}/webhooks`, webhooksRoutes);
 app.use(`${API_PREFIX}/sms`, smsAdminRoutes);
 app.use(`${API_PREFIX}/integrations`, integrationsRoutes);
 app.use(`${API_PREFIX}/staff-management`, staffManagementRoutes);
-app.use(`/public`, publicTrackingRoutes);
+app.use(`${API_PREFIX}/system-logs`, systemLogsRoutes);
+app.use(`${API_PREFIX}/warranties`, warrantiesRoutes);
+app.use(`${API_PREFIX}/recycle-bin`, recycleBinRoutes);
+app.use(`${API_PREFIX}/public`, publicTrackingRoutes);
 ```
 
 ### Controller Pattern
@@ -520,7 +556,7 @@ export const controllerFn = async (req: Request, res: Response) => {
 - **NO ORM** — All queries are raw SQL using `mysql2/promise`
 - Pool imported from `utils/db.ts`
 - Transactions used for multi-table operations (e.g., job creation, invoice generation)
-- Soft deletes: Some tables use `deleted_at` column (customers, vehicles, staff)
+- Soft deletes: Some tables use `deleted_at` column (customers, vehicles, staff, job_cards, quotations, invoices, leads)
 
 ### Code Generation
 Sequential codes generated via `utils/codes.ts`:
@@ -536,6 +572,14 @@ Sequential codes generated via `utils/codes.ts`:
 
 ### Shared Utility: `saveCustomerAndVehicleFromJobDetails`
 Located in `db.ts` — used by Quick Jobs, Advance Bookings, and Job Card creation to auto-create/lookup customer and vehicle records from inline form data.
+
+### Backend Utilities
+
+**`auditLogger.ts`** — System audit log utility
+- Export: `logActivity(staffId, actionType, entityType, entityId, description, ipAddress?, userAgent?)`
+- Inserts a record into `system_logs` table
+- Used by controllers to log critical actions (logins, staff creation, permission changes, job card operations, etc.)
+- Errors are caught silently — never breaks the main operation (fire-and-forget pattern)
 
 ### Backend Services
 
@@ -596,7 +640,7 @@ All cron jobs run in `Asia/Kolkata` timezone.
 main.tsx → QueryClientProvider → BrowserRouter → App → Toaster
 ```
 
-Note: `React.StrictMode` has been intentionally removed because it causes tldraw (whiteboard) canvas corruption via double-mounting in React 19.
+Note: `React.StrictMode` has been intentionally removed because it causes canvas corruption via double-mounting in React 19 (affects both the old tldraw and current Excalidraw whiteboard canvas).
 
 ### State Management
 - **Zustand** for global state:
@@ -627,42 +671,50 @@ const apiClient = axios.create({
 | `api/integrations.ts` | `integrationsAPI` | `getMetaSettings`, `updateMetaSettings`, `validateMetaConnection`, `runMetaTest` |
 | `api/sms.ts` | `smsAPI` | `getTemplates`, `updateTemplate`, `getStats`, `getLogs`, `retryFailed` |
 | `api/webhooks.ts` | `webhooksAPI` | `getStatus`, `updateConfig`, `getEvents`, `getLogs` |
-| `api/staffManagement.ts` | `staffManagementAPI` | `listAll`, `create`, `update`, `resetPassword`, `toggleStatus`, `getPermissions`, `updatePermissions`, `getMyPermissions` |
+| `api/staffManagement.ts` | `staffManagementAPI` | `listAll`, `create`, `update`, `delete`, `resetPassword`, `toggleStatus`, `getPermissions`, `updatePermissions`, `getMyPermissions` |
+| `api/systemLogs.ts` | `systemLogsAPI` | `getLogs(params: GetLogsParams)` — paginated audit log retrieval with filters (page, limit, staff_id, action_type, search, start_date, end_date) |
 
 ### Utilities
 - `utils/helpers.ts` — `formatINR`, `formatDate`, `getStatusConfig`, `calculateGST`, `debounce`
 - `utils/carDataset.ts` — Full Indian + international car brand/model database auto-generated from `car model dataset.csv`. Exports: `carDataset: CarBrand[]` (array of `{ brand: string, models: string[] }`) and `basicColors: string[]`. Used by: `JobCardNewPage.tsx` for vehicle make/model dropdowns.
-- `utils/usePermissions.ts` — Custom permissions client gate using `can(permKey: string): boolean` helper checking dynamic user permissions or admin bypass.
+- `utils/usePermissions.ts` — Custom permissions client gate using `can(permKey: string): boolean` helper checking dynamic user permissions or admin bypass. Also exports `isAdminRole` for admin-only features.
 
 ### Routing Structure (`App.tsx`)
 ```
-/login                    → LoginPage (PublicRoute)
-/dashboard                → DashboardPage
-/leads                    → LeadsPage
-/customers                → CustomersPage
-/bookings                 → BookingsPage
-/bookings/new             → NewBookingPage
-/jobs                     → JobCardsPage
-/jobs/new                 → JobCardNewPage
-/jobs/:id                 → JobCardDetailPage
-/jobs/:id/edit            → JobCardEditPage
-/quick-jobs               → QuickJobCards
-/advance-bookings         → AdvanceBookings
-/quotations               → QuotationsPage
-/invoices                 → InvoicesPage
-/inventory                → InventoryPage
-/staff                    → StaffPage
-/admin/staff              → StaffManagementPage
-/admin/staff/:id/permissions → StaffPermissionsPage
-/reports                  → ReportsPage
-/settings                 → SettingsPage
-/marketing                → MarketingPage
-/commissions              → CommissionsPage
-/invoice/:type/:id        → InvoicePrintPage (ProtectedRoute, outside AppShell)
-/track/:token             → PublicTrackingPage (NO auth — public customer view)
+/login                            → LoginPage (PublicRoute)
+/dashboard                        → DashboardPage
+/leads                            → LeadsPage
+/customers                        → CustomersPage
+/jobs                             → JobCardsPage
+/jobs/new                         → JobCardNewPage
+/jobs/:id                         → JobCardDetailPage
+/jobs/:id/edit                    → JobCardEditPage
+/quick-jobs                       → QuickJobCards
+/advance-bookings                 → AdvanceBookings
+/quotations                       → QuotationsPage
+/invoices                         → InvoicesPage
+/inventory                        → InventoryPage
+/staff                            → StaffPage
+/staff/:id                        → StaffDetailPage
+/staff/attendance-payments        → StaffAttendancePaymentsPage
+/reports                          → ReportsPage
+/settings                         → SettingsPage
+/marketing                        → MarketingPage
+/commissions                      → CommissionsPage
+/warranties                       → WarrantiesPage
+/admin/staff                      → StaffManagementPage
+/admin/staff/:id/permissions      → StaffPermissionsPage
+/admin/logs                       → SystemLogsPage
+/recycle-bin                      → RecycleBinPage
+/invoice/:type/:id                → InvoicePrintPage (ProtectedRoute, outside AppShell)
+/track/:token                     → PublicTrackingPage (NO auth — public customer view)
+/warranty-check                   → PublicWarrantyCheck (NO auth — public warranty verification)
+/kiosk-attendance                 → KioskAttendancePage (ProtectedRoute, outside AppShell)
 ```
 
 **Note**: `MetaIntegrationPage` and `SMSSettingsPage` exist as page components but are not currently mounted in `App.tsx` routes. They are intended to be accessed via Settings page sub-navigation or added to the router when needed.
+
+**Note**: `BookingsPage` exists as a page component and is imported, but no `/bookings` route is present in `App.tsx`. It has been removed from routing.
 
 ### Layout (Mobile Responsive)
 ```
@@ -693,13 +745,14 @@ The entire application is mobile responsive:
 {
   id: number;
   staff_code: string;
-  role: 'admin' | 'technician' | 'receptionist' | 'manager' | 'staff';
+  role: 'admin' | 'technician' | 'receptionist' | 'manager' | 'staff' | 'hr';
   full_name: string;
 }
 ```
 
 ### RBAC & Granular Access Control
 - `rbac.ts` middleware checks `req.staff.role` against allowed roles for core routing modules.
+- 6 valid staff roles: `admin`, `technician`, `receptionist`, `manager`, `staff`, `hr`
 - Most routes require `authMiddleware` verification.
 - **Granular Permissions System**:
   - Module permissions (leads, customer registry, job cards, commissions, dashboard) and action permissions (edit job card, delete customer, record payment, etc.) are cached client-side in Zustand.
@@ -709,8 +762,9 @@ The entire application is mobile responsive:
 
 ### Protected vs Public Routes
 - **Protected:** Everything under `AppShell` (requires `isAuthenticated`)
-- **Public:** `/login`, `/track/:token` (public job tracking)
+- **Public:** `/login`, `/track/:token` (public job tracking), `/warranty-check` (public warranty verification)
 - `/invoice/:type/:id` — Protected but outside AppShell (full-page print view)
+- `/kiosk-attendance` — Protected but outside AppShell (full-screen kiosk mode)
 
 ---
 
@@ -731,6 +785,7 @@ The entire application is mobile responsive:
 | PUT | `/:id` | Yes | Admin | Update staff details (excludes modifying admin account) |
 | POST | `/:id/reset-password` | Yes | Admin | Regenerate and set a new password (`GOC@XXXX`) for staff (excludes admins) |
 | PATCH | `/:id/status` | Yes | Admin | Toggle staff active/inactive status (excludes admins) |
+| DELETE | `/:id` | Yes | Admin | Delete a staff member (soft-delete, excludes admin accounts) |
 | GET | `/:id/permissions` | Yes | Admin | Retrieve permissions config for a staff member |
 | PUT | `/:id/permissions` | Yes | Admin | Update permissions config for a staff member (excludes admins) |
 
@@ -821,8 +876,33 @@ The entire application is mobile responsive:
 | POST | `/` | Create draft quotation (CRM links or manual overrides) |
 | PUT | `/:id` | Save whiteboard drawing canvas JSON and image snapshot |
 | DELETE | `/:id` | Soft-delete whiteboard quotation (admin/manager only) |
+| PUT | `/:id/restore` | Restore a soft-deleted quotation |
+| DELETE | `/:id/permanent` | Permanently delete a quotation |
 | POST | `/:id/send-whatsapp` | Dispatch quote details and PDF URL via WhatsApp (MSG91) |
 | POST | `/:id/generate-pdf` | Compile Puppeteer A4 PDF from the canvas snapshot |
+
+### Warranties (`/api/v1/warranties`)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/public/check` | **NO** | Public — check vehicle warranties by reg_number |
+| POST | `/public/claim` | **NO** | Public — submit warranty claim from public page |
+| GET | `/` | Yes | List all warranties (search by customer name, reg number, card no; filter by status) |
+| POST | `/` | Yes | Manually register a warranty (customer_id, vehicle_id, job_card_id, service_name, duration_months, warranty_card_no, start_date) |
+| GET | `/claims` | Yes | List all warranty claims with customer/vehicle joins |
+| PUT | `/claims/:id` | Yes | Update claim status (pending/approved/rejected/in_progress/completed) |
+| POST | `/claims/:id/convert-job` | Yes | Convert warranty claim → new job card (₹0 cost service, type walkin) |
+
+### Recycle Bin (`/api/v1/recycle-bin`) — Admin/Manager Only
+| Method | Path | Auth | Role | Description |
+|--------|------|------|------|-------------|
+| GET | `/` | Yes | admin, manager | List all deleted items across multiple record types (customers, job_cards, quotations, invoices, leads) with type label, code, name, extra_info, deleted_at |
+| POST | `/:type/:id/restore` | Yes | admin, manager | Restore a soft-deleted item (sets deleted_at = NULL) |
+| DELETE | `/:type/:id` | Yes | admin, manager | Permanently delete a record (hard delete from DB) |
+
+### System Logs (`/api/v1/system-logs`) — Admin Only
+| Method | Path | Auth | Role | Description |
+|--------|------|------|------|-------------|
+| GET | `/` | Yes | admin | Paginated system activity logs with filters: page, limit, staff_id, action_type, search, start_date, end_date |
 
 ### Invoices (`/api/v1/invoices`)
 | Method | Path | Description |
@@ -933,7 +1013,7 @@ The entire application is mobile responsive:
 | DELETE | `/api/v1/notifications` | Clear all |
 | GET/PUT | `/api/v1/settings` | App settings |
 | GET | `/api/v1/commissions` | List commissions |
-| GET | `/public/track/:token` | ★ Public job tracking (no auth) |
+| GET | `/api/v1/public/track/:token` | ★ Public job tracking (no auth) |
 
 ---
 
@@ -984,13 +1064,15 @@ The entire application is mobile responsive:
 - Vehicle tracking by registration number
 
 ### F. Whiteboard Quotation System
-- Freehand infinite canvas drawing system powered by `tldraw` (stylus, Apple Pencil, and touch gesture support).
+- Freehand infinite canvas drawing system powered by `@excalidraw/excalidraw` (stylus, Apple Pencil, and touch gesture support). **Note:** Previously used `@tldraw/tldraw` which has been fully replaced by Excalidraw.
 - Creator form: dynamic CRM customer lookup and vehicle selector, or manual override fields (Name, Phone, Vehicle description).
 - Drawing toolbar: Undo, Redo, Select All, Clear Canvas, and Save Canvas.
 - Serialized JSON canvas state (`canvas_data`) and base64 PNG snapshot (`canvas_snapshot`) saved to database.
+- **Manual Quotation Mode**: Quotations now support a `is_manual` toggle. When `is_manual = 1`, the quotation uses an itemized list (JSON stored in `manual_items` column) instead of the Excalidraw freehand canvas. The `QuotationsPage.tsx` can toggle between whiteboard mode (`is_manual=0`) and itemized/manual mode (`is_manual=1`).
 - PDF generation & fallback: Puppeteer searches for system-installed Google Chrome and Microsoft Edge on Windows (standard paths and Local AppData) to compile A4 PDFs without requiring Chromium downloads. If Puppeteer fails to launch for any reason, a robust HTML fallback compiles the document as a web-viewable HTML layout, ensuring the action always generates a valid preview link.
 - WhatsApp send: Dispatches quote number, grand total estimate, and PDF/HTML URL to customer's contact.
 - Mobile responsive: Canvas toolbar adapts to small screens, header truncates gracefully.
+- **Quotation soft-delete & restore**: Quotations can be soft-deleted and later restored via `PUT /:id/restore` or permanently deleted via `DELETE /:id/permanent`.
 
 ### G. Invoice & Billing
 - Two types: `tax_invoice` and `estimate`
@@ -1007,10 +1089,29 @@ The entire application is mobile responsive:
 - Purchase history
 
 ### I. Staff Management
-- Roles: admin, manager, receptionist, technician, staff
+- Roles: admin, manager, receptionist, technician, staff, hr (6 roles total)
 - GPS attendance (check-in/out with lat/lng validation)
 - Salary tracking (monthly/daily)
 - Leave request management
+- **Staff Detail Page (`StaffDetailPage.tsx`)** → Route: `/staff/:id`
+  - Individual staff member profile page
+  - Shows: name, role badge (with all 6 role configs including `hr`), status badge (active/on_leave/resigned/inactive), contact info, join date
+  - Fetches staff data via `staffAPI.getById(id)` with attendance records
+- **Staff Attendance & Payments Page (`StaffAttendancePaymentsPage.tsx`)** → Route: `/staff/attendance-payments`
+  - Consolidated page for viewing staff daily attendance records and processing salary/payment requests
+  - Supports `hr` role display with all 6 role color configs
+  - Shows today's attendance rows, payment request management (advance/salary/incentive/reimbursement)
+  - Uses `staffAPI.TodayAttendanceRow` and `staffAPI.PaymentRequest` interfaces
+  - HR, manager, and admin roles have elevated access
+- **Kiosk Attendance (`KioskAttendancePage.tsx`)** → Route: `/kiosk-attendance`
+  - Full-screen touchscreen kiosk mode for staff attendance check-in/check-out
+  - Designed to run on a dedicated tablet or screen at the studio entrance
+  - Staff search by name, check-in/check-out action selection
+  - Webcam photo capture (uses `getUserMedia` + `canvas`)
+  - GPS location capture (browser geolocation API)
+  - Kiosk lock mode with configurable passcode (stored in `app_settings` as `attendance_kiosk_passcode`, default: `1234`)
+  - Callback ref pattern used for video element to handle React 19 rendering race condition
+  - Running clock display with IST timezone
 
 ### J. Dashboard
 - KPI cards: today's revenue, active jobs, new leads, pending deliveries, low stock, staff present
@@ -1068,9 +1169,41 @@ The entire application is mobile responsive:
 - **SMS is disabled by default**: `SMS_ENABLED=false` in `app_settings` — admin must explicitly enable
 
 ### P. Staff Registration & Permissions Control Module
-- **Staff Registration Panel (`StaffManagementPage.tsx`)**: Exposes staff listing with active statuses, roles, and joined permission statistics. Allows creating new staff with custom passwords generated in a secure format (`GOC@XXXX`), password resets, status toggling, and detail updates. Fully locks admin records to prevent lockouts.
+- **Staff Registration Panel (`StaffManagementPage.tsx`)**: Exposes staff listing with active statuses, roles, and joined permission statistics. Allows creating new staff with custom passwords generated in a secure format (`GOC@XXXX`), password resets, status toggling, staff deletion, and detail updates. Fully locks admin records to prevent lockouts.
 - **Permissions Control Grid (`StaffPermissionsPage.tsx`)**: Generates toggle grids for module-level access flags (e.g. leads, bookings, job cards, reports) and granular action permissions (e.g. edit job cards, delete customers, view revenue reports). Integrates an upsert query to seamlessly insert or modify permissions.
 - **Permission Access Gate (`usePermissions` hook)**: Custom React hook that resolves permission gates via a `can(permKey)` helper. Evaluates user role and active state configuration, blocking side navigation tabs, page accesses, and operational buttons (like edit, delete, or completion).
+
+### Q. Warranty Management Module
+- **Backend Routes** (`/api/v1/warranties`): Full warranty lifecycle — public warranty check by vehicle registration, public claim filing, internal warranty registration/listing, claim management, and claim-to-job-card conversion.
+- **Database Tables**: `warranties` (stores issued service warranties with status active/expired/void) and `warranty_claims` (customer-filed claims with status pending/approved/rejected/in_progress/completed).
+- **Frontend Pages**:
+  - `WarrantiesPage.tsx` (`/warranties`) — Internal warranty management with tabs for warranty list, claims, and new warranty registration. Includes status filtering, create warranty modal, claim status updater, and convert-to-job action.
+  - `PublicWarrantyCheck.tsx` (`/warranty-check`) — Public-facing page (no auth required) for customers to check their vehicle warranties by registration number and file claims. Uses GOC Studio branding.
+- **Claim → Job Card Conversion**: `POST /warranties/claims/:id/convert-job` creates a new job card with `job_type='walkin'`, `status='in_progress'`, and a ₹0 cost service line item for warranty repair work. The claim status is set to `in_progress`.
+
+### R. Recycle Bin Module
+- **Purpose**: Admin and manager tool to view soft-deleted records across multiple tables and restore or permanently delete them.
+- **Backend Routes** (`/api/v1/recycle-bin`): `GET /` lists deleted items across customers, job_cards, quotations, invoices, and leads. `POST /:type/:id/restore` restores a record (sets `deleted_at = NULL`). `DELETE /:type/:id` permanently deletes a record.
+- **Access Control**: Requires `admin` or `manager` role (enforced via `rbac` middleware).
+- **Frontend Page** (`RecycleBinPage.tsx` at `/recycle-bin`):
+  - Filter tabs per record type: All, Customers, Job Cards, Quotations, Invoices, Leads
+  - Each deleted item shows: type icon (color-coded), code, name, extra_info, deleted_at timestamp
+  - Actions per row: Restore button, Permanently Delete button (with confirmation)
+  - TYPE_CFG map: customers (blue), job_cards (amber), quotations (purple), invoices (emerald), leads (pink)
+  - Handles foreign key constraint errors gracefully on permanent delete attempts
+
+### S. System Logs (Audit Trail) Module
+- **Purpose**: Admin-only audit log for tracking all critical system actions.
+- **Backend**:
+  - `auditLogger.ts` utility — `logActivity()` function inserts audit records into `system_logs` table. Used by controllers to log logins, staff creation, permission changes, job card operations, etc. Errors are caught silently — never breaks the main operation.
+  - `systemLogsController.ts` — Paginated retrieval with filters: page, limit, staff_id, action_type, search, start_date, end_date. Joins staff table for staff name/role display.
+  - Route: `GET /api/v1/system-logs` — admin only.
+- **Frontend**:
+  - `SystemLogsPage.tsx` (`/admin/logs`) — Admin-only page
+  - `systemLogsAPI.getLogs(params: GetLogsParams)` in `api/systemLogs.ts`
+  - Filters: staff selector, action type dropdown, date range pickers, text search
+  - Paginated table with: timestamp, staff name, action_type badge (color-coded), entity_type, entity_id, description, IP address
+  - Action types tracked include: login, logout, login_failed, create_staff, update_staff, reset_staff_password, toggle_staff_status, delete_staff, create_job_card, update_job_card, update_job_status, complete_job_card, delete_job_card
 
 ---
 
@@ -1087,7 +1220,7 @@ Work in Progress (in_progress) → Ready (ready) → Estimate (estimate) → Fin
 JOB_STATUS_FLOW = {
   in_progress: ['ready', 'cancelled'],
   ready: ['estimate', 'cancelled'],
-  estimate: ['delivered', 'cancelled'],
+  estimate: ['delivered', 'cancelled', 'ready'],
   delivered: [],
   cancelled: [],
   // Backward compatibility for old statuses:
@@ -1107,6 +1240,7 @@ JOB_STATUS_FLOW = {
 - Transitioning to `delivered` status requires confirmation via a custom pop-up dialog
 - Once status is `delivered`, the backend rejects any service insertions, updates, or deletions
 - Old statuses (scheduled, car_in, washing, qc, rework) exist for backward compatibility only
+- The `estimate` status can transition back to `ready` (added since last context update)
 
 ### Quick Job Cards — Full Pipeline (Unchanged)
 ```
@@ -1176,35 +1310,41 @@ GST is only applied when `gst_applicable = true`. During job card creation, `gst
 
 ### Sidebar (`Sidebar.tsx`)
 ```
-┌─────────────────────────────┐
-│ GOC STUDIO                   │
-│ Elite Management             │
-├─────────────────────────────┤
-│ ★ MAIN MODULES (Red themed) │
-│  ◆ ADVANCE BOOKING          │   → /advance-bookings
-│  ◆ JOB CARD CREATING        │   → /jobs/new
-│  ◆ QUICK SERVICE OR WASH    │   → /quick-jobs
-│  ◆ ALL JOB CARDS            │   → /jobs
-├─────────────────────────────┤
-│ OTHER MODULES (Scrollable)   │
-│  ◇ DASHBOARD                │   → /dashboard
-│  ◇ LEADS                    │   → /leads
-│  ◇ CUSTOMERS                │   → /customers
-│  ◇ SCHEDULE                 │   → /bookings
-│  ◇ QUOTATIONS               │   → /quotations
-│  ◇ INVOICES                 │   → /invoices
-│  ◇ INVENTORY                │   → /inventory
-│  ◇ STAFF                    │   → /staff
-│  ◇ STAFF & PERMISSIONS      │   → /admin/staff
-│  ◇ MARKETING                │   → /marketing
-│  ◇ COMMISSIONS              │   → /commissions
-│  ◇ REPORTS                  │   → /reports
-├─────────────────────────────┤
-│  ⚙ SETTINGS                 │   → /settings
-│  🚪 LOGOUT                   │
-│  👤 User Profile Card        │
-└─────────────────────────────┘
+┌─────────────────────────────────────┐
+│ GOC STUDIO                           │
+│ Elite Management                     │
+├─────────────────────────────────────┤
+│ ★ MAIN MODULES (Red themed)         │
+│  ◆ ADVANCE BOOKING                  │   → /advance-bookings     (permKey: perm_advance_bookings)
+│  ◆ JOB CARD CREATING                │   → /jobs/new             (permKey: perm_job_cards)
+│  ◆ QUICK SERVICE OR WASH            │   → /quick-jobs           (permKey: perm_quick_jobs)
+│  ◆ ALL JOB CARDS                    │   → /jobs                 (permKey: perm_job_cards)
+├─────────────────────────────────────┤
+│ OTHER MODULES (Scrollable)           │
+│  ◇ DASHBOARD                        │   → /dashboard            (permKey: perm_dashboard)
+│  ◇ LEADS                            │   → /leads                (permKey: perm_leads)
+│  ◇ CUSTOMERS                        │   → /customers            (permKey: perm_customers)
+│  ◇ ATTENDANCE KIOSK             ★NEW│   → /kiosk-attendance     (permKey: perm_dashboard)
+│  ◇ QUOTATIONS                       │   → /quotations           (permKey: perm_quotations)
+│  ◇ INVOICES                         │   → /invoices             (permKey: perm_invoices)
+│  ◇ WARRANTIES                   ★NEW│   → /warranties           (permKey: perm_job_cards)
+│  ◇ INVENTORY                        │   → /inventory            (permKey: perm_inventory)
+│  ◇ STAFF                            │   → /staff                (permKey: perm_staff_management)
+│  ◇ STAFF PAYMENTS & ATTENDANCE ★NEW │   → /staff/attendance-payments  (permKey: perm_staff_management)
+│  ◇ MARKETING                        │   → /marketing            (permKey: perm_marketing)
+│  ◇ COMMISSIONS                      │   → /commissions          (permKey: perm_commissions)
+│  ◇ REPORTS                          │   → /reports              (permKey: perm_reports)
+│  ◇ STAFF & PERMISSIONS              │   → /admin/staff          (permKey: perm_staff_management)
+│  ◇ SYSTEM LOGS                 ★NEW │   → /admin/logs           (permKey: perm_staff_management)
+│  ◇ RECYCLE BIN                 ★NEW │   → /recycle-bin          (permKey: perm_staff_management)
+├─────────────────────────────────────┤
+│  ⚙ SETTINGS                         │   → /settings             (permKey: perm_settings)
+│  🚪 LOGOUT                           │
+│  👤 User Profile Card                │
+└─────────────────────────────────────┘
 ```
+
+**Note:** `SCHEDULE` (bookings page, `/bookings`) has been **removed** from the sidebar navigation.
 
 ### Main Modules (Top 4) — Red themed with bordered cards
 - These are the primary workflows used daily
@@ -1304,6 +1444,17 @@ When admin enters name/phone/car_number in any section:
 - Format: `en-IN` locale (1,23,456)
 - Use `formatINR()` helper for display
 
+### Kiosk Attendance Passcode
+- The attendance kiosk mode (`KioskAttendancePage.tsx`) uses a configurable passcode to exit kiosk lock mode.
+- Passcode is stored in `app_settings` table with key `attendance_kiosk_passcode` (default: `1234`).
+- Seeded automatically by `db.ts` on startup if the key does not exist.
+- Can be changed via the Settings page.
+
+### Warranty Claim → Job Card Conversion
+- Converting a warranty claim to a job card creates a new `job_cards` record with `job_type='walkin'`, `status='in_progress'`.
+- A ₹0 cost service line item is added: `service_name='Warranty Repair: <original service>'`, `unit_price=0`, `line_total=0`.
+- The claim status is updated to `in_progress`.
+
 ---
 
 ## 16. CODE CONVENTIONS & PATTERNS
@@ -1369,15 +1520,18 @@ export default function ModulePage() {
 - `deleted_at` soft delete on some tables but not all
 - Auto-migrations in `db.ts` run on every server start (safe — uses IF NOT EXISTS / catches ER_DUP_FIELDNAME)
 - The `job_cards.status` enum was recently altered — old values still valid but not used in new flow
+- `hr` role is new — added to `staff.role` ENUM via auto-migration. Any frontend components that enumerate roles need updating to include `hr`.
 
 ### Frontend
 - Some pages have `2` suffix duplicates (`JobCardsPage2.tsx`, `LeadsPage2.tsx`) — these are legacy/unused
 - The `jobs.ts` API file has `JobCard.status` type that doesn't include `estimate` — but the `types/index.ts` does
 - QuickJobCards.tsx is the largest page at 66KB — very complex component
-- `React.StrictMode` has been removed from `main.tsx` — it caused tldraw canvas corruption via double-mounting in React 19
+- `React.StrictMode` has been removed from `main.tsx` — it caused canvas corruption via double-mounting in React 19 (affects both tldraw and `@excalidraw/excalidraw`)
 - `MetaIntegrationPage.tsx` and `SMSSettingsPage.tsx` exist as page components but are not currently mounted in `App.tsx` routes
 - Zustand store `goc-permissions` caches staff permissions client-side and must be cleared explicitly on logout to prevent state leaks.
 - Unrelated compiler resolution: Frontend build fixes include using an `as any` type assertion in `JobCardDetailPage.tsx` services mutations to resolve type mismatches between `unit_price: number | ''` and standard `number | undefined` definitions in `index.ts`.
+- `/warranty-check` public route serves `PublicWarrantyCheck.tsx` without authentication — uses `apiClient` directly without auth header for warranty check and claim submission.
+- `BookingsPage.tsx` exists as a component but `/bookings` route has been removed from `App.tsx` and the sidebar.
 
 ### Backend
 - `jobCardController.ts` is the largest controller at 31KB — handles all job CRUD + completion
@@ -1388,6 +1542,7 @@ export default function ModulePage() {
 - MSG91 webhooks must match path `/api/v1/webhooks/whatsapp`.
 - Granular permissions modifying uses `ON DUPLICATE KEY UPDATE` to support staff members who don't yet have an entry in the `staff_permissions` table.
 - Admin lockout protection: The default admin account (and any account with the `'admin'` role) cannot be updated, disabled, or have its password reset via staff management endpoints, preventing lockout.
+- `auditLogger.logActivity()` is fire-and-forget — errors are silently caught. Do not await it for critical paths; it should never block or fail the main operation.
 
 ### Meta Integration
 - Meta credentials are encrypted in DB using AES-256-CBC with key derived from `JWT_SECRET`. If `JWT_SECRET` changes, stored credentials become unreadable and must be re-entered.
@@ -1458,6 +1613,7 @@ mysql -u root -p goc_studio < backend/src/config/migration_sms_v1.sql
 mysql -u root -p goc_studio < backend/src/config/migration_staff_permissions_v1.sql
 mysql -u root -p goc_studio < database/migrations/005_webhook_integrations.sql
 mysql -u root -p goc_studio < database/migrations/006_meta_integration_settings.sql
+mysql -u root -p goc_studio < database/migrations/007_add_manual_quotation_columns.sql
 # Note: All above also run automatically via db.ts auto-migrations on first startup
 ```
 4. Auto-migrations in `db.ts` will create remaining tables on first startup

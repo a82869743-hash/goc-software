@@ -1,0 +1,2 @@
+ALTER TABLE staff
+  ADD COLUMN IF NOT EXISTS profile_picture VARCHAR(500) NULL AFTER email;

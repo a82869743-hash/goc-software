@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 import { formatINR, formatDate, getBackendURL } from '../utils/helpers';
 import { useAuthStore } from '../stores/authStore';
 import { carDataset } from '../utils/carDataset';
+import { usePermissions } from '../utils/usePermissions';
 
 const getVehicleDetails = (qt: WhiteboardQuotation) => {
   if (qt.vehicle_name) {
@@ -671,6 +672,7 @@ function WhiteboardModal({
 // ── Main QuotationsPage ───────────────────────────────────
 export default function QuotationsPage() {
   const queryClient = useQueryClient();
+  const { canDelete } = usePermissions();
   const staff = useAuthStore(s => s.staff);
   const isPowerUser = staff?.role === 'admin' || staff?.role === 'manager';
 
@@ -1661,18 +1663,20 @@ export default function QuotationsPage() {
                       <span className="material-symbols-outlined text-base">chat</span>
                     </button>
 
-                    <button
-                      onClick={() => {
-                        setDeleteTargetId(qt.id);
-                        setDeleteTargetCode(qt.quotation_code);
-                        setIsPermanentDelete(false);
-                      }}
-                      disabled={deleteMutation.isPending}
-                      className="p-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-xl text-red-400 hover:text-red-300 transition-colors cursor-pointer"
-                      title="Delete Quotation"
-                    >
-                      <span className="material-symbols-outlined text-base">delete</span>
-                    </button>
+                    {canDelete && (
+                      <button
+                        onClick={() => {
+                          setDeleteTargetId(qt.id);
+                          setDeleteTargetCode(qt.quotation_code);
+                          setIsPermanentDelete(false);
+                        }}
+                        disabled={deleteMutation.isPending}
+                        className="p-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-xl text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+                        title="Delete Quotation"
+                      >
+                        <span className="material-symbols-outlined text-base">delete</span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

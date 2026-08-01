@@ -3,6 +3,8 @@ import pool from '../utils/db';
 import { generateCode } from '../utils/codes';
 import { ERROR_CODES } from '../utils/constants';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import fs from 'fs';
+import path from 'path';
 
 // ─── LIST ─────────────────────────────────────────
 export const getInventoryItems = async (req: Request, res: Response): Promise<void> => {
@@ -89,8 +91,8 @@ export const logUsage = async (req: Request, res: Response): Promise<void> => {
     if (item.length === 0) { res.status(404).json({ success: false, error: { code: ERROR_CODES.NOT_FOUND, message: 'Item not found.' } }); return; }
     const totalDeducted = d.qty_used + (d.wastage_qty || 0);
     await pool.query(
-      'INSERT INTO inventory_usage (inventory_item_id, job_card_id, qty_used, wastage_qty, total_deducted, used_by, notes) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [d.inventory_item_id, d.job_card_id || null, d.qty_used, d.wastage_qty || 0, totalDeducted, staffId, d.notes || null]);
+      'INSERT INTO inventory_usage (inventory_item_id, job_card_id, qty_used, manual_amount, wastage_qty, total_deducted, used_by, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [d.inventory_item_id, d.job_card_id || null, d.qty_used, d.manual_amount || null, d.wastage_qty || 0, totalDeducted, staffId, d.notes || null]);
     // Deduct from stock
     await pool.query('UPDATE inventory_items SET current_stock = GREATEST(0, current_stock - ?) WHERE id = ?', [totalDeducted, d.inventory_item_id]);
     const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM inventory_items WHERE id = ?', [d.inventory_item_id]);
@@ -279,64 +281,156 @@ export const getInventoryUsage = async (_req: Request, res: Response): Promise<v
 export const scanPurchaseBill = async (req: Request, res: Response): Promise<void> => {
   try {
     if (!req.file) {
-      res.status(400).json({ success: false, error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'No file uploaded' } });
+      res.status(400).json({ success: false, error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'No file uploaded.' } });
       return;
     }
 
-    const mockDetailingItems = [
-      { name: 'Meguiar Ceramic Wax 500ml', category: 'car_care', unit_price: 1200, qty: 10, supplier: 'Meguiar India Pvt Ltd' },
-      { name: 'Microfiber Towel 40x40 400GSM', category: 'consumable', unit_price: 150, qty: 50, supplier: 'Detailing World' },
-      { name: 'Gtechniq Crystal Serum Ultra 50ml', category: 'ceramic', unit_price: 7500, qty: 5, supplier: 'Gtechniq India' },
-      { name: 'Supa Shield PPF TPU Roll', category: 'ppf_roll', unit_price: 38000, qty: 2, supplier: 'Supa Shield Distribution' },
-      { name: 'Car Shampoo Premium 5L', category: 'car_care', unit_price: 1800, qty: 6, supplier: 'Detailing World' }
-    ];
+    const filePath = req.file.path;
+    const ext = path.extname(req.file.originalname).toLowerCase();
 
-    const selected = mockDetailingItems.sort(() => 0.5 - Math.random()).slice(0, 3);
+    // Read the uploaded file as base64
+    const fileBuffer = fs.readFileSync(filePath);
+    const base64Data = fileBuffer.toString('base64');
+    const mediaType = ext === '.pdf' ? 'application/pdf' : `image/${ext.replace('.', '') === 'jpg' ? 'jpeg' : ext.replace('.', '')}`;
+
+    // Call Claude API for OCR/extraction
+    const axios = require('axios');
+    
+    let extractedText = '';
+    
+    try {
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      if (!apiKey) {
+        throw new Error('ANTHROPIC_API_KEY is not configured in .env');
+      }
+
+      const claudeRes = await axios.post(
+        'https://api.anthropic.com/v1/messages',
+        {
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1024,
+          messages: [{
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: { type: 'base64', media_type: mediaType, data: base64Data }
+              },
+              {
+                type: 'text',
+                text: `This is a purchase bill/invoice for an automotive detailing studio. Extract all product line items from this bill. For each item return a JSON array with this exact format, no extra text:
+[
+  { "name": "product name", "qty": number, "unit_price": number, "category": "ppf_roll|ceramic|primer|car_care|consumable", "unit": "sqft|ml|litre|units|rolls" }
+]
+Use these category rules:
+- PPF film, vinyl, tpu film → ppf_roll
+- Ceramic coating, sealant, wax → ceramic  
+- Prep spray, isopropyl, primer → primer
+- Shampoo, polish, clay bar, microfiber, detailing product → car_care
+- Towels, applicators, consumable supplies → consumable
+
+If no items found or image is not a bill, return: []`
+              }
+            ]
+          }]
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01'
+          },
+          timeout: 30000
+        }
+      );
+
+      const content = claudeRes.data?.content?.[0]?.text || '[]';
+      // Strip markdown code fences if present
+      const clean = content.replace(/```json|```/g, '').trim();
+      extractedText = clean;
+    } catch (aiErr: any) {
+      console.error('Claude API error during bill scan:', aiErr?.message || aiErr);
+      res.status(422).json({
+        success: false,
+        error: {
+          code: ERROR_CODES.SERVER_ERROR,
+          message: 'Could not read bill with AI. Ensure ANTHROPIC_API_KEY is set in .env and the image is clear.'
+        }
+      });
+      return;
+    }
+
+    let parsedItems: any[] = [];
+    try {
+      parsedItems = JSON.parse(extractedText);
+      if (!Array.isArray(parsedItems)) parsedItems = [];
+    } catch {
+      parsedItems = [];
+    }
+
+    if (parsedItems.length === 0) {
+      res.json({
+        success: true,
+        data: {
+          message: 'No items detected in the uploaded bill. Try a clearer image.',
+          extracted_items: [],
+          bill_file: `/uploads/bills/${req.file.filename}`
+        }
+      });
+      return;
+    }
+
+    // Process each extracted item into DB
     const conn = await pool.getConnection();
-
     try {
       await conn.beginTransaction();
       const results = [];
 
-      for (const item of selected) {
+      for (const item of parsedItems) {
+        if (!item.name || !item.qty) continue;
+
         const [exists] = await conn.query<RowDataPacket[]>(
-          'SELECT * FROM inventory_items WHERE name = ? AND deleted_at IS NULL',
+          'SELECT * FROM inventory_items WHERE name = ? AND deleted_at IS NULL LIMIT 1',
           [item.name]
         );
 
         let itemId: number;
         let itemCode: string;
+        const unit = item.unit || 'units';
+        const unitPrice = Number(item.unit_price) || 0;
+        const qty = Number(item.qty) || 1;
 
         if (exists.length > 0) {
           itemId = exists[0].id;
           itemCode = exists[0].item_code;
           await conn.query(
             `UPDATE inventory_items SET current_stock = current_stock + ?, purchase_price = ? WHERE id = ?`,
-            [item.qty, item.unit_price, itemId]
+            [qty, unitPrice, itemId]
           );
         } else {
-          itemCode = `INV-${Math.floor(1000 + Math.random() * 9000)}`;
+          itemCode = await generateCode('inventory');
           const [newIns] = await conn.query<ResultSetHeader>(
             `INSERT INTO inventory_items (item_code, name, category, current_stock, min_threshold, purchase_price, unit, notes)
-             VALUES (?, ?, ?, ?, 5, ?, 'units', 'Auto-created from scanned purchase bill')`,
-            [itemCode, item.name, item.category, item.qty, item.unit_price]
+             VALUES (?, ?, ?, ?, 5, ?, ?, 'Auto-created from scanned purchase bill')`,
+            [itemCode, item.name, item.category || 'consumable', qty, unitPrice, unit]
           );
           itemId = newIns.insertId;
         }
 
         await conn.query(
           `INSERT INTO inventory_purchases (inventory_item_id, qty_added, purchase_price, supplier, purchase_date, notes)
-           VALUES (?, ?, ?, ?, CURDATE(), 'Scanned bill auto-import')`,
-          [itemId, item.qty, item.unit_price, item.supplier]
+           VALUES (?, ?, ?, 'Scanned from bill', CURDATE(), 'AI bill scan auto-import')`,
+          [itemId, qty, unitPrice]
         );
 
         results.push({
           id: itemId,
           item_code: itemCode,
           name: item.name,
-          qty_added: item.qty,
-          purchase_price: item.unit_price,
-          supplier: item.supplier,
+          qty_added: qty,
+          unit,
+          purchase_price: unitPrice,
+          supplier: 'Scanned from bill',
           status: exists.length > 0 ? 'Updated Stock' : 'Created New Item'
         });
       }
@@ -345,20 +439,21 @@ export const scanPurchaseBill = async (req: Request, res: Response): Promise<voi
       res.json({
         success: true,
         data: {
-          message: 'Purchase bill scanned and processed successfully',
+          message: `${results.length} item(s) extracted and imported from bill.`,
           extracted_items: results,
           bill_file: `/uploads/bills/${req.file.filename}`
         }
       });
-    } catch (err: any) {
+    } catch (dbErr) {
       await conn.rollback();
-      throw err;
+      throw dbErr;
     } finally {
       conn.release();
     }
+
   } catch (e: any) {
-    console.error(e);
-    res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: e.message } });
+    console.error('Scan bill error:', e);
+    res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed to process bill scan.' } });
   }
 };
 

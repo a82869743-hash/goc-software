@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { staffAPI, StaffMember } from '../api/staff';
+import { usePermissions } from '../utils/usePermissions';
+import toast from 'react-hot-toast';
 
-type StaffRole = 'admin' | 'technician' | 'receptionist' | 'manager' | 'staff';
+type StaffRole = 'admin' | 'technician' | 'receptionist' | 'manager' | 'staff' | 'hr';
 
 const ROLE_CFG: Record<StaffRole, { label: string; color: string; bg: string; border: string }> = {
   admin: { label: 'Admin', color: 'text-performance-red', bg: 'bg-performance-red/10', border: 'border-performance-red/25' },
@@ -11,6 +13,7 @@ const ROLE_CFG: Record<StaffRole, { label: string; color: string; bg: string; bo
   receptionist: { label: 'Receptionist', color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20' },
   manager: { label: 'Manager', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
   staff: { label: 'Staff', color: 'text-tertiary', bg: 'bg-white/5', border: 'border-white/10' },
+  hr: { label: 'HR', color: 'text-pink-400', bg: 'bg-pink-500/10', border: 'border-pink-500/20' },
 };
 
 const STATUS_CFG: Record<string, { label: string; dot: string; text: string }> = {
@@ -33,12 +36,66 @@ const AVATAR_COLORS = [
 export default function StaffDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { isAdminRole } = usePermissions();
+  const isAdmin = isAdminRole;
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showPasswordReset, setShowPasswordReset] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   const { data: staffDetailRes, isLoading } = useQuery({
     queryKey: ['staffDetails', id],
     queryFn: () => staffAPI.getById(Number(id)),
     enabled: !!id,
   });
+
+  const uploadPhotoMutation = useMutation({
+    mutationFn: (file: File) => staffAPI.uploadProfilePicture(Number(id), file),
+    onSuccess: () => {
+      toast.success('Profile picture updated successfully');
+      queryClient.invalidateQueries({ queryKey: ['staffDetails', id] });
+      queryClient.invalidateQueries({ queryKey: ['staff'] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error?.message || 'Failed to upload photo');
+    }
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: (password: string) => staffAPI.updatePassword(Number(id), password),
+    onSuccess: () => {
+      toast.success('Staff password reset successfully');
+      setShowPasswordReset(false);
+      setNewPassword('');
+      setConfirmPassword('');
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error?.message || 'Failed to reset password');
+    }
+  });
+
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      uploadPhotoMutation.mutate(file);
+    }
+    e.target.value = '';
+  };
+
+  const handlePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassword || newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    resetPasswordMutation.mutate(newPassword);
+  };
 
   const staff = staffDetailRes?.data;
 
@@ -147,15 +204,46 @@ export default function StaffDetailPage() {
         {/* Left Column: Avatar Card */}
         <div className="bg-[#0c0c0c]/40 backdrop-blur-2xl border border-white/5 rounded-2xl p-8 flex flex-col items-center justify-center text-center shadow-2xl relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-performance-red/[0.02] blur-[50px] pointer-events-none" />
-          <div
-            className={`w-28 h-28 rounded-3xl bg-gradient-to-br ${avatarGrad} border border-white/10 flex items-center justify-center text-3xl font-extrabold text-white shadow-2xl mb-6`}
-          >
-            {staff.full_name
-              .split(' ')
-              .map((w) => w[0])
-              .join('')
-              .slice(0, 2)}
-          </div>
+          
+          {staff.profile_picture ? (
+            <img
+              src={(import.meta.env.VITE_API_BASE_URL ? import.meta.env.VITE_API_BASE_URL.replace('/api/v1', '') : 'http://localhost:4000') + staff.profile_picture}
+              alt={staff.full_name}
+              className="w-28 h-28 rounded-3xl object-cover border border-white/10 shadow-2xl mb-4"
+            />
+          ) : (
+            <div
+              className={`w-28 h-28 rounded-3xl bg-gradient-to-br ${avatarGrad} border border-white/10 flex items-center justify-center text-3xl font-extrabold text-white shadow-2xl mb-4`}
+            >
+              {staff.full_name
+                .split(' ')
+                .map((w) => w[0])
+                .join('')
+                .slice(0, 2)}
+            </div>
+          )}
+
+          {isAdmin && (
+            <>
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*"
+                className="hidden"
+                onChange={handlePhotoSelect}
+              />
+              <button
+                type="button"
+                disabled={uploadPhotoMutation.isPending}
+                onClick={() => fileInputRef.current?.click()}
+                className="mb-4 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-tertiary hover:text-white text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[14px]">photo_camera</span>
+                {uploadPhotoMutation.isPending ? 'Uploading...' : 'Change Photo'}
+              </button>
+            </>
+          )}
+
           <h2 className="text-xl font-extrabold text-white uppercase tracking-wide">
             {staff.full_name}
           </h2>
@@ -165,6 +253,53 @@ export default function StaffDetailPage() {
           <p className="font-data-sm text-xs text-tertiary/40 mt-3 font-bold">
             CODE ID: {staff.staff_code}
           </p>
+
+          {isAdmin && (
+            <div className="mt-6 w-full pt-4 border-t border-white/5">
+              <button
+                type="button"
+                onClick={() => setShowPasswordReset(!showPasswordReset)}
+                className="w-full py-2 rounded-xl bg-performance-red/10 border border-performance-red/20 hover:bg-performance-red/20 text-performance-red text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[14px]">lock_reset</span>
+                {showPasswordReset ? 'Cancel Reset' : 'Reset Password'}
+              </button>
+
+              {showPasswordReset && (
+                <form onSubmit={handlePasswordSubmit} className="mt-4 space-y-3 text-left animate-fade-in">
+                  <div>
+                    <label className="text-[9px] font-label-caps text-tertiary/60 block mb-1 uppercase">New Password *</label>
+                    <input
+                      type="password"
+                      required
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Min 6 characters"
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-performance-red/40"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-label-caps text-tertiary/60 block mb-1 uppercase">Confirm Password *</label>
+                    <input
+                      type="password"
+                      required
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Re-enter password"
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-performance-red/40"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={resetPasswordMutation.isPending}
+                    className="w-full py-2 bg-gradient-to-r from-performance-red to-[#93000a] text-white rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all disabled:opacity-50"
+                  >
+                    {resetPasswordMutation.isPending ? 'Updating...' : 'Set New Password'}
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Middle Column: Details Card */}

@@ -23,6 +23,18 @@ export default function CommissionsPage() {
     commission_value: 10
   });
 
+  // Add Manual Commission Modal State
+  const [showAddCommModal, setShowAddCommModal] = useState(false);
+  const [addCommForm, setAddCommForm] = useState({
+    connector_id: '' as number | '',
+    job_card_id: '' as number | '',
+    customer_id: '' as number | '',
+    job_amount: '' as number | '',
+    commission_pct: '' as number | '',
+    commission_amount: '' as number | '',
+    notes: '',
+  });
+
   const { data: commissionsRes, isLoading: isCommissionsLoading } = useQuery({
     queryKey: ['commissions'],
     queryFn: () => commissionsAPI.list(),
@@ -46,6 +58,27 @@ export default function CommissionsPage() {
     },
     onError: (err: any) => {
       toast.error(err.response?.data?.error?.message || 'Failed to register partner');
+    }
+  });
+
+  const addCommissionMutation = useMutation({
+    mutationFn: () => commissionsAPI.createCommission({
+      connector_id: Number(addCommForm.connector_id),
+      job_card_id: Number(addCommForm.job_card_id),
+      customer_id: Number(addCommForm.customer_id),
+      job_amount: addCommForm.job_amount !== '' ? Number(addCommForm.job_amount) : undefined,
+      commission_pct: addCommForm.commission_pct !== '' ? Number(addCommForm.commission_pct) : undefined,
+      commission_amount: Number(addCommForm.commission_amount),
+      notes: addCommForm.notes || undefined,
+    }),
+    onSuccess: () => {
+      toast.success('Commission record created successfully!');
+      setShowAddCommModal(false);
+      setAddCommForm({ connector_id: '', job_card_id: '', customer_id: '', job_amount: '', commission_pct: '', commission_amount: '', notes: '' });
+      queryClient.invalidateQueries({ queryKey: ['commissions'] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error?.message || 'Failed to create commission');
     }
   });
 
@@ -97,12 +130,18 @@ export default function CommissionsPage() {
             Monitor connector ledgers, manage referral incentives, and authorize payout batches.
           </p>
         </div>
-        <div>
+        <div className="flex flex-wrap gap-3">
           <button 
             onClick={() => setShowAddModal(true)}
             className="btn btn-primary px-5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[18px]">add</span>Add Referral
+            <span className="material-symbols-outlined text-[18px]">add</span>Add Referral Partner
+          </button>
+          <button 
+            onClick={() => setShowAddCommModal(true)}
+            className="px-5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:cursor-pointer bg-white/10 text-white hover:bg-white/20 border border-white/10 transition-all"
+          >
+            <span className="material-symbols-outlined text-[18px]">payments</span>Add Commission
           </button>
         </div>
       </div>
@@ -347,6 +386,112 @@ export default function CommissionsPage() {
               className="w-full py-3 bg-gradient-to-r from-performance-red to-[#93000a] text-white rounded-xl text-xs font-label-caps tracking-widest font-bold border border-white/10 uppercase transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-[0_0_20px_rgba(255,43,43,0.3)]"
             >
               {addConnectorMutation.isPending ? 'REGISTERING...' : 'REGISTER CONNECTOR'}
+            </button>
+          </div>
+        </div>
+      )}
+      {/* ADD MANUAL COMMISSION MODAL */}
+      {showAddCommModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="glass-panel w-full max-w-md p-6 rounded-2xl relative space-y-4 border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="font-display-hero text-lg font-black text-white tracking-tight italic uppercase">
+                  Add Manual Commission
+                </h3>
+                <p className="text-[10px] text-tertiary/50 font-label-caps tracking-widest uppercase">
+                  Record commission ledger entry
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddCommModal(false)}
+                className="text-tertiary hover:text-white p-1 hover:bg-white/5 rounded-lg transition-all"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="font-label-caps text-[9px] text-tertiary/60 tracking-widest block mb-1">Connector / Referral Partner *</label>
+                <select
+                  value={addCommForm.connector_id}
+                  onChange={e => setAddCommForm(p => ({ ...p, connector_id: e.target.value === '' ? '' : Number(e.target.value) }))}
+                  className="w-full bg-[#0a0a0a] border border-white/[0.07] rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-performance-red/40"
+                >
+                  <option value="">Select Referral Partner...</option>
+                  {dbConnectors.map((conn: any) => (
+                    <option key={conn.id} value={conn.id}>{conn.full_name} ({conn.phone})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-label-caps text-[9px] text-tertiary/60 tracking-widest block mb-1">Job Card ID *</label>
+                  <input
+                    type="number"
+                    value={addCommForm.job_card_id}
+                    onChange={e => setAddCommForm(p => ({ ...p, job_card_id: e.target.value === '' ? '' : Number(e.target.value) }))}
+                    placeholder="e.g. 12"
+                    className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-performance-red/40 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="font-label-caps text-[9px] text-tertiary/60 tracking-widest block mb-1">Customer ID *</label>
+                  <input
+                    type="number"
+                    value={addCommForm.customer_id}
+                    onChange={e => setAddCommForm(p => ({ ...p, customer_id: e.target.value === '' ? '' : Number(e.target.value) }))}
+                    placeholder="e.g. 5"
+                    className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-performance-red/40 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-label-caps text-[9px] text-tertiary/60 tracking-widest block mb-1">Job Total Amount (₹)</label>
+                  <input
+                    type="number"
+                    value={addCommForm.job_amount}
+                    onChange={e => setAddCommForm(p => ({ ...p, job_amount: e.target.value === '' ? '' : Number(e.target.value) }))}
+                    placeholder="50000"
+                    className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-performance-red/40 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="font-label-caps text-[9px] text-tertiary/60 tracking-widest block mb-1">Commission (₹) *</label>
+                  <input
+                    type="number"
+                    value={addCommForm.commission_amount}
+                    onChange={e => setAddCommForm(p => ({ ...p, commission_amount: e.target.value === '' ? '' : Number(e.target.value) }))}
+                    placeholder="5000"
+                    className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-performance-red/40 font-mono text-emerald-400 font-bold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-label-caps text-[9px] text-tertiary/60 tracking-widest block mb-1">Notes / Description</label>
+                <textarea
+                  rows={2}
+                  value={addCommForm.notes}
+                  onChange={e => setAddCommForm(p => ({ ...p, notes: e.target.value }))}
+                  placeholder="Optional details or terms"
+                  className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-performance-red/40"
+                />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              disabled={!addCommForm.connector_id || !addCommForm.job_card_id || !addCommForm.customer_id || !addCommForm.commission_amount || addCommissionMutation.isPending}
+              onClick={() => addCommissionMutation.mutate()}
+              className="w-full py-3 bg-gradient-to-r from-performance-red to-[#93000a] text-white rounded-xl text-xs font-label-caps tracking-widest font-bold border border-white/10 uppercase transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-[0_0_20px_rgba(255,43,43,0.3)]"
+            >
+              {addCommissionMutation.isPending ? 'CREATING...' : 'CREATE COMMISSION RECORD'}
             </button>
           </div>
         </div>

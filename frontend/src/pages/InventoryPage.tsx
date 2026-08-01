@@ -3,9 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { inventoryAPI, InventoryItem, InventoryUsage } from '../api/inventory';
 import toast from 'react-hot-toast';
 import apiClient from '../api/client';
+import { usePermissions } from '../utils/usePermissions';
 
 // Premium Stock Level Indicator
-function StockBar({ qty, min }: { qty: number; min: number }) {
+function StockBar({ qty, min, unit }: { qty: number; min: number; unit?: string }) {
   const pct = Math.min((qty / (min * 3)) * 100, 100);
   const isLow = qty <= min;
   const barColor = isLow 
@@ -14,19 +15,22 @@ function StockBar({ qty, min }: { qty: number; min: number }) {
   const txtColor = isLow 
     ? 'text-performance-red font-bold animate-pulse' 
     : 'text-emerald-400';
+  const unitLabel = unit === 'sqft' ? 'sq ft' : unit === 'ml' ? 'ml' : unit === 'litre' ? 'L' : unit === 'rolls' ? 'rolls' : 'pcs';
 
   return (
     <div className="flex items-center gap-3 w-full max-w-[200px]">
       <div className="flex-1 h-2 bg-black/40 rounded-full border border-white/5 overflow-hidden">
         <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${pct}%` }} />
       </div>
-      <span className={`font-data-sm text-xs tabular-nums ${txtColor}`}>{qty} sq feet</span>
+      <span className={`font-data-sm text-xs tabular-nums ${txtColor}`}>{qty} {unitLabel}</span>
     </div>
   );
 }
 
 export default function InventoryPage() {
   const queryClient = useQueryClient();
+  const { canDelete } = usePermissions();
+
   const [activeTab, setActiveTab] = useState<'ppf' | 'usages'>('ppf');
 
   // Search states
@@ -76,19 +80,29 @@ export default function InventoryPage() {
   // Form states
   const [newBrandForm, setNewBrandForm] = useState<{
     name: string;
+    category: InventoryItem['category'];
+    unit: InventoryItem['unit'];
     current_stock: number | '';
     min_threshold: number | '';
+    purchase_price: number | '';
   }>({
     name: '',
+    category: 'ppf_roll',
+    unit: 'sqft',
     current_stock: '',
     min_threshold: '',
+    purchase_price: '',
   });
 
   const [usageForm, setUsageForm] = useState<{
     qty_used: number | '';
+    manual_amount: number | '';
+    deduction_mode: 'qty' | 'amount';
     notes: string;
   }>({
     qty_used: '',
+    manual_amount: '',
+    deduction_mode: 'qty',
     notes: '',
   });
 
@@ -105,8 +119,8 @@ export default function InventoryPage() {
   });
   const items = (inventoryRes?.data || []) as InventoryItem[];
 
-  // Filter only PPF rolls
-  const ppfRolls = items.filter(i => i.category === 'ppf_roll');
+  // Show all categories in the table
+  const ppfRolls = items;
 
   const { data: usagesRes, isLoading: isUsagesLoading } = useQuery({
     queryKey: ['usagesHistory'],
@@ -133,8 +147,11 @@ export default function InventoryPage() {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
       setNewBrandForm({
         name: '',
+        category: 'ppf_roll',
+        unit: 'sqft',
         current_stock: '',
         min_threshold: '',
+        purchase_price: '',
       });
     },
     onError: (err: any) => {
@@ -149,7 +166,7 @@ export default function InventoryPage() {
       setShowUsageModal(false);
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
       queryClient.invalidateQueries({ queryKey: ['usagesHistory'] });
-      setUsageForm({ qty_used: '', notes: '' });
+      setUsageForm({ qty_used: '', manual_amount: '', deduction_mode: 'qty', notes: '' });
       setSelectedItem(null);
     },
     onError: (err: any) => {
@@ -175,20 +192,20 @@ export default function InventoryPage() {
   const handleCommitNewBrand = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newBrandForm.name) {
-      toast.error('PPF Brand Name is required.');
+      toast.error('Item Name is required.');
       return;
     }
     const payload = {
       name: newBrandForm.name,
-      category: 'ppf_roll',
+      category: newBrandForm.category,
       brand: newBrandForm.name,
-      unit: 'sqft',
+      unit: newBrandForm.unit,
       current_stock: newBrandForm.current_stock === '' ? 0 : Number(newBrandForm.current_stock),
       min_threshold: newBrandForm.min_threshold === '' ? 10 : Number(newBrandForm.min_threshold),
-      purchase_price: 0,
+      purchase_price: newBrandForm.purchase_price === '' ? 0 : Number(newBrandForm.purchase_price),
       selling_price: 0,
-      location: 'PPF Hangar',
-      notes: 'Added via simplified inventory manager',
+      location: 'Main Hangar',
+      notes: 'Added via inventory manager',
     };
     createBrandMutation.mutate(payload);
   };
@@ -196,15 +213,28 @@ export default function InventoryPage() {
   const handleCommitUsage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedItem) return;
-    if (usageForm.qty_used === '' || Number(usageForm.qty_used) <= 0) {
-      toast.error('Please input a valid quantity to deduct.');
-      return;
+    let qty: number;
+    if (usageForm.deduction_mode === 'amount') {
+      const price = Number(selectedItem.purchase_price) || 1;
+      if (usageForm.manual_amount === '' || Number(usageForm.manual_amount) <= 0) {
+        toast.error('Please input a valid amount to deduct.');
+        return;
+      }
+      qty = Number(usageForm.manual_amount) / price;
+    } else {
+      if (usageForm.qty_used === '' || Number(usageForm.qty_used) <= 0) {
+        toast.error('Please input a valid quantity to deduct.');
+        return;
+      }
+      qty = Number(usageForm.qty_used);
     }
+
     const payload = {
       inventory_item_id: selectedItem.id,
-      qty_used: Number(usageForm.qty_used),
+      qty_used: qty,
+      manual_amount: usageForm.deduction_mode === 'amount' ? Number(usageForm.manual_amount) : undefined,
       wastage_qty: 0,
-      notes: usageForm.notes || 'Manual stock deduction',
+      notes: usageForm.notes || (usageForm.deduction_mode === 'amount' ? `Manual amount deduction: ₹${usageForm.manual_amount}` : 'Manual stock deduction'),
     };
     recordUsageMutation.mutate(payload);
   };
@@ -516,14 +546,14 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {/* MODAL: ADD PPF BRAND */}
+      {/* MODAL: ADD INVENTORY ITEM */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
-          <div className="bg-[#0c0c0c] border border-white/10 rounded-2xl p-6 max-w-md w-full relative shadow-2xl">
+          <div className="bg-[#0c0c0c] border border-white/10 rounded-2xl p-6 max-w-md w-full relative shadow-2xl space-y-4">
             <div className="absolute -top-24 -left-24 w-48 h-48 bg-performance-red/[0.04] blur-[60px] pointer-events-none" />
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex justify-between items-center mb-2">
               <h3 className="font-display-hero text-lg font-black text-white uppercase tracking-wider">
-                Register PPF Brand
+                Register Inventory Item
               </h3>
               <button
                 type="button"
@@ -537,12 +567,12 @@ export default function InventoryPage() {
             <form onSubmit={handleCommitNewBrand} className="space-y-4">
               <div>
                 <label className="block text-[10px] text-tertiary font-label-caps mb-1.5 uppercase tracking-wider font-bold">
-                  PPF Brand Name
+                  Item Name *
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. XPEL Ultimate Plus"
+                  placeholder="e.g. XPEL Ultimate Plus / Meguiar Ceramic Wax"
                   value={newBrandForm.name}
                   onChange={(e) => setNewBrandForm({ ...newBrandForm, name: e.target.value })}
                   className="w-full bg-black border border-white/10 focus:border-performance-red/50 focus:outline-none rounded-xl px-3 py-2.5 text-xs text-white font-body-lg"
@@ -551,8 +581,40 @@ export default function InventoryPage() {
 
               <div className="grid grid-cols-2 gap-3 font-data-sm text-xs">
                 <div>
+                  <label className="block text-[10px] text-tertiary font-label-caps mb-1.5 uppercase tracking-wider font-bold">Category *</label>
+                  <select
+                    value={newBrandForm.category}
+                    onChange={(e) => setNewBrandForm({ ...newBrandForm, category: e.target.value as InventoryItem['category'] })}
+                    className="w-full bg-black border border-white/10 focus:border-performance-red/50 focus:outline-none rounded-xl px-3 py-2.5 text-xs text-white outline-none"
+                  >
+                    <option value="ppf_roll">PPF Roll</option>
+                    <option value="ceramic">Ceramic Coating</option>
+                    <option value="primer">Primer / Prep</option>
+                    <option value="car_care">Car Care Product</option>
+                    <option value="consumable">Consumable</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] text-tertiary font-label-caps mb-1.5 uppercase tracking-wider font-bold">Unit of Measurement *</label>
+                  <select
+                    value={newBrandForm.unit}
+                    onChange={(e) => setNewBrandForm({ ...newBrandForm, unit: e.target.value as InventoryItem['unit'] })}
+                    className="w-full bg-black border border-white/10 focus:border-performance-red/50 focus:outline-none rounded-xl px-3 py-2.5 text-xs text-white outline-none"
+                  >
+                    <option value="sqft">Square Feet (sq ft)</option>
+                    <option value="ml">Millilitres (ml)</option>
+                    <option value="litre">Litres (L)</option>
+                    <option value="units">Units / Pieces (pcs)</option>
+                    <option value="rolls">Rolls</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 font-data-sm text-xs">
+                <div>
                   <label className="block text-[10px] text-tertiary font-label-caps mb-1.5 uppercase tracking-wider font-bold">
-                    Square Feet Adding Field
+                    Initial Stock
                   </label>
                   <input
                     type="number"
@@ -565,7 +627,7 @@ export default function InventoryPage() {
                 </div>
                 <div>
                   <label className="block text-[10px] text-tertiary font-label-caps mb-1.5 uppercase tracking-wider font-bold">
-                    Low Stock Alert Alert
+                    Low Stock Alert
                   </label>
                   <input
                     type="number"
@@ -573,6 +635,19 @@ export default function InventoryPage() {
                     required
                     value={newBrandForm.min_threshold}
                     onChange={(e) => setNewBrandForm({ ...newBrandForm, min_threshold: e.target.value === '' ? '' : Number(e.target.value) })}
+                    className="w-full bg-black border border-white/10 focus:border-performance-red/50 focus:outline-none rounded-xl p-2.5 text-white text-right"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-tertiary font-label-caps mb-1.5 uppercase tracking-wider font-bold">
+                    Unit Price (₹)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={newBrandForm.purchase_price}
+                    onChange={(e) => setNewBrandForm({ ...newBrandForm, purchase_price: e.target.value === '' ? '' : Number(e.target.value) })}
+                    placeholder="0"
                     className="w-full bg-black border border-white/10 focus:border-performance-red/50 focus:outline-none rounded-xl p-2.5 text-white text-right"
                   />
                 </div>
@@ -687,19 +762,69 @@ export default function InventoryPage() {
             </div>
 
             <form onSubmit={handleCommitUsage} className="space-y-4">
-              <div>
-                <label className="block text-[10px] text-tertiary font-label-caps mb-1.5 uppercase tracking-wider font-bold">
-                  Square Feet to Deduct *
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  required
-                  value={usageForm.qty_used}
-                  onChange={(e) => setUsageForm({ ...usageForm, qty_used: e.target.value === '' ? '' : Number(e.target.value) })}
-                  className="w-full bg-black border border-white/10 focus:border-performance-red/50 focus:outline-none rounded-xl p-3 text-xs text-white text-right font-data-sm"
-                />
+              {/* Mode toggle */}
+              <div className="flex gap-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => setUsageForm({ ...usageForm, deduction_mode: 'qty' })}
+                  className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
+                    usageForm.deduction_mode === 'qty'
+                      ? 'bg-performance-red/20 border border-performance-red/40 text-performance-red'
+                      : 'bg-white/5 border border-white/10 text-tertiary'
+                  }`}
+                >
+                  By Quantity
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUsageForm({ ...usageForm, deduction_mode: 'amount' })}
+                  className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
+                    usageForm.deduction_mode === 'amount'
+                      ? 'bg-performance-red/20 border border-performance-red/40 text-performance-red'
+                      : 'bg-white/5 border border-white/10 text-tertiary'
+                  }`}
+                >
+                  By Amount (₹)
+                </button>
               </div>
+
+              {usageForm.deduction_mode === 'qty' ? (
+                <div>
+                  <label className="block text-[10px] text-tertiary font-label-caps mb-1.5 uppercase tracking-wider font-bold">
+                    Quantity Used ({selectedItem?.unit || 'units'}) *
+                  </label>
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="any"
+                    required
+                    value={usageForm.qty_used}
+                    onChange={(e) => setUsageForm({ ...usageForm, qty_used: e.target.value === '' ? '' : Number(e.target.value) })}
+                    placeholder={`Amount in ${selectedItem?.unit || 'units'}`}
+                    className="w-full bg-black border border-white/10 focus:border-performance-red/50 focus:outline-none rounded-xl p-3 text-xs text-white text-right font-data-sm"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-[10px] text-tertiary font-label-caps mb-1.5 uppercase tracking-wider font-bold">
+                    Manual Deduction Amount (₹) *
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={usageForm.manual_amount}
+                    onChange={(e) => setUsageForm({ ...usageForm, manual_amount: e.target.value === '' ? '' : Number(e.target.value) })}
+                    placeholder="Enter rupee value used"
+                    className="w-full bg-black border border-white/10 focus:border-performance-red/50 focus:outline-none rounded-xl p-3 text-xs text-white text-right font-data-sm"
+                  />
+                  <p className="text-[10px] text-tertiary/40 mt-1">
+                    {selectedItem?.purchase_price && usageForm.manual_amount
+                      ? `≈ ${(Number(usageForm.manual_amount) / selectedItem.purchase_price).toFixed(2)} ${selectedItem.unit} @ ₹${selectedItem.purchase_price}/${selectedItem.unit}`
+                      : 'Quantity calculated using item unit purchase price'}
+                  </p>
+                </div>
+              )}
 
               <div>
                 <label className="block text-[10px] text-tertiary font-label-caps mb-1.5 uppercase tracking-wider font-bold">
@@ -819,7 +944,7 @@ export default function InventoryPage() {
   );
 
   function setShowUsageMutationDialog() {
-    setUsageForm({ qty_used: '', notes: '' });
+    setUsageForm({ qty_used: '', manual_amount: '', deduction_mode: 'qty', notes: '' });
     setShowUsageModal(true);
   }
 

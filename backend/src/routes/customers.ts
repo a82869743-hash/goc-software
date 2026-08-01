@@ -25,7 +25,7 @@ router.post('/', validate(createCustomerSchema), createCustomer);
 // Update — any authenticated staff
 router.put('/:id', validate(updateCustomerSchema), updateCustomer);
 
-// Delete — owner/manager only
-router.delete('/:id', rbac('admin', 'manager'), deleteCustomer);
+// Delete — admin only
+router.delete('/:id', rbac('admin'), deleteCustomer);
 
 export default router;

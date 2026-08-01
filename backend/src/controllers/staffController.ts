@@ -827,3 +827,58 @@ export const approvePaymentRequest = async (req: Request, res: Response): Promis
     res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed to process payment request.' } });
   }
 };
+
+/** POST /staff/:id/profile-picture — Upload staff profile picture */
+export const uploadProfilePicture = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ success: false, error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'No file uploaded.' } });
+      return;
+    }
+    const url = `/uploads/photos/${req.file.filename}`;
+    await pool.query('UPDATE staff SET profile_picture = ? WHERE id = ?', [url, req.params.id]);
+    res.json({ success: true, data: { profile_picture: url } });
+  } catch (e) {
+    console.error('Upload profile picture error:', e);
+    res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Upload failed.' } });
+  }
+};
+
+/** PUT /staff/:id/password — Update password for staff member (Admin only) */
+export const updateStaffPassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { new_password } = req.body;
+    if (!new_password || new_password.length < 6) {
+      res.status(400).json({ success: false, error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'Password must be at least 6 characters.' } });
+      return;
+    }
+    const bcrypt = require('bcryptjs');
+    const hash = await bcrypt.hash(new_password, 10);
+    await pool.query('UPDATE staff SET password_hash = ? WHERE id = ? AND deleted_at IS NULL', [hash, req.params.id]);
+    res.json({ success: true, data: { message: 'Password updated successfully.' } });
+  } catch (e) {
+    console.error('Update password error:', e);
+    res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed to update password.' } });
+  }
+};
+
+/** POST /staff/reset-all-passwords — Reset passwords for all non-admin staff members */
+export const resetAllStaffPasswords = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { new_password } = req.body;
+    if (!new_password || new_password.length < 6) {
+      res.status(400).json({ success: false, error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'Password must be at least 6 characters.' } });
+      return;
+    }
+    const bcrypt = require('bcryptjs');
+    const hash = await bcrypt.hash(new_password, 10);
+    const [result] = await pool.query<ResultSetHeader>(
+      `UPDATE staff SET password_hash = ? WHERE role != 'admin' AND deleted_at IS NULL`,
+      [hash]
+    );
+    res.json({ success: true, data: { updated: result.affectedRows, message: `Password reset for ${result.affectedRows} staff member(s).` } });
+  } catch (e) {
+    console.error('Reset all passwords error:', e);
+    res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed to reset passwords.' } });
+  }
+};

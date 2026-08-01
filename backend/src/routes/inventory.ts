@@ -47,6 +47,6 @@ router.get('/', validateQuery(inventoryFiltersSchema), getInventoryItems);
 router.get('/:id', getInventoryItemById);
 router.post('/', rbac('admin', 'manager'), validate(createInventoryItemSchema), createInventoryItem);
 router.put('/:id', rbac('admin', 'manager'), validate(updateInventoryItemSchema), updateInventoryItem);
-router.delete('/:id', rbac('admin', 'manager'), deleteInventoryItem);
+router.delete('/:id', rbac('admin'), deleteInventoryItem);
 
 export default router;

@@ -28,8 +28,8 @@ router.post('/', rbac('admin', 'manager', 'receptionist'), validate(createLeadSc
 // PUT /leads/:id — Update
 router.put('/:id', rbac('admin', 'manager', 'receptionist'), validate(updateLeadSchema), updateLead);
 
-// DELETE /leads/:id — Soft delete (admin/manager only)
-router.delete('/:id', rbac('admin', 'manager'), deleteLead);
+// DELETE /leads/:id — Soft delete (admin only)
+router.delete('/:id', rbac('admin'), deleteLead);
 
 export default router;
 

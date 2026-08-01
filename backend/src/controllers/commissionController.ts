@@ -174,3 +174,24 @@ export const deleteConnector = async (req: Request, res: Response): Promise<void
   }
 };
 
+/** POST /commissions — Create manual commission record */
+export const createManualCommission = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { connector_id, job_card_id, customer_id, job_amount, commission_pct, commission_amount, notes } = req.body;
+    if (!connector_id || !job_card_id || !customer_id || !commission_amount) {
+      res.status(400).json({ success: false, error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'connector_id, job_card_id, customer_id and commission_amount are required.' } });
+      return;
+    }
+    const [result] = await pool.query<ResultSetHeader>(
+      `INSERT INTO connector_commissions (connector_id, job_card_id, customer_id, job_amount, commission_pct, commission_amount, status, notes)
+       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)`,
+      [connector_id, job_card_id, customer_id, job_amount || 0, commission_pct || null, commission_amount, notes || null]
+    );
+    const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM connector_commissions WHERE id = ?', [result.insertId]);
+    res.status(201).json({ success: true, data: rows[0] });
+  } catch (error) {
+    console.error('Create manual commission error:', error);
+    res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed to create commission.' } });
+  }
+};
+

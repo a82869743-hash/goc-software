@@ -64,6 +64,19 @@ export const commissionsAPI = {
     return data as { data: Connector };
   },
 
+  createCommission: async (payload: {
+    connector_id: number;
+    job_card_id: number;
+    customer_id: number;
+    job_amount?: number;
+    commission_pct?: number;
+    commission_amount: number;
+    notes?: string;
+  }) => {
+    const { data } = await apiClient.post('/commissions', payload);
+    return data as { data: Commission };
+  },
+
   deleteConnector: async (id: number) => {
     const { data } = await apiClient.delete(`/commissions/connectors/${id}`);
     return data;

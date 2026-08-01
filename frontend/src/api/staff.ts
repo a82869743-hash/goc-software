@@ -12,6 +12,7 @@ export interface StaffMember {
   salary_amount: number;
   join_date: string;
   status: 'active' | 'on_leave' | 'resigned';
+  profile_picture?: string | null;
   attendance?: AttendanceRecord[];
 }
 
@@ -112,6 +113,18 @@ export const staffAPI = {
   },
   approvePaymentRequest: async (id: number, payload: { status: 'approved' | 'rejected'; notes?: string }): Promise<ApiResponse<{ message: string }>> => {
     const { data } = await apiClient.patch(`/staff/payment-requests/${id}`, payload);
+    return data;
+  },
+  uploadProfilePicture: async (staffId: number, file: File): Promise<ApiResponse<{ profile_picture: string }>> => {
+    const formData = new FormData();
+    formData.append('photo', file);
+    const { data } = await apiClient.post(`/staff/${staffId}/profile-picture`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data;
+  },
+  updatePassword: async (staffId: number, newPassword: string): Promise<ApiResponse<{ message: string }>> => {
+    const { data } = await apiClient.put(`/staff/${staffId}/password`, { new_password: newPassword });
     return data;
   },
 };

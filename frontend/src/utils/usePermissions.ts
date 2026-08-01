@@ -13,5 +13,7 @@ export function usePermissions() {
     return permissions[permKey] === 1;
   };
 
-  return { can, isAdminRole, permissions };
+  const canDelete = isAdminRole || isAdmin || permissions?.perm_delete_all === 1;
+
+  return { can, isAdminRole, isAdmin, canDelete, permissions };
 }

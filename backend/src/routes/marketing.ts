@@ -53,12 +53,12 @@ router.post('/whatsapp/quick-send', rbac('admin', 'manager', 'receptionist'), qu
 router.get('/campaigns', getCampaigns);
 router.post('/campaigns', rbac('admin', 'manager'), createCampaign);
 router.put('/campaigns/:id', rbac('admin', 'manager'), updateCampaign);
-router.delete('/campaigns/:id', rbac('admin', 'manager'), deleteCampaign);
+router.delete('/campaigns/:id', rbac('admin'), deleteCampaign);
 router.post('/campaigns/:id/execute', rbac('admin', 'manager'), executeCampaign);
 
 // ── Promotional Materials ──────────────────────────────────
 router.get('/materials', getPromotionalMaterials);
 router.post('/materials', rbac('admin', 'manager'), materialsUpload.single('file'), uploadPromotionalMaterial);
-router.delete('/materials/:id', rbac('admin', 'manager'), deletePromotionalMaterial);
+router.delete('/materials/:id', rbac('admin'), deletePromotionalMaterial);
 
 export default router;

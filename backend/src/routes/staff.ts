@@ -21,12 +21,16 @@ import {
   kioskAttendance,
   getPaymentRequests,
   createPaymentRequest,
-  approvePaymentRequest
+  approvePaymentRequest,
+  uploadProfilePicture,
+  updateStaffPassword,
+  resetAllStaffPasswords
 } from '../controllers/staffController';
 import { authMiddleware } from '../middleware/auth';
 import { rbac } from '../middleware/rbac';
 import { validate, validateQuery } from '../middleware/validate';
 import { createStaffSchema, updateStaffSchema, staffFiltersSchema, markAttendanceSchema } from '../validations/staffValidation';
+import { uploadPhoto } from '../middleware/upload';
 
 const router = Router();
 router.use(authMiddleware);
@@ -66,6 +70,11 @@ router.delete('/:id', rbac('admin'), deleteStaff);
 
 // Attendance manual marking
 router.post('/attendance', rbac('admin', 'manager'), validate(markAttendanceSchema), markAttendance);
+
+// Profile picture & password endpoints
+router.post('/reset-all-passwords', rbac('admin'), resetAllStaffPasswords);
+router.post('/:id/profile-picture', rbac('admin'), uploadPhoto.single('photo'), uploadProfilePicture);
+router.put('/:id/password', rbac('admin'), updateStaffPassword);
 
 // Kiosk Attendance route (snaps webcam photo, checks in/out)
 router.post('/kiosk-attendance', kioskAttendance);

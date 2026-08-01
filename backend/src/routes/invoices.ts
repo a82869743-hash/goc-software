@@ -20,7 +20,7 @@ router.get('/', validateQuery(invoiceFiltersSchema), getInvoices);
 router.get('/:id', getInvoiceById);
 router.post('/', validate(createInvoiceSchema), createInvoice);
 router.put('/:id', validate(updateInvoiceSchema), updateInvoice);
-router.delete('/:id', rbac('admin', 'manager'), deleteInvoice);
+router.delete('/:id', rbac('admin'), deleteInvoice);
 
 // ─── Generate PDF ─────────────────────────────────
 router.post('/:id/generate-pdf', async (req: Request, res: Response): Promise<void> => {

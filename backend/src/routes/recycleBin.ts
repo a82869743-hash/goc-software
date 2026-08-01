@@ -15,7 +15,7 @@ router.get('/', getDeletedItems);
 // Restore a deleted item
 router.post('/:type/:id/restore', restoreItem);
 
-// Permanently delete an item
-router.delete('/:type/:id', permanentlyDeleteItem);
+// Permanently delete an item (admin only)
+router.delete('/:type/:id', rbac('admin'), permanentlyDeleteItem);
 
 export default router;

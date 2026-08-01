@@ -24,7 +24,7 @@ router.post('/', validate(createVehicleSchema), createVehicle);
 // Update
 router.put('/:id', validate(updateVehicleSchema), updateVehicle);
 
-// Delete — owner/manager only
-router.delete('/:id', rbac('admin', 'manager'), deleteVehicle);
+// Delete — admin only
+router.delete('/:id', rbac('admin'), deleteVehicle);
 
 export default router;

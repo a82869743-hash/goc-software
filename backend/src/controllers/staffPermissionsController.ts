@@ -85,7 +85,8 @@ export const updatePermissions = async (req: Request, res: Response): Promise<vo
       'perm_invoices_create', 'perm_payments_record',
       'perm_leads_delete', 'perm_leads_assign',
       'perm_customers_delete', 'perm_inventory_edit',
-      'perm_reports_revenue', 'perm_reports_accounts', 'perm_reports_salary'
+      'perm_reports_revenue', 'perm_reports_accounts', 'perm_reports_salary',
+      'perm_delete_all'
     ];
 
     const updateFields: string[] = [];
@@ -180,7 +181,8 @@ export const getMyPermissions = async (req: Request, res: Response): Promise<voi
           perm_inventory_edit: 1,
           perm_reports_revenue: 1,
           perm_reports_accounts: 1,
-          perm_reports_salary: 1
+          perm_reports_salary: 1,
+          perm_delete_all: 1
         }
       });
       return;

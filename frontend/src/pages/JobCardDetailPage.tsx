@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { jobsAPI, JobCard, JobService } from '../api/jobs';
 import { inventoryAPI, InventoryItem } from '../api/inventory';
+import apiClient from '../api/client';
 import toast from 'react-hot-toast';
 import { getBackendURL } from '../utils/helpers';
 import { useAuthStore } from '../stores/authStore';
@@ -125,7 +126,31 @@ export default function JobCardDetailPage() {
   const [showDeliveredConfirm, setShowDeliveredConfirm] = useState(false);
   const [pendingStatusChange, setPendingStatusChange] = useState<{ new_status: string; notes?: string } | null>(null);
 
+  const { data: mediaRes } = useQuery({
+    queryKey: ['job-media', id],
+    queryFn: async () => {
+      const res = await apiClient.get(`/jobs/${id}/media`);
+      return res.data?.data || [];
+    },
+    enabled: !!id,
+  });
+
+  const mediaList = mediaRes || [];
+
   const handleStatusTransition = (nextStatus: string) => {
+    const current = job?.status;
+    const hasBeforePhoto = mediaList.some((m: any) => ['before_image', 'during_image'].includes(m.media_type));
+    const hasAfterPhoto = mediaList.some((m: any) => m.media_type === 'after_image');
+
+    if (['car_in', 'in_progress'].includes(current || '') && !['cancelled', 'car_in', 'in_progress'].includes(nextStatus) && !hasBeforePhoto) {
+      toast.error('Upload at least one before/during photo before progressing this job.');
+      return;
+    }
+    if (nextStatus === 'delivered' && !hasAfterPhoto) {
+      toast.error('Upload at least one "After" photo before marking as delivered.');
+      return;
+    }
+
     if (nextStatus === 'delivered') {
       setPendingStatusChange({ new_status: nextStatus, notes: statusNotes || undefined });
       setShowDeliveredConfirm(true);

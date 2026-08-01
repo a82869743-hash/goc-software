@@ -262,6 +262,21 @@ pool.getConnection()
         setting_value = CASE WHEN setting_value = 'hiru@29' THEN '1234' ELSE setting_value END;
     `).catch(err => console.error('❌ Failed to seed default kiosk passcode setting:', err));
 
+    // Auto-migrate profile_picture in staff table
+    await conn.query(`
+      ALTER TABLE staff ADD COLUMN IF NOT EXISTS profile_picture VARCHAR(500) NULL AFTER email;
+    `).catch(() => {});
+
+    // Auto-migrate perm_delete_all in staff_permissions table
+    await conn.query(`
+      ALTER TABLE staff_permissions ADD COLUMN IF NOT EXISTS perm_delete_all TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'Only admin gets this';
+    `).catch(() => {});
+
+    // Auto-migrate manual_amount in inventory_usage table
+    await conn.query(`
+      ALTER TABLE inventory_usage ADD COLUMN IF NOT EXISTS manual_amount DECIMAL(10,2) NULL AFTER qty_used;
+    `).catch(() => {});
+
 
     // Alter job_cards status column to include 'estimate' and change default to 'in_progress'
     await conn.query(`

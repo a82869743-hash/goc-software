@@ -2,13 +2,13 @@ const { Client } = require('ssh2');
 
 const conn = new Client();
 const commands = [
-  'grep -i "STUDIO_NAME" /root/goc-software/.env',
-  'echo "---PDF_SERVICE_CHECK---"',
-  'grep -in "pack wolf\\|Pack Wolf\\|PACK WOLF" /root/goc-software/backend/src/services/pdfService.ts || echo "NO_PACK_WOLF_IN_SOURCE"',
-  'echo "---BUILT_JS_CHECK---"',
-  'grep -rn "Pack Wolf" /root/goc-software/backend/dist/services/pdfService.js 2>/dev/null || echo "NO_PACK_WOLF_IN_DIST"',
-  'echo "---ENV_FULL---"',
-  'grep -i "STUDIO" /root/goc-software/.env'
+  'cd /root/goc-software && git pull origin main',
+  "sed -i 's/STUDIO_NAME=Pack Wolf Pvt Ltd/STUDIO_NAME=Packwolf Services Pvt Ltd/' /root/goc-software/.env",
+  'echo "---ENV_VERIFY---"',
+  'grep STUDIO_NAME /root/goc-software/.env',
+  'cd /root/goc-software/backend && npm run build',
+  'pm2 restart goc-backend',
+  'echo "===DEPLOY_COMPLETE==="'
 ];
 
 const allCommands = commands.join(' && ');

@@ -347,6 +347,48 @@ export const updateJobStatus = async (req: Request, res: Response): Promise<void
       return;
     }
 
+    // Photo requirement: before moving OUT of 'car_in' or 'in_progress', at least one before/during photo must exist
+    if (['car_in', 'in_progress'].includes(current) && !['cancelled', 'car_in', 'in_progress'].includes(new_status)) {
+      const [mediaCount] = await pool.query<RowDataPacket[]>(
+        `SELECT (
+          (SELECT COUNT(*) FROM job_card_media WHERE job_card_id = ? AND media_type IN ('before_image', 'during_image')) +
+          (SELECT COUNT(*) FROM job_photos WHERE job_card_id = ? AND stage IN ('before', 'during'))
+        ) as cnt`,
+        [req.params.id, req.params.id]
+      );
+      if (Number(mediaCount[0].cnt) === 0) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: ERROR_CODES.VALIDATION_ERROR,
+            message: 'At least one car photo (before/during) must be uploaded before progressing job status.'
+          }
+        });
+        return;
+      }
+    }
+
+    // Photo requirement: before marking as 'delivered', at least one 'after' photo must exist
+    if (new_status === 'delivered') {
+      const [afterCount] = await pool.query<RowDataPacket[]>(
+        `SELECT (
+          (SELECT COUNT(*) FROM job_card_media WHERE job_card_id = ? AND media_type = 'after_image') +
+          (SELECT COUNT(*) FROM job_photos WHERE job_card_id = ? AND stage = 'after')
+        ) as cnt`,
+        [req.params.id, req.params.id]
+      );
+      if (Number(afterCount[0].cnt) === 0) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: ERROR_CODES.VALIDATION_ERROR,
+            message: 'At least one "After" photo is required before marking the job as delivered.'
+          }
+        });
+        return;
+      }
+    }
+
     const staffId = (req as any).staff?.id;
 
     // Update status with timestamp for car_in and delivered

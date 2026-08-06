@@ -498,7 +498,7 @@ const MarketingPage: React.FC = () => {
 
       {/* ── QUICK SEND MODAL ── */}
       {showQuickSend && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={() => setShowQuickSend(false)}>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[70] flex items-center justify-center p-4 pt-20 sm:pt-4" onClick={() => setShowQuickSend(false)}>
           <div className="bg-[#0c0c0c]/90 backdrop-blur-2xl border border-white/10 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto relative shadow-2xl animate-fade-in flex flex-col p-6" onClick={(e) => e.stopPropagation()}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-performance-red/[0.03] blur-[50px] rounded-full pointer-events-none" />
             
@@ -533,7 +533,7 @@ const MarketingPage: React.FC = () => {
 
       {/* ── NEW CAMPAIGN MODAL ── */}
       {showCampaignModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={() => setShowCampaignModal(false)}>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[70] flex items-center justify-center p-4 pt-20 sm:pt-4" onClick={() => setShowCampaignModal(false)}>
           <div className="bg-[#0c0c0c]/90 backdrop-blur-2xl border border-white/10 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto relative shadow-2xl animate-fade-in flex flex-col p-6" onClick={(e) => e.stopPropagation()}>
             <div className="absolute top-0 right-0 w-32 h-32 bg-performance-red/[0.03] blur-[50px] rounded-full pointer-events-none" />
             
@@ -677,7 +677,7 @@ const MarketingPage: React.FC = () => {
 
       {/* UPLOAD PROMOTIONAL MATERIAL MODAL */}
       {showUploadMaterialModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[70] p-4 pt-20 sm:pt-4 animate-fade-in">
           <div className="bg-[#0e0e0e] border border-white/10 rounded-3xl w-full max-w-md p-6 relative overflow-hidden shadow-2xl space-y-4">
             <div className="absolute top-0 left-0 w-full h-[3px] bg-performance-red"></div>
 

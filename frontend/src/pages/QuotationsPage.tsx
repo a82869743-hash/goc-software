@@ -240,11 +240,11 @@ function ManualEditorModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[1000] p-4 sm:p-6 overflow-y-auto"
+      className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[1000] p-4 pt-20 sm:p-6 sm:pt-6 overflow-y-auto"
       onClick={onClose}
     >
       <div
-        className="bg-[#111111] border border-white/10 rounded-2xl p-6 w-full max-w-4xl shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar flex flex-col my-auto relative animate-scale-up"
+        className="bg-[#111111] border border-white/10 rounded-2xl p-6 w-full max-w-4xl shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto custom-scrollbar flex flex-col my-auto relative animate-scale-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -546,7 +546,7 @@ function WhiteboardModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-white">
+    <div className="fixed inset-0 z-[70] flex flex-col bg-white">
       {/* Modal Header Bar */}
       <div className="flex items-center justify-between px-3 sm:px-6 py-2 sm:py-3 bg-white border-b border-gray-200 shrink-0 shadow-sm relative z-50">
         <div className="flex items-center gap-2 sm:gap-4">
@@ -1123,11 +1123,11 @@ export default function QuotationsPage() {
       {/* ── New Quotation customer header modal ── */}
       {showForm && (
         <div
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[1000] p-4 sm:p-6 overflow-y-auto"
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[1000] p-4 pt-20 sm:p-6 sm:pt-6 overflow-y-auto"
           onClick={() => setShowForm(false)}
         >
           <div
-            className="bg-[#111111] border border-white/10 rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar my-auto relative animate-scale-up"
+            className="bg-[#111111] border border-white/10 rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto custom-scrollbar my-auto relative animate-scale-up"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center">

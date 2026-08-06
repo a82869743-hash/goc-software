@@ -1145,8 +1145,8 @@ export default function JobCardDetailPage() {
 
       {/* ── Complete Job Modal ── */}
       {showCompleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="bg-[#111] border border-white/10 rounded-2xl p-6 sm:p-8 w-[95vw] sm:max-w-md space-y-6 mx-auto">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 pt-20 sm:pt-4">
+          <div className="bg-[#111] border border-white/10 rounded-2xl p-6 sm:p-8 w-[95vw] sm:max-w-md space-y-6 mx-auto max-h-[90vh] overflow-y-auto">
             <h2 className="font-display-hero text-lg text-on-surface">Complete Job — Generate Document</h2>
             <div>
               <label className="font-label-caps text-[9px] text-on-surface-variant/50 tracking-widest block mb-1">Document Type</label>
@@ -1210,8 +1210,8 @@ export default function JobCardDetailPage() {
 
       {/* ── Delivered Confirmation Modal ── */}
       {showDeliveredConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="bg-[#111] border border-white/10 rounded-2xl p-6 sm:p-8 w-[95vw] sm:max-w-sm space-y-6 mx-auto">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 pt-20 sm:pt-4">
+          <div className="bg-[#111] border border-white/10 rounded-2xl p-6 sm:p-8 w-[95vw] sm:max-w-sm space-y-6 mx-auto max-h-[90vh] overflow-y-auto">
             <div className="text-center space-y-3">
               <span className="material-symbols-outlined text-4xl text-amber-400">warning</span>
               <h2 className="font-display-hero text-lg text-on-surface">Confirm Final Delivery</h2>
@@ -1248,8 +1248,8 @@ export default function JobCardDetailPage() {
 
       {/* ── WhatsApp Sharing Options Modal ── */}
       {showWhatsAppModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="glass-panel w-full max-w-md p-6 rounded-2xl relative space-y-4 border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 pt-20 sm:pt-4">
+          <div className="glass-panel w-full max-w-md p-6 rounded-2xl relative space-y-4 border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start">
               <div>
                 <h3 className="font-display-hero text-lg font-black text-white tracking-tight italic uppercase">

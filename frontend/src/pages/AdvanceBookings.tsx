@@ -366,7 +366,7 @@ export default function AdvanceBookings() {
       {/* ── SCHEDULING FORM MODAL ─────────────────────────── */}
       {showScheduleModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm overflow-y-auto p-4"
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm overflow-y-auto p-4 pt-20 sm:pt-4"
           onClick={() => setShowScheduleModal(false)}
         >
           <div
@@ -387,7 +387,7 @@ export default function AdvanceBookings() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateSubmit} className="p-6 space-y-4 overflow-y-auto custom-scrollbar">
+            <form onSubmit={handleCreateSubmit} className="p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1 min-h-0">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="relative">
                   <label className="block text-[10px] text-gray-500 uppercase tracking-wider font-bold mb-1.5">Customer Name *</label>
@@ -573,7 +573,7 @@ export default function AdvanceBookings() {
       {/* ── CANCELLATION modal ────────────────────────────── */}
       {showCancelModal && selectedBooking && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 pt-20 sm:pt-4"
           onClick={() => setShowCancelModal(false)}
         >
           <div

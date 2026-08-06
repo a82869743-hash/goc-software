@@ -298,8 +298,8 @@ export default function CommissionsPage() {
 
       {/* ADD CONNECTOR MODAL */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="glass-panel w-full max-w-md p-6 rounded-2xl relative space-y-4 border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[70] flex items-center justify-center p-4 pt-20 sm:pt-4">
+          <div className="glass-panel w-full max-w-md p-6 rounded-2xl relative space-y-4 border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start">
               <div>
                 <h3 className="font-display-hero text-lg font-black text-white tracking-tight italic uppercase">
@@ -392,8 +392,8 @@ export default function CommissionsPage() {
       )}
       {/* ADD MANUAL COMMISSION MODAL */}
       {showAddCommModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="glass-panel w-full max-w-md p-6 rounded-2xl relative space-y-4 border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[70] flex items-center justify-center p-4 pt-20 sm:pt-4">
+          <div className="glass-panel w-full max-w-md p-6 rounded-2xl relative space-y-4 border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start">
               <div>
                 <h3 className="font-display-hero text-lg font-black text-white tracking-tight italic uppercase">

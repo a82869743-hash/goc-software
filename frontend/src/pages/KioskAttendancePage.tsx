@@ -595,7 +595,7 @@ export default function KioskAttendancePage() {
 
       {/* ── KEYPAD KEYBOARD UNLOCK OVERLAY ───────────────── */}
       {showUnlockModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 pt-20 sm:pt-4 animate-fade-in">
           <div className="bg-[#0c0c0e] border border-white/10 rounded-3xl p-6 max-w-xs w-full shadow-2xl flex flex-col items-center relative">
             <button
               onClick={() => {

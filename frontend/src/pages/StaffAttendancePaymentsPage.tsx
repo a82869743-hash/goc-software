@@ -725,8 +725,8 @@ export default function StaffAttendancePaymentsPage() {
       </div>
       {/* NEW PAYMENT REQUEST MODAL */}
       {showRequestModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="bg-[#0e0e0e] border border-white/10 rounded-3xl w-full max-w-md p-6 relative overflow-hidden shadow-2xl space-y-4">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[70] p-4 pt-20 sm:pt-4 animate-fade-in">
+          <div className="bg-[#0e0e0e] border border-white/10 rounded-3xl w-full max-w-md p-6 relative overflow-hidden shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="absolute top-0 left-0 w-full h-[3px] bg-performance-red"></div>
 
             <div className="flex justify-between items-start">

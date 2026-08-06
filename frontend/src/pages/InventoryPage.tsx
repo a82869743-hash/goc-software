@@ -548,8 +548,8 @@ export default function InventoryPage() {
 
       {/* MODAL: ADD INVENTORY ITEM */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
-          <div className="bg-[#0c0c0c] border border-white/10 rounded-2xl p-6 max-w-md w-full relative shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 pt-20 sm:pt-4">
+          <div className="bg-[#0c0c0c] border border-white/10 rounded-2xl p-6 max-w-md w-full relative shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="absolute -top-24 -left-24 w-48 h-48 bg-performance-red/[0.04] blur-[60px] pointer-events-none" />
             <div className="flex justify-between items-center mb-2">
               <h3 className="font-display-hero text-lg font-black text-white uppercase tracking-wider">
@@ -676,8 +676,8 @@ export default function InventoryPage() {
 
       {/* MODAL: STOCK IN ADJUSTMENT */}
       {showPurchaseModal && selectedItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
-          <div className="bg-[#0c0c0c] border border-white/10 rounded-2xl p-6 max-w-sm w-full relative shadow-2xl">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 pt-20 sm:pt-4">
+          <div className="bg-[#0c0c0c] border border-white/10 rounded-2xl p-6 max-w-sm w-full relative shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="absolute -top-24 -left-24 w-48 h-48 bg-performance-red/[0.04] blur-[60px] pointer-events-none" />
             <div className="flex justify-between items-center mb-6">
               <div className="space-y-1">
@@ -739,8 +739,8 @@ export default function InventoryPage() {
 
       {/* MODAL: MANUAL DEDUCTION ADJUSTMENT */}
       {showUsageModal && selectedItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
-          <div className="bg-[#0c0c0c] border border-white/10 rounded-2xl p-6 max-w-sm w-full relative shadow-2xl">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 pt-20 sm:pt-4">
+          <div className="bg-[#0c0c0c] border border-white/10 rounded-2xl p-6 max-w-sm w-full relative shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="absolute -top-24 -left-24 w-48 h-48 bg-performance-red/[0.04] blur-[60px] pointer-events-none" />
             <div className="flex justify-between items-center mb-6">
               <div className="space-y-1">
@@ -866,8 +866,8 @@ export default function InventoryPage() {
 
       {/* SCAN BILL RESULT MODAL */}
       {showScanModal && extractedItems && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="bg-[#0e0e0e] border border-white/10 rounded-3xl w-full max-w-lg p-6 relative overflow-hidden shadow-2xl space-y-4">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[70] p-4 pt-20 sm:pt-4 animate-fade-in">
+          <div className="bg-[#0e0e0e] border border-white/10 rounded-3xl w-full max-w-lg p-6 relative overflow-hidden shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="absolute top-0 left-0 w-full h-[3px] bg-performance-red"></div>
             
             <div className="flex justify-between items-start">

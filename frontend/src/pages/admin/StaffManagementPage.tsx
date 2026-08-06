@@ -479,7 +479,7 @@ export default function StaffManagementPage() {
 
       {/* REGISTRATION MODAL */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4 pt-20 sm:pt-4">
           <div className="bg-void-black border border-white/10 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 relative transition-all duration-300">
             <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-green-500/50 to-transparent" />
             
@@ -599,7 +599,7 @@ export default function StaffManagementPage() {
 
       {/* EDIT MODAL */}
       {showEditModal && editingStaff && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4 pt-20 sm:pt-4">
           <div className="bg-void-black border border-white/10 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 relative transition-all duration-300">
             <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
             
@@ -711,8 +711,8 @@ export default function StaffManagementPage() {
 
       {/* CUSTOM PASSWORD RESET MODAL */}
       {showResetModal && resetTargetStaff && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-void-black border border-white/10 rounded-2xl shadow-2xl max-w-md w-full p-6 relative">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4 pt-20 sm:pt-4">
+          <div className="bg-void-black border border-white/10 rounded-2xl shadow-2xl max-w-md w-full p-6 relative max-h-[90vh] overflow-y-auto">
             <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-amber-500/50 to-transparent" />
             
             <div className="flex justify-between items-start mb-6">
@@ -772,7 +772,7 @@ export default function StaffManagementPage() {
 
       {/* PASSWORD RESET CONFIRMATION DIALOG / MODAL */}
       {resetCredentials && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4 pt-20 sm:pt-4 animate-fade-in">
           <div className="bg-void-black border border-white/10 rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6 relative text-center">
             <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-amber-500 to-transparent" />
             

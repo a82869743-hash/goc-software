@@ -131,7 +131,7 @@ export default function DashboardPage() {
 
   // ── Render Views ──────────────────────────────────────────────────
   return (
-    <div className="relative w-full">
+    <div className="relative w-full max-w-[1800px] mx-auto">
       {/* Dynamic Floating Tooltip */}
       {tooltip.visible && (
         <div

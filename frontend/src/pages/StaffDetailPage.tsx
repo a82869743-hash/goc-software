@@ -171,7 +171,7 @@ export default function StaffDetailPage() {
   const todayCheckIn = getTodayCheckInTime();
 
   return (
-    <div className="space-y-8 relative z-10 font-medium pb-10">
+    <div className="space-y-8 relative z-10 font-medium pb-10 max-w-6xl mx-auto">
       {/* HEADER WITH BACK BUTTON */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 border-b border-white/5 pb-6">
         <div>

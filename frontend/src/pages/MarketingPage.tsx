@@ -174,7 +174,7 @@ const MarketingPage: React.FC = () => {
   const formatDate = (d: string) => new Date(d).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
   return (
-    <div className="space-y-8 relative z-10 font-body-lg animate-fade-in">
+    <div className="space-y-8 relative z-10 font-body-lg animate-fade-in max-w-7xl mx-auto">
       
       {/* HEADER SECTION */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 border-b border-white/5 pb-6">
@@ -678,7 +678,7 @@ const MarketingPage: React.FC = () => {
       {/* UPLOAD PROMOTIONAL MATERIAL MODAL */}
       {showUploadMaterialModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[70] p-4 pt-20 sm:pt-4 animate-fade-in">
-          <div className="bg-[#0e0e0e] border border-white/10 rounded-3xl w-full max-w-md p-6 relative overflow-hidden shadow-2xl space-y-4">
+          <div className="bg-[#0e0e0e] border border-white/10 rounded-3xl w-full max-w-md p-6 relative overflow-hidden shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto">
             <div className="absolute top-0 left-0 w-full h-[3px] bg-performance-red"></div>
 
             <div className="flex justify-between items-start">

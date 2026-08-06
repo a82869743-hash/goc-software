@@ -759,7 +759,7 @@ export default function MetaIntegrationPage() {
       {/* Test Diagnostics Modal */}
       {showTestModal && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 pt-20 sm:pt-4 bg-black/75 backdrop-blur-md animate-fade-in">
-          <div className="bg-[#0f0f0f] border border-white/10 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl animate-scale-in">
+          <div className="bg-[#0f0f0f] border border-white/10 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl animate-scale-in max-h-[85vh] flex flex-col">
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-black/40">
               <div className="flex items-center gap-2">

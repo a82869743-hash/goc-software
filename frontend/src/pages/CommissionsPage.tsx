@@ -112,7 +112,7 @@ export default function CommissionsPage() {
   });
 
   return (
-    <div className="space-y-8 relative z-10 font-body-lg animate-fade-in">
+    <div className="space-y-8 relative z-10 font-body-lg animate-fade-in max-w-7xl mx-auto">
       
       {/* HEADER SECTION */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 border-b border-white/5 pb-6">

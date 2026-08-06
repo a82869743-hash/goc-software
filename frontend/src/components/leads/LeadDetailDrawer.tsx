@@ -106,12 +106,12 @@ export const LeadDetailDrawer: React.FC<LeadDetailDrawerProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 md:p-6 bg-slate-950/80 backdrop-blur-md transition-all animate-fade-in overflow-y-auto"
+      className="fixed inset-0 z-[9999] flex items-start justify-center p-3 pt-20 sm:p-4 sm:pt-22 md:p-6 md:pt-24 bg-slate-950/80 backdrop-blur-md transition-all animate-fade-in overflow-y-auto"
       onClick={onClose}
     >
       {/* Centered Premium Lead Details Modal Container */}
       <div
-        className="w-full max-w-4xl bg-white border border-slate-200/90 rounded-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden my-auto text-slate-900 relative animate-scale-up"
+        className="w-full max-w-4xl bg-white border border-slate-200/90 rounded-2xl shadow-2xl flex flex-col max-h-[calc(100vh-88px)] sm:max-h-[calc(100vh-100px)] overflow-hidden text-slate-900 relative animate-scale-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Sticky Header */}

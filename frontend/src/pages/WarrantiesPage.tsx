@@ -170,7 +170,7 @@ export default function WarrantiesPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* Page Title */}
       <div>
         <h1 className="font-display-hero text-display-hero text-on-surface">WARRANTY MANAGEMENT</h1>

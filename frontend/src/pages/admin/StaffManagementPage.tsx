@@ -9,8 +9,7 @@ import { StaffMember, CreateStaffResponse } from '../../types';
 const ROLE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   admin: { bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/20' },
   manager: { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/20' },
-  technician: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20' },
-  receptionist: { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/20' },
+  salesman: { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/20' },
   staff: { bg: 'bg-gray-500/10', text: 'text-gray-400', border: 'border-gray-500/20' },
 };
 
@@ -62,9 +61,9 @@ export default function StaffManagementPage() {
   // Mutations
   const createMutation = useMutation({
     mutationFn: (payload: any) => staffManagementAPI.create(payload),
-    onSuccess: (res) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminStaffList'] });
-      setCreatedCredentials(res.data.data);
+      setShowAddModal(false);
       setAddForm({
         full_name: '',
         phone: '',
@@ -74,7 +73,7 @@ export default function StaffManagementPage() {
         salary_type: 'monthly',
         password: '',
       });
-      toast.success('Staff member created successfully!');
+      toast.success('Staff member registered successfully! Phone and password saved for login.');
     },
     onError: (err: any) => {
       toast.error(err.response?.data?.error?.message || 'Failed to create staff member.');
@@ -147,24 +146,23 @@ export default function StaffManagementPage() {
   }
 
   // Handlers
-  const handleAddSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!addForm.full_name || !addForm.phone || !addForm.role || !addForm.salary) {
-      toast.error('Please fill in all required fields.');
+  const handleAddSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!addForm.full_name || !addForm.phone || !addForm.role || !addForm.password || !addForm.salary) {
+      toast.error('Please fill in all fields (Full Name, Phone Number, Role, Password, Salary).');
       return;
     }
-    if (addForm.password && addForm.password.length < 6) {
+    if (addForm.password.length < 6) {
       toast.error('Password must be at least 6 characters long.');
       return;
     }
     createMutation.mutate({
       full_name: addForm.full_name,
       phone: addForm.phone,
-      email: addForm.email || undefined,
       role: addForm.role,
       salary: parseFloat(addForm.salary),
       salary_type: addForm.salary_type,
-      password: addForm.password || undefined,
+      password: addForm.password,
     });
   };
 
@@ -488,179 +486,113 @@ export default function StaffManagementPage() {
             <div className="flex justify-between items-start mb-6">
               <div>
                 <h3 className="text-lg font-bold text-white uppercase tracking-wider">Register Operator</h3>
-                <p className="text-xs text-tertiary">Create a new studio staff profile credentials</p>
+                <p className="text-xs text-tertiary">Create new staff account login credentials</p>
               </div>
               <button
-                onClick={() => {
-                  setShowAddModal(false);
-                  setCreatedCredentials(null);
-                }}
+                onClick={() => setShowAddModal(false)}
                 className="text-tertiary hover:text-white transition-colors cursor-pointer"
               >
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
 
-            {createdCredentials ? (
-              <div className="space-y-6 animate-fadeIn">
-                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 flex items-center gap-3">
-                  <span className="material-symbols-outlined text-emerald-400">check_circle</span>
-                  <p className="text-xs text-emerald-400 font-bold uppercase tracking-wider">Operator Profile Generated successfully</p>
-                </div>
-
-                <div className="space-y-4 bg-white/5 border border-white/5 rounded-xl p-5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-bold font-data-sm">
-                    <div>
-                      <p className="text-tertiary/50 uppercase font-label-caps">Operator ID</p>
-                      <p className="text-white mt-1 text-sm">{createdCredentials.staff_code}</p>
-                    </div>
-                    <div>
-                      <p className="text-tertiary/50 uppercase font-label-caps">System Role</p>
-                      <p className="text-white mt-1 text-sm capitalize">{createdCredentials.role}</p>
-                    </div>
-                    <div className="col-span-2">
-                      <p className="text-tertiary/50 uppercase font-label-caps">Access Username (Phone)</p>
-                      <p className="text-white mt-1 text-sm">{createdCredentials.phone}</p>
-                    </div>
-                  </div>
-
-                  <div className="pt-3 border-t border-white/5 space-y-2">
-                    <p className="text-[10px] text-tertiary/50 uppercase font-label-caps font-bold">Auto-Generated Security Key</p>
-                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 flex justify-between items-center font-mono text-lg text-amber-400 font-bold">
-                      <span>{createdCredentials.plain_password}</span>
-                      <button
-                        onClick={() => handleCopy(createdCredentials.plain_password)}
-                        className="text-amber-400 hover:text-white transition-colors cursor-pointer"
-                        title="Copy password"
-                      >
-                        <span className="material-symbols-outlined text-[20px]">content_copy</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-amber-500/5 border border-amber-500/10 rounded-xl p-4 flex items-start gap-3">
-                  <span className="material-symbols-outlined text-amber-400 text-sm">warning</span>
-                  <p className="text-[10px] text-amber-400/80 leading-relaxed font-bold">
-                    Please share these credentials with the staff member and ask them to keep it safe. This security key will not be shown again.
-                  </p>
-                </div>
-
-                <button
-                  onClick={() => {
-                    setShowAddModal(false);
-                    setCreatedCredentials(null);
-                  }}
-                  className="w-full py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-colors cursor-pointer"
-                >
-                  Dismiss &amp; Complete
-                </button>
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] uppercase font-bold text-tertiary font-label-caps">Full Name *</label>
+                <input
+                  type="text"
+                  readOnly
+                  onFocus={(e) => e.target.removeAttribute('readonly')}
+                  autoComplete="off"
+                  className="w-full bg-white/5 border border-white/5 focus:border-green-500/50 rounded-xl p-3 text-xs text-white placeholder-tertiary/30 focus:outline-none focus:ring-0 font-bold"
+                  placeholder="Enter staff full name"
+                  value={addForm.full_name}
+                  onChange={(e) => setAddForm({ ...addForm, full_name: e.target.value })}
+                />
               </div>
-            ) : (
-              <form onSubmit={handleAddSubmit} className="space-y-4">
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase font-bold text-tertiary font-label-caps">Full Name *</label>
+                  <label className="text-[10px] uppercase font-bold text-tertiary font-label-caps">Phone Number (Login ID) *</label>
                   <input
                     type="text"
-                    required
-                    className="w-full bg-white/5 border border-white/5 focus:border-green-500/50 rounded-xl p-3 text-xs text-white placeholder-tertiary/30 focus:outline-none focus:ring-0 font-bold"
-                    placeholder="Enter full name"
-                    value={addForm.full_name}
-                    onChange={(e) => setAddForm({ ...addForm, full_name: e.target.value })}
+                    maxLength={10}
+                    readOnly
+                    onFocus={(e) => e.target.removeAttribute('readonly')}
+                    autoComplete="off"
+                    className="w-full bg-white/5 border border-white/5 focus:border-green-500/50 rounded-xl p-3 text-xs text-white placeholder-tertiary/30 focus:outline-none focus:ring-0 font-bold font-mono"
+                    placeholder="10 digit phone number"
+                    value={addForm.phone}
+                    onChange={(e) => setAddForm({ ...addForm, phone: e.target.value.replace(/\D/g, '') })}
                   />
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase font-bold text-tertiary font-label-caps">Phone (10 digits) *</label>
-                    <input
-                      type="tel"
-                      required
-                      maxLength={10}
-                      pattern="\d{10}"
-                      className="w-full bg-white/5 border border-white/5 focus:border-green-500/50 rounded-xl p-3 text-xs text-white placeholder-tertiary/30 focus:outline-none focus:ring-0 font-bold"
-                      placeholder="9998887770"
-                      value={addForm.phone}
-                      onChange={(e) => setAddForm({ ...addForm, phone: e.target.value.replace(/\D/g, '') })}
-                    />
-                  </div>
  
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase font-bold text-tertiary font-label-caps">System Role *</label>
-                    <select
-                      className="w-full bg-[#0c0c0c] border border-white/5 focus:border-green-500/50 rounded-xl p-3 text-xs text-white focus:outline-none focus:ring-0 font-bold"
-                      value={addForm.role}
-                      onChange={(e) => setAddForm({ ...addForm, role: e.target.value })}
-                    >
-                      <option value="manager">Manager</option>
-                      <option value="receptionist">Receptionist</option>
-                      <option value="technician">Technician</option>
-                      <option value="staff">General Staff</option>
-                    </select>
-                  </div>
-                </div>
-
                 <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase font-bold text-tertiary font-label-caps">Mobile Number</label>
-                  <input
-                    type="tel"
-                    className="w-full bg-white/5 border border-white/5 focus:border-green-500/50 rounded-xl p-3 text-xs text-white placeholder-tertiary/30 focus:outline-none focus:ring-0 font-bold"
-                    placeholder="Enter mobile number"
-                    value={addForm.email}
-                    onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
-                  />
+                  <label className="text-[10px] uppercase font-bold text-tertiary font-label-caps">System Role *</label>
+                  <select
+                    className="w-full bg-[#0c0c0c] border border-white/5 focus:border-green-500/50 rounded-xl p-3 text-xs text-white focus:outline-none focus:ring-0 font-bold"
+                    value={addForm.role}
+                    onChange={(e) => setAddForm({ ...addForm, role: e.target.value })}
+                  >
+                    <option value="admin">Admin</option>
+                    <option value="manager">Manager</option>
+                    <option value="salesman">Salesman</option>
+                    <option value="staff">General Staff</option>
+                  </select>
                 </div>
+              </div>
 
+              <div className="space-y-1.5">
+                <label className="text-[10px] uppercase font-bold text-tertiary font-label-caps">Login Password *</label>
+                <input
+                  type="text"
+                  readOnly
+                  onFocus={(e) => e.target.removeAttribute('readonly')}
+                  style={{ WebkitTextSecurity: 'disc' } as any}
+                  autoComplete="off"
+                  className="w-full bg-white/5 border border-white/5 focus:border-green-500/50 rounded-xl p-3 text-xs text-white placeholder-tertiary/30 focus:outline-none focus:ring-0 font-bold"
+                  placeholder="Set password for staff login (min 6 chars)"
+                  value={addForm.password}
+                  onChange={(e) => setAddForm({ ...addForm, password: e.target.value })}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <div className="flex justify-between items-center">
-                    <label className="text-[10px] uppercase font-bold text-tertiary font-label-caps">Initial Password (Optional)</label>
-                    <span className="text-[9px] text-tertiary/60">Leave blank to auto-generate</span>
-                  </div>
-                  <input
-                    type="password"
-                    className="w-full bg-white/5 border border-white/5 focus:border-green-500/50 rounded-xl p-3 text-xs text-white placeholder-tertiary/30 focus:outline-none focus:ring-0 font-bold"
-                    placeholder="Set custom password (min 6 chars)"
-                    value={addForm.password}
-                    onChange={(e) => setAddForm({ ...addForm, password: e.target.value })}
-                  />
+                  <label className="text-[10px] uppercase font-bold text-tertiary font-label-caps">Salary Cycle *</label>
+                  <select
+                    className="w-full bg-[#0c0c0c] border border-white/5 focus:border-green-500/50 rounded-xl p-3 text-xs text-white focus:outline-none focus:ring-0 font-bold"
+                    value={addForm.salary_type}
+                    onChange={(e) => setAddForm({ ...addForm, salary_type: e.target.value })}
+                  >
+                    <option value="monthly">Monthly Cycle</option>
+                    <option value="daily">Daily Wage</option>
+                  </select>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase font-bold text-tertiary font-label-caps">Salary Cycle *</label>
-                    <select
-                      className="w-full bg-[#0c0c0c] border border-white/5 focus:border-green-500/50 rounded-xl p-3 text-xs text-white focus:outline-none focus:ring-0 font-bold"
-                      value={addForm.salary_type}
-                      onChange={(e) => setAddForm({ ...addForm, salary_type: e.target.value })}
-                    >
-                      <option value="monthly">Monthly Cycle</option>
-                      <option value="daily">Daily Wage</option>
-                    </select>
-                  </div>
  
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase font-bold text-tertiary font-label-caps">Amount (INR) *</label>
-                    <input
-                      type="number"
-                      required
-                      min={0}
-                      className="w-full bg-white/5 border border-white/5 focus:border-green-500/50 rounded-xl p-3 text-xs text-white placeholder-tertiary/30 focus:outline-none focus:ring-0 font-bold"
-                      placeholder="18000"
-                      value={addForm.salary}
-                      onChange={(e) => setAddForm({ ...addForm, salary: e.target.value })}
-                    />
-                  </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase font-bold text-tertiary font-label-caps font-mono">Salary Amount (INR) *</label>
+                  <input
+                    type="number"
+                    min={0}
+                    readOnly
+                    onFocus={(e) => e.target.removeAttribute('readonly')}
+                    className="w-full bg-white/5 border border-white/5 focus:border-green-500/50 rounded-xl p-3 text-xs text-white placeholder-tertiary/30 focus:outline-none focus:ring-0 font-bold"
+                    placeholder="18000"
+                    value={addForm.salary}
+                    onChange={(e) => setAddForm({ ...addForm, salary: e.target.value })}
+                  />
                 </div>
+              </div>
 
-                <button
-                  type="submit"
-                  disabled={createMutation.isPending}
-                  className="w-full py-3.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-all duration-300 disabled:opacity-50 mt-4 cursor-pointer"
-                >
-                  {createMutation.isPending ? 'Generating credentials...' : 'Register Operator'}
-                </button>
-              </form>
-            )}
+              <button
+                onClick={() => handleAddSubmit()}
+                disabled={createMutation.isPending}
+                className="w-full py-3.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-all duration-300 disabled:opacity-50 mt-4 cursor-pointer"
+              >
+                {createMutation.isPending ? 'Registering Staff...' : 'Register Operator'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -674,7 +606,7 @@ export default function StaffManagementPage() {
             <div className="flex justify-between items-start mb-6">
               <div>
                 <h3 className="text-lg font-bold text-white uppercase tracking-wider">Edit Operator Details</h3>
-                <p className="text-xs text-tertiary">Modify staff catalog properties for ID: {editingStaff.staff_code}</p>
+                <p className="text-xs text-tertiary">Modify staff properties for: {editingStaff.staff_code}</p>
               </div>
               <button
                 onClick={() => {
@@ -687,12 +619,11 @@ export default function StaffManagementPage() {
               </button>
             </div>
             
-            <form onSubmit={handleEditSubmit} className="space-y-4">
+            <div className="space-y-4">
               <div className="space-y-1.5">
                 <label className="text-[10px] uppercase font-bold text-tertiary font-label-caps">Full Name *</label>
                 <input
                   type="text"
-                  required
                   className="w-full bg-white/5 border border-white/5 focus:border-blue-500/50 rounded-xl p-3 text-xs text-white placeholder-tertiary/30 focus:outline-none focus:ring-0 font-bold"
                   placeholder="Enter full name"
                   value={editForm.full_name}
@@ -704,11 +635,9 @@ export default function StaffManagementPage() {
                 <div className="space-y-1.5">
                   <label className="text-[10px] uppercase font-bold text-tertiary font-label-caps">Phone (10 digits) *</label>
                   <input
-                    type="tel"
-                    required
+                    type="text"
                     maxLength={10}
-                    pattern="\d{10}"
-                    className="w-full bg-white/5 border border-white/5 focus:border-blue-500/50 rounded-xl p-3 text-xs text-white placeholder-tertiary/30 focus:outline-none focus:ring-0 font-bold"
+                    className="w-full bg-white/5 border border-white/5 focus:border-blue-500/50 rounded-xl p-3 text-xs text-white placeholder-tertiary/30 focus:outline-none focus:ring-0 font-bold font-mono"
                     placeholder="9998887770"
                     value={editForm.phone}
                     onChange={(e) => setEditForm({ ...editForm, phone: e.target.value.replace(/\D/g, '') })}
@@ -722,23 +651,12 @@ export default function StaffManagementPage() {
                     value={editForm.role}
                     onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
                   >
+                    <option value="admin">Admin</option>
                     <option value="manager">Manager</option>
-                    <option value="receptionist">Receptionist</option>
-                    <option value="technician">Technician</option>
+                    <option value="salesman">Salesman</option>
                     <option value="staff">General Staff</option>
                   </select>
                 </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] uppercase font-bold text-tertiary font-label-caps">Mobile Number</label>
-                <input
-                  type="tel"
-                  className="w-full bg-white/5 border border-white/5 focus:border-blue-500/50 rounded-xl p-3 text-xs text-white placeholder-tertiary/30 focus:outline-none focus:ring-0 font-bold"
-                  placeholder="Enter mobile number"
-                  value={editForm.email}
-                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -758,7 +676,6 @@ export default function StaffManagementPage() {
                   <label className="text-[10px] uppercase font-bold text-tertiary font-label-caps">Amount (INR) *</label>
                   <input
                     type="number"
-                    required
                     min={0}
                     className="w-full bg-white/5 border border-white/5 focus:border-blue-500/50 rounded-xl p-3 text-xs text-white placeholder-tertiary/30 focus:outline-none focus:ring-0 font-bold"
                     placeholder="18000"
@@ -781,13 +698,13 @@ export default function StaffManagementPage() {
               </div>
 
               <button
-                type="submit"
+                onClick={() => handleEditSubmit({ preventDefault: () => {} } as any)}
                 disabled={updateMutation.isPending}
                 className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-all duration-300 disabled:opacity-50 mt-4 cursor-pointer"
               >
                 {updateMutation.isPending ? 'Updating record...' : 'Save Operations Update'}
               </button>
-            </form>
+            </div>
           </div>
         </div>
       )}

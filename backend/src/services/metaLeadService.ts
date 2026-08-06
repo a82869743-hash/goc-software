@@ -12,7 +12,7 @@ import {
   NormalizedMetaLead
 } from '../types/meta';
 
-const META_GRAPH_VERSION = 'v23.0';
+const META_GRAPH_VERSION = 'v26.0';
 const META_GRAPH_BASE = `https://graph.facebook.com/${META_GRAPH_VERSION}`;
 
 export interface MetaSettings {
@@ -20,6 +20,7 @@ export interface MetaSettings {
   instagramEnabled: boolean;
   appId: string;
   appSecret: string;
+  pageId: string;
   pageAccessToken: string;
   verifyToken: string;
   autoAssignStaffId: number | null;
@@ -41,6 +42,7 @@ export async function getMetaSettings(): Promise<MetaSettings | null> {
       instagramEnabled: s.instagram_enabled === 1,
       appId: s.app_id || '',
       appSecret: s.app_secret ? decrypt(s.app_secret) : '',
+      pageId: s.page_id || '',
       pageAccessToken: s.page_access_token ? decrypt(s.page_access_token) : '',
       verifyToken: s.verify_token || 'GOC_META_WEBHOOK_2024',
       autoAssignStaffId: s.auto_assign_staff_id,
@@ -66,23 +68,54 @@ function normalizePhone(phone: string): string {
 /**
  * Fetch lead details from Meta Graph API
  */
+import {
+  formatExternalApiError,
+  formatErrorDiagnosticCard,
+  ExternalApiError
+} from '../utils/errorUtils';
+
 export async function fetchMetaLeadFromGraph(
   leadgenId: string,
   pageAccessToken?: string
-): Promise<MetaLeadGenResponse | null> {
-  try {
-    let token = pageAccessToken;
-    if (!token) {
-      const settings = await getMetaSettings();
-      token = settings?.pageAccessToken || '';
-    }
-    
-    if (!token) {
-      console.error('[MetaLeadService] META_PAGE_ACCESS_TOKEN not configured.');
-      return null;
-    }
+): Promise<MetaLeadGenResponse> {
+  const startTime = Date.now();
+  
+  // 1. Always load settings dynamically from database first (Zero caching)
+  const settings = await getMetaSettings();
+  
+  let token = '';
+  let tokenSource: 'DATABASE' | 'ENVIRONMENT (Bootstrap Only)' | 'EXPLICIT_PARAMETER' | 'NONE' = 'NONE';
 
-    const url = `${META_GRAPH_BASE}/${leadgenId}`;
+  if (pageAccessToken && pageAccessToken.trim()) {
+    token = pageAccessToken.trim();
+    tokenSource = 'EXPLICIT_PARAMETER';
+  } else if (settings?.pageAccessToken && settings.pageAccessToken.trim()) {
+    token = settings.pageAccessToken.trim();
+    tokenSource = 'DATABASE';
+  } else if (process.env.NODE_ENV !== 'production' && process.env.META_PAGE_ACCESS_TOKEN && process.env.META_PAGE_ACCESS_TOKEN.trim()) {
+    // Bootstrap fallback allowed ONLY during local development when DB is empty
+    token = process.env.META_PAGE_ACCESS_TOKEN.trim();
+    tokenSource = 'ENVIRONMENT (Bootstrap Only)';
+  }
+
+  // Mask token for logging: First 8 chars ... Last 6 chars
+  const maskedToken = token.length >= 14 
+    ? `${token.substring(0, 8)}...${token.slice(-6)}` 
+    : (token ? `${token.substring(0, 3)}...` : 'EMPTY');
+
+  console.log(`[MetaLeadService] Graph API Call — Leadgen ID: ${leadgenId} | Token Source: ${tokenSource} | Token: ${maskedToken}`);
+
+  if (!token) {
+    const structErr = formatExternalApiError('Meta Graph API', new Error('Meta Page Access Token is not configured in CRM database. Please save your Page Access Token under Settings -> Meta Integration.'), {
+      leadgenId,
+      executionTimeMs: Date.now() - startTime
+    });
+    console.error(formatErrorDiagnosticCard(structErr));
+    throw new ExternalApiError(structErr);
+  }
+
+  const url = `${META_GRAPH_BASE}/${leadgenId}`;
+  try {
     const response = await axios.get<MetaLeadGenResponse>(url, {
       params: { access_token: token },
       timeout: 15000,
@@ -90,9 +123,14 @@ export async function fetchMetaLeadFromGraph(
 
     return response.data;
   } catch (error: any) {
-    const msg = error?.response?.data?.error?.message || error.message;
-    console.error(`[MetaLeadService] Graph API error for leadgen ${leadgenId}:`, msg);
-    return null;
+    const structErr = formatExternalApiError('Meta Graph API', error, {
+      leadgenId,
+      requestParams: { access_token: token },
+      executionTimeMs: Date.now() - startTime
+    });
+
+    console.error(formatErrorDiagnosticCard(structErr));
+    throw new ExternalApiError(structErr);
   }
 }
 
@@ -184,7 +222,49 @@ export function normalizeMetaLead(
     isOrganic: graphData.is_organic === true,
     campaignName: webhookValue.campaign_name || null,
     adName: webhookValue.ad_name || null,
+    createdTime: webhookValue.created_time
   };
+}
+
+/**
+ * Startup Validator — Verifies Single Source of Truth token architecture
+ */
+export async function validateMetaTokenArchitectureOnStartup(): Promise<void> {
+  try {
+    const settings = await getMetaSettings();
+    const [rows] = await pool.query<RowDataPacket[]>('SELECT id, page_access_token, updated_at FROM meta_integration_settings WHERE id = 1 LIMIT 1');
+    const dbRow = rows[0] || null;
+    const dbTokenExists = !!(dbRow && dbRow.page_access_token);
+    
+    let decryptedToken = '';
+    if (dbTokenExists) {
+      try {
+        decryptedToken = decrypt(dbRow.page_access_token);
+      } catch (e) {}
+    }
+
+    const tokenSource = decryptedToken ? 'DATABASE' : (process.env.META_PAGE_ACCESS_TOKEN ? 'ENVIRONMENT (Bootstrap Only)' : 'NONE');
+    const activeToken = settings?.pageAccessToken || '';
+    const maskedToken = activeToken.length >= 14 
+      ? `${activeToken.substring(0, 8)}...${activeToken.slice(-6)}` 
+      : 'NONE';
+
+    console.log('==================================================');
+    console.log(' META PAGE ACCESS TOKEN ARCHITECTURE DIAGNOSTICS ');
+    console.log('==================================================');
+    console.log(` Database Token Exists: ${dbTokenExists ? 'YES' : 'NO'}`);
+    console.log(` Decryption Succeeded: ${!!decryptedToken ? 'YES' : 'NO'}`);
+    console.log(` Active Token Source: ${tokenSource}`);
+    console.log(` Active Masked Token: ${maskedToken}`);
+    console.log(` Single Source of Truth: DATABASE (meta_integration_settings)`);
+    console.log('==================================================');
+
+    if (!dbTokenExists && process.env.NODE_ENV === 'production') {
+      console.warn('[WARNING] No Meta Page Access Token found in production database. Please save configuration in CRM Settings.');
+    }
+  } catch (err: any) {
+    console.error('[MetaLeadService] Startup validation error:', err.message);
+  }
 }
 
 /**

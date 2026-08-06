@@ -40,15 +40,15 @@ export const createStaff = async (req: Request, res: Response): Promise<void> =>
     if (!full_name || !phone || !role || salary === undefined || !salary_type) {
       res.status(400).json({
         success: false,
-        error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'All required fields must be provided.' },
+        error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'All required fields (Full Name, Phone Number, Role, Password, Salary) must be provided.' },
       });
       return;
     }
 
-    if (password !== undefined && (typeof password !== 'string' || password.trim().length < 6)) {
+    if (!password || typeof password !== 'string' || password.trim().length < 6) {
       res.status(400).json({
         success: false,
-        error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'Password must be at least 6 characters long.' },
+        error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'Login password is required and must be at least 6 characters long.' },
       });
       return;
     }
@@ -56,12 +56,12 @@ export const createStaff = async (req: Request, res: Response): Promise<void> =>
     if (phone.length !== 10 || !/^\d{10}$/.test(phone)) {
       res.status(400).json({
         success: false,
-        error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'Phone must be exactly 10 digits.' },
+        error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'Phone number must be exactly 10 digits.' },
       });
       return;
     }
 
-    const validRoles = ['manager', 'receptionist', 'technician', 'staff'];
+    const validRoles = ['admin', 'manager', 'salesman', 'staff'];
     if (!validRoles.includes(role)) {
       res.status(400).json({
         success: false,
@@ -70,79 +70,125 @@ export const createStaff = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    // Check unique phone
-    const [dup] = await pool.query<RowDataPacket[]>(
-      'SELECT id FROM staff WHERE phone = ? AND deleted_at IS NULL',
-      [phone]
-    );
-    if (dup.length > 0) {
-      res.status(409).json({
-        success: false,
-        error: { code: ERROR_CODES.CONFLICT, message: 'Phone number already registered.' },
-      });
-      return;
-    }
+    // Use database transaction so staff creation and permissions insert are atomic
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
 
-    // Generate staff code
-    const staffCode = await generateCode('staff');
-
-    // Determine plain password
-    let plainPassword = password;
-    if (!plainPassword || typeof plainPassword !== 'string' || plainPassword.trim() === '') {
-      // Generate random alphanumeric password format GOC@XXXX
-      const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-      let randomPart = '';
-      for (let i = 0; i < 4; i++) {
-        const idx = crypto.randomInt(chars.length);
-        randomPart += chars[idx];
+      // Check unique phone inside transaction
+      const [dup] = await conn.query<RowDataPacket[]>(
+        'SELECT id FROM staff WHERE phone = ? AND deleted_at IS NULL',
+        [phone]
+      );
+      if (dup.length > 0) {
+        conn.release();
+        res.status(409).json({
+          success: false,
+          error: { code: ERROR_CODES.CONFLICT, message: 'Phone number already registered.' },
+        });
+        return;
       }
-      plainPassword = `GOC@${randomPart}`;
-    } else {
-      plainPassword = plainPassword.trim();
+
+      // Generate staff code
+      const staffCode = await generateCode('staff');
+
+      const plainPassword = password.trim();
+      const hashedPassword = await bcrypt.hash(plainPassword, 10);
+
+      // Insert staff record
+      const joinDate = new Date().toISOString().split('T')[0];
+      const [result] = await conn.query<ResultSetHeader>(
+        `INSERT INTO staff (staff_code, full_name, phone, email, role, salary_type, salary_amount, join_date, status, password_hash)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)`,
+        [staffCode, full_name, phone, email || null, role, salary_type, Number(salary), joinDate, hashedPassword]
+      );
+
+      const staffId = result.insertId;
+
+      // Insert default staff permissions based on role (using exact table columns)
+      if (role === 'admin') {
+        await conn.query(
+          `INSERT INTO staff_permissions (
+            staff_id, perm_dashboard, perm_leads, perm_customers, perm_bookings, perm_advance_bookings,
+            perm_job_cards, perm_quick_jobs, perm_quotations, perm_invoices, perm_payments,
+            perm_inventory, perm_reports, perm_marketing, perm_commissions, perm_settings,
+            perm_staff_management, perm_job_cards_edit, perm_job_cards_delete, perm_job_cards_complete,
+            perm_invoices_create, perm_payments_record, perm_leads_delete, perm_leads_assign,
+            perm_customers_delete, perm_inventory_edit, perm_reports_revenue, perm_reports_accounts,
+            perm_reports_salary, perm_delete_all
+          ) VALUES (?, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)`,
+          [staffId]
+        );
+      } else if (role === 'manager') {
+        await conn.query(
+          `INSERT INTO staff_permissions (
+            staff_id, perm_dashboard, perm_leads, perm_customers, perm_bookings, perm_advance_bookings,
+            perm_job_cards, perm_quick_jobs, perm_quotations, perm_invoices, perm_payments,
+            perm_inventory, perm_reports, perm_marketing, perm_commissions,
+            perm_job_cards_edit, perm_job_cards_complete, perm_invoices_create, perm_payments_record,
+            perm_inventory_edit, perm_reports_revenue, perm_reports_accounts, perm_reports_salary
+          ) VALUES (?, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)`,
+          [staffId]
+        );
+      } else if (role === 'salesman') {
+        await conn.query(
+          `INSERT INTO staff_permissions (
+            staff_id, perm_dashboard, perm_leads, perm_customers, perm_bookings, perm_advance_bookings,
+            perm_job_cards, perm_quick_jobs, perm_quotations
+          ) VALUES (?, 1, 1, 1, 1, 1, 1, 1, 1)`,
+          [staffId]
+        );
+      } else {
+        await conn.query(
+          `INSERT INTO staff_permissions (
+            staff_id, perm_dashboard, perm_job_cards, perm_quick_jobs
+          ) VALUES (?, 1, 1, 1)`,
+          [staffId]
+        );
+      }
+
+      await conn.commit();
+      conn.release();
+
+      const actorId = (req as any).staff?.id || null;
+      await logActivity(
+        actorId,
+        'create_staff',
+        'staff',
+        staffId,
+        `Created staff member ${full_name} with role ${role} (Code: ${staffCode})`,
+        req.ip,
+        req.headers['user-agent']
+      );
+
+      res.status(201).json({
+        success: true,
+        data: {
+          id: staffId,
+          staff_code: staffCode,
+          full_name,
+          phone,
+          role,
+        },
+      });
+    } catch (error: any) {
+      await conn.rollback();
+      conn.release();
+      console.error('Create staff error:', error);
+      if (error && error.code === 'ER_DUP_ENTRY') {
+        res.status(409).json({
+          success: false,
+          error: { code: ERROR_CODES.CONFLICT, message: 'Phone number already registered for another staff member.' },
+        });
+        return;
+      }
+      res.status(500).json({
+        success: false,
+        error: { code: ERROR_CODES.SERVER_ERROR, message: error?.message || 'Failed to create staff record.' },
+      });
     }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(plainPassword, 10);
-
-    // Insert staff record
-    const joinDate = new Date().toISOString().split('T')[0];
-    const [result] = await pool.query<ResultSetHeader>(
-      `INSERT INTO staff (staff_code, full_name, phone, email, role, salary_type, salary_amount, join_date, status, password_hash)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)`,
-      [staffCode, full_name, phone, email || null, role, salary_type, Number(salary), joinDate, hashedPassword]
-    );
-
-    const staffId = result.insertId;
-
-    // Insert default staff permissions (perm_dashboard = 1, all else 0)
-    await pool.query(
-      `INSERT INTO staff_permissions (staff_id, perm_dashboard) VALUES (?, 1)`,
-      [staffId]
-    );
-
-    const actorId = (req as any).staff?.id || null;
-    await logActivity(
-      actorId,
-      'create_staff',
-      'staff',
-      staffId,
-      `Created staff member ${full_name} with role ${role} (Code: ${staffCode})`,
-      req.ip,
-      req.headers['user-agent']
-    );
-
-    res.status(201).json({
-      success: true,
-      data: {
-        staff_code: staffCode,
-        full_name,
-        phone,
-        role,
-        plain_password: plainPassword,
-      },
-    });
-  } catch (error) {
-    console.error('Create staff error:', error);
+  } catch (outerError: any) {
+    console.error('Create staff outer error:', outerError);
     res.status(500).json({
       success: false,
       error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed to create staff record.' },
@@ -427,9 +473,16 @@ export const deleteStaff = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    // Soft delete, mark as resigned, and increment token_version to force logout immediately
+    // Soft delete, mark as resigned, increment token_version, and append _del_<id> to phone/email/staff_code to free unique keys
     await pool.query(
-      "UPDATE staff SET deleted_at = CURRENT_TIMESTAMP, status = 'resigned', token_version = token_version + 1 WHERE id = ?",
+      `UPDATE staff 
+       SET deleted_at = CURRENT_TIMESTAMP, 
+           status = 'resigned', 
+           token_version = token_version + 1,
+           phone = CASE WHEN phone NOT LIKE '%_del_%' THEN CONCAT(phone, '_del_', id) ELSE phone END,
+           email = CASE WHEN email IS NOT NULL AND email NOT LIKE '%_del_%' THEN CONCAT(email, '_del_', id) ELSE email END,
+           staff_code = CASE WHEN staff_code NOT LIKE '%_del_%' THEN CONCAT(staff_code, '_del_', id) ELSE staff_code END
+       WHERE id = ?`,
       [id]
     );
 

@@ -15,6 +15,89 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
   skipped_form_filter: { label: 'Form Filtered',   color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20' },
 };
 
+function renderDiagnosticCard(log: WebhookLogEntry) {
+  if (!log.error_message) return null;
+  
+  let parsedErr: any = null;
+  try {
+    if (log.error_message.startsWith('{')) {
+      parsedErr = JSON.parse(log.error_message);
+    }
+  } catch (e) {}
+
+  if (parsedErr) {
+    return (
+      <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl space-y-3 font-sans text-xs text-white animate-fade-in">
+        <div className="flex items-center justify-between border-b border-red-500/20 pb-2">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-red-400 text-sm">warning</span>
+            <span className="font-bold text-red-400 uppercase tracking-wider text-[11px] font-mono">
+              {parsedErr.provider || 'META GRAPH API'} ERROR (HTTP {parsedErr.httpStatus || 400})
+            </span>
+          </div>
+          <span className="text-[10px] text-red-300/60 font-mono">
+            ErrorCode: {parsedErr.errorCode || 'N/A'} {parsedErr.errorSubcode !== null && parsedErr.errorSubcode !== undefined ? `(Subcode: ${parsedErr.errorSubcode})` : ''}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px] font-mono">
+          <div>
+            <span className="text-on-surface-variant/50 text-[9px] uppercase tracking-wider block">Error Type</span>
+            <span className="text-red-300 font-bold">{parsedErr.errorType || 'OAuthException'}</span>
+          </div>
+          <div>
+            <span className="text-on-surface-variant/50 text-[9px] uppercase tracking-wider block">FB Trace ID</span>
+            <span className="text-white/80">{parsedErr.fbTraceId || 'N/A'}</span>
+          </div>
+          <div>
+            <span className="text-on-surface-variant/50 text-[9px] uppercase tracking-wider block">Leadgen ID</span>
+            <span className="text-white/80">{log.leadgen_id || parsedErr.leadgenId || 'N/A'}</span>
+          </div>
+          <div>
+            <span className="text-on-surface-variant/50 text-[9px] uppercase tracking-wider block">Page ID / Form ID</span>
+            <span className="text-white/80">{log.page_id || 'N/A'} / {log.form_id || 'N/A'}</span>
+          </div>
+          <div className="sm:col-span-2">
+            <span className="text-on-surface-variant/50 text-[9px] uppercase tracking-wider block">Message</span>
+            <span className="text-red-200">{parsedErr.message || 'Error occurred during Graph API call'}</span>
+          </div>
+          <div className="sm:col-span-2">
+            <span className="text-on-surface-variant/50 text-[9px] uppercase tracking-wider block">Request URL</span>
+            <span className="text-white/60 break-all">{parsedErr.requestUrl || 'https://graph.facebook.com/v26.0/...'}</span>
+          </div>
+        </div>
+
+        {parsedErr.recommendation && (
+          <div className="p-3 bg-red-950/40 border border-red-500/30 rounded-lg text-amber-200 text-[11px] space-y-1">
+            <div className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-[10px] text-amber-400">
+              <span className="material-symbols-outlined text-xs">build</span>
+              Actionable Fix Recommendation
+            </div>
+            <p>{parsedErr.recommendation}</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-3 bg-red-500/5 border border-red-500/15 rounded-lg text-red-400 font-mono text-[11px]">
+      <span className="font-bold text-[9px] uppercase tracking-wider block mb-1 font-sans">Error Details:</span>
+      <p className="whitespace-pre-wrap break-words">{log.error_message}</p>
+    </div>
+  );
+}
+
+function formatRawPayload(rawPayload: string | undefined | null): string {
+  if (!rawPayload) return 'No raw payload recorded.';
+  try {
+    const parsed = JSON.parse(rawPayload);
+    return JSON.stringify(parsed, null, 2);
+  } catch (e) {
+    return rawPayload;
+  }
+}
+
 export default function MetaIntegrationPage() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'setup' | 'settings' | 'logs'>('setup');
@@ -52,6 +135,7 @@ export default function MetaIntegrationPage() {
     instagramEnabled: false,
     appId: '',
     appSecret: '',
+    pageId: '',
     pageAccessToken: '',
     verifyToken: 'GOC_META_WEBHOOK_2024',
     autoAssignStaffId: null,
@@ -65,6 +149,7 @@ export default function MetaIntegrationPage() {
         instagramEnabled: !!settingsData.data.instagramEnabled,
         appId: settingsData.data.appId || '',
         appSecret: settingsData.data.appSecret || '',
+        pageId: settingsData.data.pageId || '',
         pageAccessToken: settingsData.data.pageAccessToken || '',
         verifyToken: settingsData.data.verifyToken || 'GOC_META_WEBHOOK_2024',
         autoAssignStaffId: settingsData.data.autoAssignStaffId,
@@ -89,6 +174,7 @@ export default function MetaIntegrationPage() {
       instagramEnabled: form.instagramEnabled,
       appId: form.appId,
       appSecret: form.appSecret,
+      pageId: form.pageId,
       pageAccessToken: form.pageAccessToken,
       verifyToken: form.verifyToken,
       autoAssignStaffId: form.autoAssignStaffId ? Number(form.autoAssignStaffId) : null,
@@ -114,6 +200,27 @@ export default function MetaIntegrationPage() {
 
   // Compute webhook URL for display
   const webhookUrl = `${window.location.origin.replace('5173', '4000')}/api/v1/webhooks/meta`;
+
+  // Subscription state
+  const [isSubscribing, setIsSubscribing] = useState(false);
+
+  // Subscribe Meta Page App Handler
+  const handleSubscribe = async () => {
+    setIsSubscribing(true);
+    try {
+      const res = await integrationsAPI.subscribeMetaPageApp();
+      if (res.success) {
+        toast.success((res as any).message || 'Page leadgen webhooks subscribed successfully!');
+        queryClient.invalidateQueries({ queryKey: ['webhookStatus'] });
+      } else {
+        toast.error((res as any).error?.message || 'Page subscription failed.');
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.error?.message || 'Failed to subscribe Page webhooks');
+    } finally {
+      setIsSubscribing(false);
+    }
+  };
 
   // Validate Meta Connection Action Handler
   const handleValidate = async () => {
@@ -429,6 +536,17 @@ export default function MetaIntegrationPage() {
               </div>
             </div>
 
+            <div className="flex flex-col gap-2">
+              <label className="font-label-caps text-xs text-on-surface-variant/80 uppercase tracking-widest font-bold">Facebook Page ID (Optional / Auto-detect)</label>
+              <input
+                type="text"
+                className="w-full bg-black border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm font-mono focus:outline-none focus:border-performance-red/50 transition-all placeholder-white/20"
+                placeholder="e.g. 109283749201"
+                value={form.pageId || ''}
+                onChange={e => setForm(p => ({ ...p, pageId: e.target.value }))}
+              />
+            </div>
+
             <div className="flex flex-col gap-2 md:col-span-2">
               <label className="font-label-caps text-xs text-on-surface-variant/80 uppercase tracking-widest font-bold">Page Access Token *</label>
               <div className="relative">
@@ -495,7 +613,7 @@ export default function MetaIntegrationPage() {
           </div>
 
           <div className="pt-4 border-t border-white/5 flex flex-wrap justify-between items-center gap-3">
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               <button
                 type="button"
                 onClick={handleValidate}
@@ -503,17 +621,27 @@ export default function MetaIntegrationPage() {
                 className="px-4 py-2.5 bg-black border border-white/10 hover:border-white/20 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all disabled:opacity-50 hover:cursor-pointer flex items-center gap-2"
               >
                 <span className="material-symbols-outlined text-sm">{isValidating ? 'sync' : 'verified'}</span>
-                {isValidating ? 'Validating...' : 'Validate Meta Connection'}
+                {isValidating ? 'Validating...' : 'Validate Connection'}
               </button>
               
+              <button
+                type="button"
+                onClick={handleSubscribe}
+                disabled={isSubscribing || settingsLoading}
+                className="px-4 py-2.5 bg-black border border-white/10 hover:border-white/20 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all disabled:opacity-50 hover:cursor-pointer flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-sm">{isSubscribing ? 'sync' : 'notifications_active'}</span>
+                {isSubscribing ? 'Subscribing...' : 'Subscribe Page Webhooks'}
+              </button>
+
               <button
                 type="button"
                 onClick={handleRunTest}
                 disabled={isTesting || settingsLoading}
                 className="px-4 py-2.5 bg-black border border-white/10 hover:border-white/20 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all disabled:opacity-50 hover:cursor-pointer flex items-center gap-2"
               >
-                <span className="material-symbols-outlined text-sm">{isTesting ? 'sync' : 'build'}</span>
-                {isTesting ? 'Testing...' : 'Run Test'}
+                <span className="material-symbols-outlined text-sm">{isTesting ? 'sync' : 'diagnostics'}</span>
+                {isTesting ? 'Testing...' : 'Run Diagnostics'}
               </button>
             </div>
 
@@ -603,15 +731,19 @@ export default function MetaIntegrationPage() {
                     {isExpanded && (
                       <div className="border-t border-white/5 p-4 bg-black/40 space-y-3 font-mono text-[11px] text-on-surface-variant/80">
                         {log.error_message && (
-                          <div className="p-3 bg-red-500/5 border border-red-500/15 rounded-lg text-red-400">
-                            <span className="font-bold text-[9px] uppercase tracking-wider block mb-1">Error Log:</span>
-                            {log.error_message}
+                          <div className="space-y-2">
+                            <span className="font-bold text-[9px] uppercase tracking-wider block text-on-surface-variant/50 font-sans">
+                              Developer Diagnostics & Error Card
+                            </span>
+                            {renderDiagnosticCard(log)}
                           </div>
                         )}
                         <div>
-                          <span className="font-bold text-[9px] uppercase tracking-wider block mb-1">Raw Callback Payload:</span>
-                          <pre className="p-3 bg-black border border-white/5 rounded-lg text-white overflow-x-auto max-h-60 leading-relaxed scrollbar-thin scrollbar-thumb-white/10">
-                            {JSON.stringify(JSON.parse(log.raw_payload || '{}'), null, 2)}
+                          <span className="font-bold text-[9px] uppercase tracking-wider block mb-1 text-on-surface-variant/50 font-sans">
+                            Raw Callback Payload & Execution Trace
+                          </span>
+                          <pre className="p-3 bg-black border border-white/5 rounded-lg text-white overflow-x-auto max-h-60 leading-relaxed scrollbar-thin scrollbar-thumb-white/10 whitespace-pre-wrap break-all">
+                            {formatRawPayload(log.raw_payload)}
                           </pre>
                         </div>
                       </div>

@@ -12,7 +12,8 @@ interface StaffRow extends RowDataPacket {
   full_name: string;
   phone: string;
   email: string | null;
-  role: 'admin' | 'technician' | 'receptionist' | 'manager' | 'staff';
+  profile_picture: string | null;
+  role: 'admin' | 'manager' | 'salesman' | 'staff';
   status: string;
   password_hash: string;
   token_version: number;
@@ -28,7 +29,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     // Find staff by phone
     const [rows] = await pool.query<StaffRow[]>(
-      `SELECT id, staff_code, full_name, phone, email, role, status, password_hash, token_version 
+      `SELECT id, staff_code, full_name, phone, email, profile_picture, role, status, password_hash, token_version 
        FROM staff 
        WHERE phone = ? AND deleted_at IS NULL`,
       [phone]
@@ -120,6 +121,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
           role: staff.role,
           phone: staff.phone,
           email: staff.email,
+          profile_picture: staff.profile_picture || null,
         },
       },
     });
@@ -179,7 +181,7 @@ export const getMe = async (req: Request, res: Response): Promise<void> => {
 
     // Fetch fresh data from DB
     const [rows] = await pool.query<StaffRow[]>(
-      `SELECT id, staff_code, full_name, phone, email, role, status, salary_type, join_date
+      `SELECT id, staff_code, full_name, phone, email, profile_picture, role, status, salary_type, join_date
        FROM staff 
        WHERE id = ? AND deleted_at IS NULL`,
       [req.staff.id]
@@ -205,6 +207,7 @@ export const getMe = async (req: Request, res: Response): Promise<void> => {
         full_name: staff.full_name,
         phone: staff.phone,
         email: staff.email,
+        profile_picture: staff.profile_picture || null,
         role: staff.role,
         status: staff.status,
       },

@@ -62,7 +62,7 @@ export async function notifyByRole(
 export const NotificationTriggers = {
   newLead: async (leadId: number, leadName: string) => {
     await notifyByRole(
-      ['admin', 'manager', 'receptionist'],
+      ['admin', 'manager', 'salesman'],
       'new_lead',
       `🔔 New Lead: ${leadName}`,
       `A new lead "${leadName}" has been added to the pipeline.`,
@@ -95,7 +95,7 @@ export const NotificationTriggers = {
 
   customerArrived: async (customerName: string, jobId: number, jobCode: string) => {
     await notifyByRole(
-      ['admin', 'manager', 'technician'],
+      ['admin', 'manager', 'staff'],
       'customer_arrived',
       `🚗 Customer Arrived: ${customerName}`,
       `${customerName} has arrived for job ${jobCode}.`,

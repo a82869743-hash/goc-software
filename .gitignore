@@ -8,3 +8,6 @@ Thumbs.db
 *.tar.gz
 *.csv
 scratch/
+scratch_*.js
+backend/src/acceptance_test_check.ts
+backend/src/inspect_live_test_lead.ts

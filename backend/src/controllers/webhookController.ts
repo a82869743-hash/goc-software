@@ -6,6 +6,7 @@
  * Meta must always receive HTTP 200. All processing is async.
  */
 import { Request, Response } from 'express';
+import axios from 'axios';
 import pool from '../utils/db';
 import { ResultSetHeader, RowDataPacket } from 'mysql2';
 import { generateCode } from '../utils/codes';
@@ -60,14 +61,15 @@ async function updateWebhookLog(
   logId: number,
   status: string,
   createdLeadId?: number,
-  errorMessage?: string
+  errorMessage?: string,
+  fullPayload?: string
 ): Promise<void> {
   try {
     await pool.query(
       `UPDATE webhook_logs
-       SET processing_status = ?, created_lead_id = ?, error_message = ?
+       SET processing_status = ?, created_lead_id = ?, error_message = ?, raw_payload = COALESCE(?, raw_payload)
        WHERE id = ?`,
-      [status, createdLeadId || null, errorMessage || null, logId]
+      [status, createdLeadId || null, errorMessage || null, fullPayload || null, logId]
     );
     console.log(`[Webhook Log Update] Log entry #${logId} updated to status: ${status} (Lead: ${createdLeadId || 'N/A'})`);
   } catch (err) {
@@ -231,37 +233,51 @@ export const verifyMetaWebhook = async (req: Request, res: Response): Promise<vo
 // POST /api/v1/webhooks/meta — Receive Meta Lead Events
 // ═══════════════════════════════════════════════════════════════════════
 export const receiveMetaWebhook = async (req: Request, res: Response): Promise<void> => {
-  console.log('[Webhook Received] Meta Webhook Event received.');
+  const timestamp = new Date().toISOString();
+  const rawBody = Buffer.isBuffer(req.body) 
+    ? req.body.toString('utf8') 
+    : (typeof req.body === 'string' ? req.body : JSON.stringify(req.body));
+  
+  let body: any = null;
+  try {
+    body = typeof req.body === 'object' && !Buffer.isBuffer(req.body) ? req.body : JSON.parse(rawBody);
+  } catch (e) {
+    body = req.body;
+  }
+
+  console.log(`
+==================================================
+WEBHOOK RECEIVED
+==================================================
+Timestamp: ${timestamp}
+Headers: ${JSON.stringify(req.headers, null, 2)}
+Query Parameters: ${JSON.stringify(req.query, null, 2)}
+Request Body: ${JSON.stringify(body, null, 2)}
+Raw Body: ${rawBody}
+==================================================
+`);
   
   // ⚠️ ALWAYS respond 200 immediately — Meta retries if it doesn't get 200
   res.status(200).json({ received: true });
 
   try {
-    const rawBody = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : JSON.stringify(req.body);
-    console.log('[Webhook Received] Raw Payload String:', rawBody);
-    
-    const body: MetaWebhookPayload = typeof req.body === 'object' && !Buffer.isBuffer(req.body)
-      ? req.body
-      : JSON.parse(rawBody);
-
-    // Immediate Logging of Page ID, Form ID, Leadgen ID, and Timestamp
-    if (body && body.entry) {
-      for (const entry of body.entry) {
-        for (const change of entry.changes || []) {
-          if (change.field === 'leadgen' && change.value) {
-            const { page_id, form_id, leadgen_id } = change.value;
-            console.log(`[Webhook Event Details] Page ID: ${page_id || 'N/A'}, Form ID: ${form_id || 'N/A'}, Leadgen ID: ${leadgen_id || 'N/A'}, Timestamp: ${new Date().toISOString()}`);
-          }
-        }
-      }
-    }
-
-    // Process asynchronously — do NOT await here
-    processMetaWebhookAsync(body).catch(err => {
-      console.error('[Webhook] Async processing fatal error:', err);
+    processMetaWebhookAsync(req, rawBody, body).catch(err => {
+      console.error(`
+==================================================
+Webhook failed: ${err.message}
+Stack Trace:
+${err.stack}
+==================================================
+`);
     });
   } catch (err: any) {
-    console.error('[Webhook Received] Error parsing payload:', err.message);
+    console.error(`
+==================================================
+Webhook failed: ${err.message}
+Stack Trace:
+${err.stack}
+==================================================
+`);
   }
 };
 
@@ -275,7 +291,20 @@ export const receiveInstagramWebhook = async (req: Request, res: Response): Prom
 // ═══════════════════════════════════════════════════════════════════════
 // Async Lead Processing Pipeline
 // ═══════════════════════════════════════════════════════════════════════
-async function processMetaWebhookAsync(body: MetaWebhookPayload): Promise<void> {
+async function processMetaWebhookAsync(req: Request, rawBody: string, body: MetaWebhookPayload): Promise<void> {
+  const fullLogAccumulator: string[] = [];
+
+  const initialLogBlock = `==================================================
+WEBHOOK RECEIVED
+==================================================
+Timestamp: ${new Date().toISOString()}
+Headers: ${JSON.stringify(req.headers, null, 2)}
+Query Parameters: ${JSON.stringify(req.query, null, 2)}
+Request Body: ${JSON.stringify(body, null, 2)}
+Raw Body: ${rawBody}
+==================================================`;
+  fullLogAccumulator.push(initialLogBlock);
+
   if (!body || body.object !== 'page') {
     console.log('[Webhook Async] Event object is not "page", skipping.');
     return;
@@ -288,9 +317,17 @@ async function processMetaWebhookAsync(body: MetaWebhookPayload): Promise<void> 
         continue;
       }
 
-      const value = change.value;
+      const value = change.value || {};
       const { leadgen_id, form_id, page_id } = value;
-      console.log(`[Webhook Async] Processing event. Leadgen ID: ${leadgen_id}, Form ID: ${form_id}, Page ID: ${page_id}`);
+
+      const verificationBlock = `==================================================
+Webhook verification passed
+Leadgen ID: ${leadgen_id || 'N/A'}
+Page ID: ${page_id || 'N/A'}
+Form ID: ${form_id || 'N/A'}
+==================================================`;
+      console.log(verificationBlock);
+      fullLogAccumulator.push(verificationBlock);
 
       // Log the incoming event immediately
       const logId = await logWebhook({
@@ -298,7 +335,7 @@ async function processMetaWebhookAsync(body: MetaWebhookPayload): Promise<void> 
         leadgen_id,
         form_id,
         page_id,
-        raw_payload: JSON.stringify(body),
+        raw_payload: fullLogAccumulator.join('\n\n'),
         processing_status: 'processing',
       });
 
@@ -306,71 +343,114 @@ async function processMetaWebhookAsync(body: MetaWebhookPayload): Promise<void> 
         // Check if specific form filter is configured
         const formAllowed = await isFormAllowed(form_id);
         if (!formAllowed) {
-          console.log(`[Webhook Async] Form ${form_id} not in allowed list — skipping.`);
-          await updateWebhookLog(logId, 'skipped_form_filter');
+          const filterMsg = `[Webhook Async] Form ${form_id} not in allowed list — skipping.`;
+          console.log(filterMsg);
+          fullLogAccumulator.push(filterMsg);
+          await updateWebhookLog(logId, 'skipped_form_filter', undefined, filterMsg, fullLogAccumulator.join('\n\n'));
           continue;
         }
-
-        // Check if source is enabled
-        const settings = await getMetaSettings();
-        const fbEnabled  = settings?.facebookEnabled ? 'true' : 'false';
-        const igEnabled  = settings?.instagramEnabled ? 'true' : 'false';
 
         // Fetch from Meta Graph API
-        console.log(`[Webhook Async] Fetching fields from Meta Graph API for leadgen ID: ${leadgen_id}`);
-        const graphData = await fetchMetaLeadFromGraph(leadgen_id);
+        let graphData: any = null;
+        try {
+          graphData = await fetchMetaLeadFromGraph(leadgen_id);
+        } catch (fetchErr: any) {
+          const structErr = fetchErr.structuredError || null;
+          let logErrorMsg = fetchErr.message || 'Meta Graph API error';
+          
+          if (structErr) {
+            logErrorMsg = JSON.stringify(structErr);
+          }
+          
+          const failBlock = `==================================================
+Webhook failed: ${structErr ? structErr.message : fetchErr.message}
+Recommendation: ${structErr ? structErr.recommendation : 'Check Page Access Token and permissions'}
+==================================================`;
+          console.error(failBlock);
+          fullLogAccumulator.push(failBlock);
+          await updateWebhookLog(logId, 'failed', undefined, logErrorMsg, fullLogAccumulator.join('\n\n'));
+          continue;
+        }
+
         if (!graphData) {
-          console.error(`[Webhook Async] Failed to fetch fields for leadgen ${leadgen_id}. Graph API returned null.`);
-          await updateWebhookLog(logId, 'failed', undefined, 'Meta Graph API returned null');
+          const failBlock = `==================================================
+Webhook failed: Meta Graph API returned null data
+==================================================`;
+          console.error(failBlock);
+          fullLogAccumulator.push(failBlock);
+          await updateWebhookLog(logId, 'failed', undefined, 'Meta Graph API returned null data', fullLogAccumulator.join('\n\n'));
           continue;
         }
-        console.log('[Webhook Async] Meta Graph Response Data:', JSON.stringify(graphData));
 
-        // Normalize
+        // Normalize lead
         const lead = normalizeMetaLead(graphData, value);
-        console.log('[Webhook Async] Normalized Lead Data:', JSON.stringify(lead));
-
-        // Source check (after we know if it's FB or IG)
-        if (lead.source === 'facebook' && fbEnabled !== 'true') {
-          console.log('[Webhook Async] Facebook leads disabled in settings — skipping.');
-          await updateWebhookLog(logId, 'skipped_disabled');
-          continue;
-        }
-        if (lead.source === 'instagram' && igEnabled !== 'true') {
-          console.log('[Webhook Async] Instagram leads disabled in settings — skipping.');
-          await updateWebhookLog(logId, 'skipped_disabled');
-          continue;
-        }
 
         // Duplicate check
+        let dupStatus = 'passed';
         const isDuplicate = await checkDuplicateLead(lead.phone, leadgen_id);
         if (isDuplicate) {
-          console.log(`[Webhook Async] Lead ${leadgen_id} is a duplicate, skipping insertion.`);
-          await updateWebhookLog(logId, 'duplicate');
+          dupStatus = 'duplicate (leadgen_id or phone matched existing record)';
+        }
+
+        let dbInsertStatus = 'skipped';
+        let newLeadId: number | null = null;
+
+        if (!isDuplicate) {
+          newLeadId = await createMetaLeadInCRM(lead);
+          dbInsertStatus = newLeadId ? `inserted (Lead ID #${newLeadId})` : 'failed';
+        }
+
+        const normBlock = `==================================================
+Lead normalized: ${JSON.stringify(lead, null, 2)}
+Duplicate check: ${dupStatus}
+Database insert: ${dbInsertStatus}
+Lead ID: ${newLeadId || 'N/A'}
+==================================================`;
+        console.log(normBlock);
+        fullLogAccumulator.push(normBlock);
+
+        if (isDuplicate) {
+          const dupComplete = `==================================================
+Webhook completed successfully (Duplicate Skipped)
+==================================================`;
+          console.log(dupComplete);
+          fullLogAccumulator.push(dupComplete);
+          await updateWebhookLog(logId, 'duplicate', undefined, undefined, fullLogAccumulator.join('\n\n'));
           continue;
         }
 
-        // Create lead in CRM
-        console.log('[Webhook Async] Inserting lead into GOC CRM database...');
-        const newLeadId = await createMetaLeadInCRM(lead);
         if (!newLeadId) {
-          console.error('[Webhook Async] Lead insertion failed. No ID returned.');
-          await updateWebhookLog(logId, 'failed', undefined, 'DB insert returned no ID');
+          const insertFail = `==================================================
+Webhook failed: Database insertion failed
+==================================================`;
+          console.error(insertFail);
+          fullLogAccumulator.push(insertFail);
+          await updateWebhookLog(logId, 'failed', undefined, 'DB insertion failed', fullLogAccumulator.join('\n\n'));
           continue;
         }
 
-        // Update log with success
-        await updateWebhookLog(logId, 'success', newLeadId);
+        const successBlock = `==================================================
+Webhook completed successfully
+==================================================`;
+        console.log(successBlock);
+        fullLogAccumulator.push(successBlock);
+
+        await updateWebhookLog(logId, 'success', newLeadId, undefined, fullLogAccumulator.join('\n\n'));
 
         // Fire notifications and WhatsApp (non-blocking)
         fireLeadNotifications(lead, newLeadId).catch(err =>
-          console.error('[Webhook Async] Notification error (non-blocking):', err)
+          console.error('[Webhook Async] Notification error:', err)
         );
 
       } catch (err: any) {
-        const errMsg = err?.message || 'Unknown processing error';
-        console.error(`[Webhook Async] Processing error for leadgen ${leadgen_id}:`, errMsg);
-        await updateWebhookLog(logId, 'failed', undefined, errMsg);
+        const errBlock = `==================================================
+Webhook failed: ${err?.message || 'Unknown processing error'}
+Stack Trace:
+${err.stack || 'No stack trace'}
+==================================================`;
+        console.error(errBlock);
+        fullLogAccumulator.push(errBlock);
+        await updateWebhookLog(logId, 'failed', undefined, err.message, fullLogAccumulator.join('\n\n'));
       }
     }
   }
@@ -497,7 +577,7 @@ async function fireLeadNotifications(
   // In-app notification to admin/manager
   try {
     await notifyByRole(
-      ['admin', 'manager', 'receptionist'],
+      ['admin', 'manager', 'salesman'],
       'new_lead',
       `📱 New ${sourceName} Lead: ${lead.fullName}`,
       `Phone: ${lead.phone || 'N/A'} | Vehicle: ${[lead.vehicleMake, lead.vehicleModel].filter(Boolean).join(' ') || 'N/A'} | ${lead.requirement || 'No requirement specified'}`,
@@ -613,7 +693,7 @@ export const receiveWhatsAppWebhook = async (req: Request, res: Response): Promi
       }
 
       await notifyByRole(
-        ['admin', 'manager', 'receptionist'],
+        ['admin', 'manager', 'salesman'],
         'new_lead',
         `New WhatsApp Lead: ${displayName}`,
         `Phone: ${normalizedPhone} | Message: "${(messageText || '').slice(0, 80)}" | Lead: ${leadCode}`,

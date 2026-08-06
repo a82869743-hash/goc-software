@@ -4,22 +4,20 @@ import { staffAPI, StaffMember, TodayAttendanceRow, PaymentRequest } from '../ap
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../stores/authStore';
 
-type StaffRole = 'admin' | 'technician' | 'receptionist' | 'manager' | 'staff' | 'hr';
+type StaffRole = 'admin' | 'manager' | 'salesman' | 'staff';
 
 const ROLE_CFG: Record<StaffRole, { label: string; color: string; bg: string; border: string }> = {
   admin: { label: 'Admin', color: 'text-performance-red', bg: 'bg-performance-red/10', border: 'border-performance-red/25' },
-  technician: { label: 'Technician', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
-  receptionist: { label: 'Receptionist', color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20' },
   manager: { label: 'Manager', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
+  salesman: { label: 'Salesman', color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20' },
   staff: { label: 'Staff', color: 'text-tertiary', bg: 'bg-white/5', border: 'border-white/10' },
-  hr: { label: 'HR', color: 'text-pink-400', bg: 'bg-pink-500/10', border: 'border-pink-500/20' },
 };
 
 export default function StaffAttendancePaymentsPage() {
   const queryClient = useQueryClient();
   const { staff: currentStaff } = useAuthStore();
   const currentRole = currentStaff?.role;
-  const isHR = ['hr', 'manager', 'admin'].includes(currentRole || '');
+  const isManagerOrAdmin = ['manager', 'admin'].includes(currentRole || '');
 
   // Sub Tab: attendance vs requests
   const [subTab, setSubTab] = useState<'attendance' | 'requests'>('attendance');
@@ -490,7 +488,7 @@ export default function StaffAttendancePaymentsPage() {
                           {req.approved_by_name || '—'}
                         </td>
                         <td className="py-3.5 px-4 text-right">
-                          {req.status === 'pending' && isHR ? (
+                          {req.status === 'pending' && isManagerOrAdmin ? (
                             <div className="flex gap-2 justify-end">
                               <button
                                 onClick={() => approveRequestMutation.mutate({ id: req.id, payload: { status: 'approved' } })}

@@ -11,22 +11,22 @@ const router = Router();
 router.use(authMiddleware);
 
 // GET /leads/stats — Pipeline stats (must come before /:id)
-router.get('/stats', rbac('admin', 'manager', 'receptionist'), getLeadStats);
+router.get('/stats', rbac('admin', 'manager', 'salesman'), getLeadStats);
 
 // PATCH /leads/bulk-reassign — Bulk reassign leads
-router.patch('/bulk-reassign', rbac('admin', 'manager', 'receptionist'), validate(bulkReassignSchema), bulkReassignLeads);
+router.patch('/bulk-reassign', rbac('admin', 'manager', 'salesman'), validate(bulkReassignSchema), bulkReassignLeads);
 
 // GET /leads — List with filters
-router.get('/', rbac('admin', 'manager', 'receptionist'), validateQuery(leadFiltersSchema), getLeads);
+router.get('/', rbac('admin', 'manager', 'salesman'), validateQuery(leadFiltersSchema), getLeads);
 
 // GET /leads/:id — Single lead
-router.get('/:id', rbac('admin', 'manager', 'receptionist'), getLeadById);
+router.get('/:id', rbac('admin', 'manager', 'salesman'), getLeadById);
 
 // POST /leads — Create
-router.post('/', rbac('admin', 'manager', 'receptionist'), validate(createLeadSchema), createLead);
+router.post('/', rbac('admin', 'manager', 'salesman'), validate(createLeadSchema), createLead);
 
 // PUT /leads/:id — Update
-router.put('/:id', rbac('admin', 'manager', 'receptionist'), validate(updateLeadSchema), updateLead);
+router.put('/:id', rbac('admin', 'manager', 'salesman'), validate(updateLeadSchema), updateLead);
 
 // DELETE /leads/:id — Soft delete (admin only)
 router.delete('/:id', rbac('admin'), deleteLead);

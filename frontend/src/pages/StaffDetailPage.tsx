@@ -3,17 +3,16 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { staffAPI, StaffMember } from '../api/staff';
 import { usePermissions } from '../utils/usePermissions';
+import { useAuthStore } from '../stores/authStore';
 import toast from 'react-hot-toast';
 
-type StaffRole = 'admin' | 'technician' | 'receptionist' | 'manager' | 'staff' | 'hr';
+type StaffRole = 'admin' | 'manager' | 'salesman' | 'staff';
 
 const ROLE_CFG: Record<StaffRole, { label: string; color: string; bg: string; border: string }> = {
   admin: { label: 'Admin', color: 'text-performance-red', bg: 'bg-performance-red/10', border: 'border-performance-red/25' },
-  technician: { label: 'Technician', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
-  receptionist: { label: 'Receptionist', color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20' },
   manager: { label: 'Manager', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
+  salesman: { label: 'Salesman', color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20' },
   staff: { label: 'Staff', color: 'text-tertiary', bg: 'bg-white/5', border: 'border-white/10' },
-  hr: { label: 'HR', color: 'text-pink-400', bg: 'bg-pink-500/10', border: 'border-pink-500/20' },
 };
 
 const STATUS_CFG: Record<string, { label: string; dot: string; text: string }> = {
@@ -38,6 +37,7 @@ export default function StaffDetailPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isAdminRole } = usePermissions();
+  const { staff: currentUser, updateProfile } = useAuthStore();
   const isAdmin = isAdminRole;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -53,10 +53,14 @@ export default function StaffDetailPage() {
 
   const uploadPhotoMutation = useMutation({
     mutationFn: (file: File) => staffAPI.uploadProfilePicture(Number(id), file),
-    onSuccess: () => {
+    onSuccess: (res) => {
       toast.success('Profile picture updated successfully');
       queryClient.invalidateQueries({ queryKey: ['staffDetails', id] });
       queryClient.invalidateQueries({ queryKey: ['staff'] });
+      // Sync auth store if current user uploaded their own photo
+      if (currentUser && currentUser.id === Number(id)) {
+        updateProfile({ profile_picture: res.data.profile_picture });
+      }
     },
     onError: (err: any) => {
       toast.error(err.response?.data?.error?.message || 'Failed to upload photo');

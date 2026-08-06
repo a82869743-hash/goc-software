@@ -7,7 +7,7 @@ export interface StaffMember {
   full_name: string;
   phone: string;
   email?: string | null;
-  role: 'admin' | 'technician' | 'receptionist' | 'manager' | 'staff' | 'hr';
+  role: 'admin' | 'manager' | 'salesman' | 'staff';
   salary_type: 'monthly' | 'daily';
   salary_amount: number;
   join_date: string;
@@ -125,6 +125,14 @@ export const staffAPI = {
   },
   updatePassword: async (staffId: number, newPassword: string): Promise<ApiResponse<{ message: string }>> => {
     const { data } = await apiClient.put(`/staff/${staffId}/password`, { new_password: newPassword });
+    return data;
+  },
+  uploadMyProfilePicture: async (file: File): Promise<ApiResponse<{ profile_picture: string }>> => {
+    const formData = new FormData();
+    formData.append('photo', file);
+    const { data } = await apiClient.post('/staff/me/profile-picture', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
     return data;
   },
 };

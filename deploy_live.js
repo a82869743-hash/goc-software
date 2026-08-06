@@ -13,43 +13,38 @@ const VPS = {
 const REMOTE_BASE = '/root/goc-software';
 const LOCAL_BASE = __dirname; // project root
 
-// All files that were changed in this update
+// Helper function to recursively collect source files
+function getAllFiles(dir, base) {
+  let results = [];
+  if (!fs.existsSync(dir)) return results;
+  const list = fs.readdirSync(dir);
+  list.forEach((file) => {
+    const fullPath = path.join(dir, file);
+    const relPath = path.join(base, file);
+    const stat = fs.statSync(fullPath);
+    if (stat && stat.isDirectory()) {
+      if (file !== 'node_modules' && file !== 'dist' && file !== '.git' && file !== '.vite') {
+        results = results.concat(getAllFiles(fullPath, relPath));
+      }
+    } else {
+      results.push(relPath.replace(/\\/g, '/'));
+    }
+  });
+  return results;
+}
+
+// Dynamically generate complete list of files to upload
 const FILES_TO_UPLOAD = [
-  // Backend controllers
-  'backend/src/controllers/commissionController.ts',
-  'backend/src/controllers/inventoryController.ts',
-  'backend/src/controllers/jobCardController.ts',
-  'backend/src/controllers/staffController.ts',
-  'backend/src/controllers/staffPermissionsController.ts',
-  // Backend routes
-  'backend/src/routes/commissions.ts',
-  'backend/src/routes/customers.ts',
-  'backend/src/routes/inventory.ts',
-  'backend/src/routes/invoices.ts',
-  'backend/src/routes/leads.ts',
-  'backend/src/routes/marketing.ts',
-  'backend/src/routes/quotations.ts',
-  'backend/src/routes/recycleBin.ts',
-  'backend/src/routes/staff.ts',
-  'backend/src/routes/vehicles.ts',
-  // Backend utils
-  'backend/src/utils/db.ts',
-  // Frontend API
-  'frontend/src/api/commissions.ts',
-  'frontend/src/api/staff.ts',
-  // Frontend pages
-  'frontend/src/pages/CommissionsPage.tsx',
-  'frontend/src/pages/InventoryPage.tsx',
-  'frontend/src/pages/JobCardDetailPage.tsx',
-  'frontend/src/pages/QuotationsPage.tsx',
-  'frontend/src/pages/RecycleBinPage.tsx',
-  'frontend/src/pages/StaffDetailPage.tsx',
-  // Frontend utils
-  'frontend/src/utils/usePermissions.ts',
-  // Database migration
-  'database/migrations/008_add_staff_profile_picture.sql',
-  // Config
+  ...getAllFiles(path.join(LOCAL_BASE, 'frontend/src'), 'frontend/src'),
+  ...getAllFiles(path.join(LOCAL_BASE, 'backend/src'), 'backend/src'),
+  ...getAllFiles(path.join(LOCAL_BASE, 'database/migrations'), 'database/migrations'),
+  'backend/server.ts',
+  'backend/package.json',
+  'frontend/package.json',
+  'frontend/index.html',
+  'frontend/vite.config.ts',
   '.env.example',
+  '.env',
 ];
 
 // ─── SFTP UPLOAD ──────────────────────────────────────────
@@ -109,14 +104,16 @@ function uploadFiles(conn) {
 function runRemoteCommands(conn) {
   return new Promise((resolve, reject) => {
     const commands = [
+      `mysql -u root goc_studio -e "ALTER TABLE meta_integration_settings ADD COLUMN page_id VARCHAR(255) NULL AFTER app_secret;" 2>&1 || true`,
       `echo "=== [1/4] Installing backend deps ==="`,
       `cd ${REMOTE_BASE}/backend && npm install --production=false 2>&1`,
       `echo "=== [2/4] Building backend ==="`,
       `cd ${REMOTE_BASE}/backend && npm run build 2>&1`,
       `echo "=== [3/4] Building frontend ==="`,
-      `cd ${REMOTE_BASE}/frontend && npm install --production=false 2>&1 && npm run build 2>&1`,
-      `echo "=== [4/4] Restarting PM2 ==="`,
-      `pm2 restart goc-backend 2>&1`,
+      `cd ${REMOTE_BASE}/frontend && npm install --production=false 2>&1 && npm run build 2>&1 && rm -rf /var/www/goc-studio/* && cp -r ${REMOTE_BASE}/frontend/dist/* /var/www/goc-studio/ && (nginx -s reload 2>&1 || systemctl reload nginx 2>&1 || true)`,
+      `cp ${REMOTE_BASE}/.env ${REMOTE_BASE}/backend/.env 2>&1 || true`,
+      `echo "=== [4/4] Restarting PM2 with updated env ==="`,
+      `pm2 restart goc-backend --update-env 2>&1`,
       `echo "=== DEPLOY COMPLETE ==="`,
       `pm2 status 2>&1`,
     ].join(' && ');

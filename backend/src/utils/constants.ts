@@ -68,7 +68,7 @@ export const SERVICE_TYPES = ['ppf', 'ceramic', 'polish', 'detailing', 'other'] 
 
 export const LEAD_SOURCES = ['facebook', 'instagram', 'whatsapp', 'walkin', 'reference', 'other'] as const;
 
-export const STAFF_ROLES = ['admin', 'technician', 'receptionist', 'manager', 'staff', 'hr'] as const;
+export const STAFF_ROLES = ['admin', 'manager', 'salesman', 'staff'] as const;
 
 export const TIME_SLOTS = ['09:00', '11:00', '14:00', '16:00'] as const;
 

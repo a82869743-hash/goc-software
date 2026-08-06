@@ -68,6 +68,10 @@ export default function JobCardNewPage() {
   const [concerns, setConcerns] = useState<string[]>([]);
   const [concernInput, setConcernInput] = useState('');
 
+  // Discount Controls
+  const [discountType, setDiscountType] = useState<'fixed' | 'percentage'>('fixed');
+  const [discountValue, setDiscountValue] = useState<number | ''>('');
+
   const bookingId = searchParams.get('booking_id') ? Number(searchParams.get('booking_id')) : null;
   const advanceBookingId = searchParams.get('advance_booking_id') ? Number(searchParams.get('advance_booking_id')) : null;
 
@@ -222,6 +226,12 @@ export default function JobCardNewPage() {
         throw new Error('Failed to resolve customer or vehicle details.');
       }
 
+      const subtotalAmt = services.reduce((acc, s) => acc + (Number(s.unit_price || 0) * Number(s.quantity || 1)), 0);
+      const discVal = Number(discountValue || 0);
+      const discAmt = discountType === 'percentage'
+        ? Math.round((subtotalAmt * (discVal / 100)) * 100) / 100
+        : discVal;
+
       // 3. Create Job Card with Services atomically
       const jobRes = await jobsAPI.create({
         customer_id: customerId,
@@ -234,6 +244,9 @@ export default function JobCardNewPage() {
         advance_amount: advanceAmount === '' ? 0 : Number(advanceAmount),
         advance_payment_mode: advanceMode,
         advance_payment_ref: advanceRef || null,
+        discount_type: discountType,
+        discount_value: discVal,
+        discount_amount: discAmt,
         concerns,
         services: services.map(svc => ({
           service_name: svc.service_name,
@@ -710,6 +723,26 @@ export default function JobCardNewPage() {
                     <option value="walkin">Walk-in</option>
                     <option value="booked">Booked</option>
                   </select>
+                </div>
+                <div>
+                  <label className="font-label-caps text-[9px] text-on-surface-variant/50 tracking-widest block mb-1">Customer Discount (Optional)</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <select
+                      value={discountType}
+                      onChange={e => setDiscountType(e.target.value as 'fixed' | 'percentage')}
+                      className="bg-black border border-white/[0.07] rounded-lg px-2.5 py-2.5 text-xs text-white outline-none focus:border-performance-red/40"
+                    >
+                      <option value="fixed">Fixed (₹)</option>
+                      <option value="percentage">Percent (%)</option>
+                    </select>
+                    <input
+                      type="number"
+                      value={discountValue}
+                      onChange={e => setDiscountValue(e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder={discountType === 'percentage' ? 'e.g. 10 (%)' : 'e.g. 500 (₹)'}
+                      className="col-span-2 bg-white/[0.03] border border-white/[0.07] rounded-lg px-3 py-2.5 text-sm text-white outline-none focus:border-performance-red/40 font-data-sm"
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="font-label-caps text-[9px] text-on-surface-variant/50 tracking-widest block mb-1">Advance Payment Amount (Optional)</label>

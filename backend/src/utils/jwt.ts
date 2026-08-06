@@ -9,7 +9,7 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '12h';
 export interface JWTPayload {
   id: number;
   staff_code: string;
-  role: 'admin' | 'technician' | 'receptionist' | 'manager' | 'staff';
+  role: 'admin' | 'manager' | 'salesman' | 'staff';
   full_name: string;
   token_version?: number;
 }

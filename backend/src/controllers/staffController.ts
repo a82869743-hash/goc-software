@@ -21,7 +21,7 @@ export const getStaff = async (req: Request, res: Response): Promise<void> => {
 
     const [countR] = await pool.query<RowDataPacket[]>(`SELECT COUNT(*) as total FROM staff s WHERE ${where}`, params);
     const [rows] = await pool.query<RowDataPacket[]>(
-      `SELECT s.id, s.staff_code, s.full_name, s.phone, s.email, s.role, s.salary_type, s.salary_amount, s.join_date, s.status, s.created_at
+      `SELECT s.id, s.staff_code, s.full_name, s.phone, s.email, s.profile_picture, s.role, s.salary_type, s.salary_amount, s.join_date, s.status, s.created_at
        FROM staff s WHERE ${where} ORDER BY s.id DESC LIMIT ? OFFSET ?`, [...params, Number(limit), offset]);
 
     res.json({ success: true, data: rows, meta: { total: countR[0].total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(countR[0].total / Number(limit)) } });
@@ -32,7 +32,7 @@ export const getStaff = async (req: Request, res: Response): Promise<void> => {
 export const getStaffById = async (req: Request, res: Response): Promise<void> => {
   try {
     const [rows] = await pool.query<RowDataPacket[]>(
-      `SELECT s.id, s.staff_code, s.full_name, s.phone, s.email, s.role, s.salary_type, s.salary_amount, s.join_date, s.status, s.created_at
+      `SELECT s.id, s.staff_code, s.full_name, s.phone, s.email, s.profile_picture, s.role, s.salary_type, s.salary_amount, s.join_date, s.status, s.created_at
        FROM staff s WHERE s.id = ? AND s.deleted_at IS NULL`, [req.params.id]);
     if (rows.length === 0) { res.status(404).json({ success: false, error: { code: ERROR_CODES.NOT_FOUND, message: 'Staff not found.' } }); return; }
     // Recent attendance
@@ -87,7 +87,17 @@ export const deleteStaff = async (req: Request, res: Response): Promise<void> =>
   try {
     const [existing] = await pool.query<RowDataPacket[]>('SELECT id FROM staff WHERE id = ? AND deleted_at IS NULL', [req.params.id]);
     if (existing.length === 0) { res.status(404).json({ success: false, error: { code: ERROR_CODES.NOT_FOUND, message: 'Staff not found.' } }); return; }
-    await pool.query('UPDATE staff SET deleted_at = NOW() WHERE id = ?', [req.params.id]);
+    await pool.query(
+      `UPDATE staff 
+       SET deleted_at = NOW(), 
+           status = 'resigned', 
+           token_version = token_version + 1,
+           phone = CASE WHEN phone NOT LIKE '%_del_%' THEN CONCAT(phone, '_del_', id) ELSE phone END,
+           email = CASE WHEN email IS NOT NULL AND email NOT LIKE '%_del_%' THEN CONCAT(email, '_del_', id) ELSE email END,
+           staff_code = CASE WHEN staff_code NOT LIKE '%_del_%' THEN CONCAT(staff_code, '_del_', id) ELSE staff_code END
+       WHERE id = ?`,
+      [req.params.id]
+    );
     res.json({ success: true, data: { message: 'Staff member removed.' } });
   } catch (error) { console.error('Delete staff error:', error); res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Failed.' } }); }
 };
@@ -840,6 +850,26 @@ export const uploadProfilePicture = async (req: Request, res: Response): Promise
     res.json({ success: true, data: { profile_picture: url } });
   } catch (e) {
     console.error('Upload profile picture error:', e);
+    res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Upload failed.' } });
+  }
+};
+
+/** POST /staff/me/profile-picture — Any logged-in user uploads their own profile picture */
+export const uploadSelfProfilePicture = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.staff) {
+      res.status(401).json({ success: false, error: { code: ERROR_CODES.AUTH_REQUIRED, message: 'Authentication required.' } });
+      return;
+    }
+    if (!req.file) {
+      res.status(400).json({ success: false, error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'No file uploaded.' } });
+      return;
+    }
+    const url = `/uploads/photos/${req.file.filename}`;
+    await pool.query('UPDATE staff SET profile_picture = ? WHERE id = ?', [url, req.staff.id]);
+    res.json({ success: true, data: { profile_picture: url } });
+  } catch (e) {
+    console.error('Self upload profile picture error:', e);
     res.status(500).json({ success: false, error: { code: ERROR_CODES.SERVER_ERROR, message: 'Upload failed.' } });
   }
 };

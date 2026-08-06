@@ -4,6 +4,8 @@ import { useAuthStore } from '../../stores/authStore';
 import { usePermissions } from '../../utils/usePermissions';
 import { usePermissionsStore } from '../../stores/permissionsStore';
 
+const API_BASE = (import.meta.env.VITE_API_BASE_URL ? import.meta.env.VITE_API_BASE_URL.replace('/api/v1', '') : 'http://localhost:4000');
+
 interface NavItem {
   to: string;
   icon: string;
@@ -204,8 +206,12 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         {/* User Profile */}
         {staff && (
           <div className="flex items-center gap-2.5 mt-2 px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/5">
-            <div className="w-8 h-8 rounded-lg bg-surface-container-highest border border-white/10 flex items-center justify-center text-performance-red shrink-0">
-              <span className="material-symbols-outlined text-base">account_circle</span>
+            <div className="w-8 h-8 rounded-lg bg-surface-container-highest border border-white/10 flex items-center justify-center text-performance-red shrink-0 overflow-hidden">
+              {staff.profile_picture ? (
+                <img src={API_BASE + staff.profile_picture} alt={staff.full_name} className="w-full h-full object-cover" />
+              ) : (
+                <span className="material-symbols-outlined text-base">account_circle</span>
+              )}
             </div>
             <div className="min-w-0">
               <p className="text-on-surface text-xs font-bold truncate">{staff.full_name}</p>

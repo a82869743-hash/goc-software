@@ -6,6 +6,7 @@ export interface MetaIntegrationSettings {
   instagramEnabled: boolean;
   appId: string;
   appSecret: string;
+  pageId: string;
   pageAccessToken: string;
   verifyToken: string;
   autoAssignStaffId: number | null;
@@ -54,6 +55,11 @@ export const integrationsAPI = {
 
   runMetaTest: async (): Promise<ApiResponse<TestDiagnosticsResult>> => {
     const { data } = await apiClient.post('/integrations/meta/test');
+    return data;
+  },
+
+  subscribeMetaPageApp: async (): Promise<ApiResponse<any>> => {
+    const { data } = await apiClient.post('/integrations/meta/subscribe');
     return data;
   }
 };

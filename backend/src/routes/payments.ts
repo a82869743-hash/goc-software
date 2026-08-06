@@ -64,7 +64,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 });
 
 // ─── RECORD PAYMENT ───────────────────────────────
-router.post('/', rbac('admin', 'manager', 'receptionist'), async (req: Request, res: Response): Promise<void> => {
+router.post('/', rbac('admin', 'manager', 'salesman'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { invoice_id, amount, payment_mode, reference_number, notes } = req.body;
     const staffId = (req as any).staff?.id;

@@ -63,4 +63,29 @@ export interface NormalizedMetaLead {
   isOrganic: boolean;
   campaignName: string | null;
   adName: string | null;
+  createdTime?: number;
+}
+
+export interface StructuredExternalApiError {
+  success: false;
+  provider: string;
+  httpStatus: number;
+  errorType: string;
+  errorCode: number | string;
+  errorSubcode: number | null;
+  message: string;
+  fbTraceId: string | null;
+  requestUrl: string;
+  requestParams: Record<string, any>;
+  requestHeaders?: Record<string, any>;
+  responseHeaders?: Record<string, any>;
+  responseBody?: Record<string, any>;
+  stack?: string;
+  timestamp: string;
+  retryable: boolean;
+  recommendation: string;
+  leadgenId?: string;
+  pageId?: string;
+  formId?: string;
+  executionTimeMs?: number;
 }

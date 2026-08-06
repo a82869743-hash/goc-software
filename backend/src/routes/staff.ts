@@ -23,6 +23,7 @@ import {
   createPaymentRequest,
   approvePaymentRequest,
   uploadProfilePicture,
+  uploadSelfProfilePicture,
   updateStaffPassword,
   resetAllStaffPasswords
 } from '../controllers/staffController';
@@ -54,6 +55,9 @@ router.post('/check-out', staffCheckOut);
 router.post('/leaves', requestLeave);
 router.patch('/leaves/:id', rbac('admin', 'manager'), approveLeave);
 router.get('/leaves', getLeaves);
+
+// Self-upload profile picture (any logged-in user, their own photo)
+router.post('/me/profile-picture', uploadPhoto.single('photo'), uploadSelfProfilePicture);
 
 // Staff advances
 router.get('/:id/advances', rbac('admin', 'manager'), getStaffAdvances);

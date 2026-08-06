@@ -175,6 +175,16 @@ pool.getConnection()
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `).catch(err => console.error('❌ Failed to auto-migrate staff_payment_requests table:', err));
 
+    // Auto-migrate connectors table to add email column if missing
+    await conn.query(`
+      ALTER TABLE connectors ADD COLUMN email VARCHAR(100) NULL AFTER phone;
+    `).catch(() => {});
+
+    // Auto-migrate job_cards to backfill date_in with created_at if NULL
+    await conn.query(`
+      UPDATE job_cards SET date_in = created_at WHERE date_in IS NULL;
+    `).catch(() => {});
+
     // Auto-migrate sms_templates table if not exists
     await conn.query(`
       CREATE TABLE IF NOT EXISTS sms_templates (
@@ -262,10 +272,21 @@ pool.getConnection()
         setting_value = CASE WHEN setting_value = 'hiru@29' THEN '1234' ELSE setting_value END;
     `).catch(err => console.error('❌ Failed to seed default kiosk passcode setting:', err));
 
-    // Auto-migrate profile_picture in staff table
+    // Auto-migrate profile_picture, phone, staff_code in staff table
     await conn.query(`
       ALTER TABLE staff ADD COLUMN IF NOT EXISTS profile_picture VARCHAR(500) NULL AFTER email;
     `).catch(() => {});
+    await conn.query("ALTER TABLE staff MODIFY COLUMN phone VARCHAR(50) NOT NULL;").catch(() => {});
+    await conn.query("ALTER TABLE staff MODIFY COLUMN staff_code VARCHAR(50) NOT NULL;").catch(() => {});
+
+    // Auto-migrate soft-deleted staff records: release UNIQUE phone, email, staff_code constraint
+    await conn.query(`
+      UPDATE staff 
+      SET phone = CONCAT(phone, '_del_', id),
+          email = CASE WHEN email IS NOT NULL AND email NOT LIKE '%_del_%' THEN CONCAT(email, '_del_', id) ELSE email END,
+          staff_code = CASE WHEN staff_code NOT LIKE '%_del_%' THEN CONCAT(staff_code, '_del_', id) ELSE staff_code END
+      WHERE deleted_at IS NOT NULL AND phone NOT LIKE '%_del_%';
+    `).catch(err => console.error('❌ Failed to update soft-deleted staff phones:', err.message));
 
     // Auto-migrate perm_delete_all in staff_permissions table
     await conn.query(`
@@ -276,6 +297,17 @@ pool.getConnection()
     await conn.query(`
       ALTER TABLE inventory_usage ADD COLUMN IF NOT EXISTS manual_amount DECIMAL(10,2) NULL AFTER qty_used;
     `).catch(() => {});
+
+    // Auto-migrate page_id in meta_integration_settings table
+    try {
+      const [columns]: any = await conn.query("SHOW COLUMNS FROM meta_integration_settings LIKE 'page_id'").catch(() => [[]]);
+      if (!columns || columns.length === 0) {
+        await conn.query('ALTER TABLE meta_integration_settings ADD COLUMN page_id VARCHAR(255) NULL AFTER app_secret;');
+        console.log('✅ Added page_id column to meta_integration_settings table');
+      }
+    } catch (e) {
+      console.error('❌ Failed to add page_id column to meta_integration_settings:', e);
+    }
 
 
     // Alter job_cards status column to include 'estimate' and change default to 'in_progress'
@@ -333,7 +365,10 @@ pool.getConnection()
       "ALTER TABLE job_cards ADD COLUMN dispatch_sms TINYINT(1) NOT NULL DEFAULT 0",
       "ALTER TABLE job_cards ADD COLUMN km_reading INT DEFAULT NULL",
       "ALTER TABLE job_cards ADD COLUMN insurance_company VARCHAR(150) NULL DEFAULT NULL",
-      "ALTER TABLE job_cards ADD COLUMN insurance_expiry DATE NULL DEFAULT NULL"
+      "ALTER TABLE job_cards ADD COLUMN insurance_expiry DATE NULL DEFAULT NULL",
+      "ALTER TABLE job_cards ADD COLUMN discount_type ENUM('fixed','percentage') NOT NULL DEFAULT 'fixed'",
+      "ALTER TABLE job_cards ADD COLUMN discount_value DECIMAL(10,2) NOT NULL DEFAULT 0.00",
+      "ALTER TABLE job_cards ADD COLUMN discount_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00"
     ];
     for (const sql of addJcCols) {
       await conn.query(sql).catch(err => {
@@ -586,9 +621,13 @@ pool.getConnection()
       });
     }
 
-    // Ensure staff table role ENUM includes 'hr'
+    // Ensure staff table role ENUM has 4 roles: admin, manager, salesman, staff (stepwise for MySQL compliance)
+    await conn.query("ALTER TABLE staff MODIFY COLUMN role ENUM('admin','technician','receptionist','manager','staff','hr','salesman') NOT NULL DEFAULT 'staff'").catch(() => {});
+    await conn.query("UPDATE staff SET role = 'staff' WHERE role = 'technician'").catch(() => {});
+    await conn.query("UPDATE staff SET role = 'salesman' WHERE role = 'receptionist'").catch(() => {});
+    await conn.query("UPDATE staff SET role = 'manager' WHERE role = 'hr'").catch(() => {});
     await conn.query(`
-      ALTER TABLE staff MODIFY COLUMN role ENUM('admin','technician','receptionist','manager','staff','hr') NOT NULL DEFAULT 'technician'
+      ALTER TABLE staff MODIFY COLUMN role ENUM('admin','manager','salesman','staff') NOT NULL DEFAULT 'staff'
     `).catch(err => console.error('❌ Failed to update staff role enum:', err.message));
 
     // Auto-migrate staff_payment_requests table

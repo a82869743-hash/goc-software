@@ -941,7 +941,7 @@ export default function JobCardDetailPage() {
               job.vehicle_notes ? { label: 'Vehicle Notes', value: job.vehicle_notes, icon: 'note' } : null,
               { label: 'Reg No.', value: job.reg_number || '—', icon: 'pin' },
               { label: 'Job Type', value: (job.job_type || 'walkin').toUpperCase(), icon: 'category' },
-              { label: 'Date In', value: job.date_in ? new Date(job.date_in).toLocaleDateString('en-IN') : '—', icon: 'login' },
+              { label: 'Date In', value: (job.date_in || job.created_at) ? new Date(job.date_in || job.created_at).toLocaleDateString('en-IN') : '—', icon: 'login' },
               { label: 'Expected Out', value: job.expected_out ? new Date(job.expected_out).toLocaleDateString('en-IN') : '—', icon: 'event' },
               { label: 'Date Out', value: job.date_out ? new Date(job.date_out).toLocaleDateString('en-IN') : '—', icon: 'logout' },
               { label: 'Created By', value: job.created_by_name || '—', icon: 'badge' },

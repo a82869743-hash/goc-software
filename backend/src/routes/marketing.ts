@@ -47,7 +47,7 @@ router.use(authMiddleware);
 // ── WhatsApp Logs & Stats ──────────────────────────────────
 router.get('/whatsapp/logs', getWhatsAppLogs);
 router.get('/whatsapp/stats', getWhatsAppStats);
-router.post('/whatsapp/quick-send', rbac('admin', 'manager', 'receptionist'), quickSend);
+router.post('/whatsapp/quick-send', rbac('admin', 'manager', 'salesman'), quickSend);
 
 // ── Campaigns ──────────────────────────────────────────────
 router.get('/campaigns', getCampaigns);

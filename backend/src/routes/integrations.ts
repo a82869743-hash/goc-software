@@ -5,7 +5,9 @@ import {
   getMetaSettingsHandler,
   updateMetaSettingsHandler,
   validateMetaConnection,
-  runMetaTest
+  runMetaTest,
+  subscribeMetaPageApp,
+  getMetaDeveloperDiagnostics
 } from '../controllers/integrationsController';
 
 const router = Router();
@@ -18,5 +20,7 @@ router.get('/meta/settings', getMetaSettingsHandler);
 router.patch('/meta/settings', updateMetaSettingsHandler);
 router.post('/meta/validate', validateMetaConnection);
 router.post('/meta/test', runMetaTest);
+router.post('/meta/subscribe', subscribeMetaPageApp);
+router.get('/meta/diagnostics', getMetaDeveloperDiagnostics);
 
 export default router;

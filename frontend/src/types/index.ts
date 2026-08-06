@@ -10,6 +10,7 @@ export interface StaffProfile {
   full_name: string;
   phone: string;
   email: string | null;
+  profile_picture?: string | null;
   role: StaffRole;
   status: StaffStatus;
   salary_type?: 'monthly' | 'daily';
@@ -17,7 +18,7 @@ export interface StaffProfile {
   join_date?: string;
 }
 
-export type StaffRole = 'admin' | 'technician' | 'receptionist' | 'manager' | 'staff';
+export type StaffRole = 'admin' | 'manager' | 'salesman' | 'staff';
 export type StaffStatus = 'active' | 'on_leave' | 'resigned';
 
 export interface LoginRequest {
@@ -525,7 +526,7 @@ export interface StaffMember {
   full_name: string;
   phone: string;
   email?: string;
-  role: 'admin' | 'manager' | 'technician' | 'receptionist' | 'staff';
+  role: 'admin' | 'manager' | 'salesman' | 'staff';
   status: 'active' | 'inactive';
   salary: number;
   salary_type: 'monthly' | 'daily';

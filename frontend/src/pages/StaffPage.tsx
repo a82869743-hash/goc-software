@@ -1,15 +1,18 @@
-import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState, useRef } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { staffAPI, StaffMember } from '../api/staff';
+import { useAuthStore } from '../stores/authStore';
+import toast from 'react-hot-toast';
 
-type StaffRole = 'admin' | 'technician' | 'receptionist' | 'manager' | 'staff';
+const API_BASE = (import.meta.env.VITE_API_BASE_URL ? import.meta.env.VITE_API_BASE_URL.replace('/api/v1', '') : 'http://localhost:4000');
+
+type StaffRole = 'admin' | 'manager' | 'salesman' | 'staff';
 
 const ROLE_CFG: Record<StaffRole, { label: string; color: string; bg: string; border: string }> = {
   admin: { label: 'Admin', color: 'text-performance-red', bg: 'bg-performance-red/10', border: 'border-performance-red/25' },
-  technician: { label: 'Technician', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
-  receptionist: { label: 'Receptionist', color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20' },
   manager: { label: 'Manager', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
+  salesman: { label: 'Salesman', color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20' },
   staff: { label: 'Staff', color: 'text-tertiary', bg: 'bg-white/5', border: 'border-white/10' },
 };
 
@@ -32,9 +35,13 @@ const AVATAR_COLORS = [
 
 export default function StaffPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { staff: currentUser, updateProfile } = useAuthStore();
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<StaffRole | 'all'>('all');
   const [view, setView] = useState<'grid' | 'list'>('grid');
+  const [popupStaff, setPopupStaff] = useState<StaffMember | null>(null);
+  const popupFileRef = useRef<HTMLInputElement>(null);
 
   // API QUERIES
   const { data: staffRes, isLoading: isStaffLoading } = useQuery({
@@ -51,6 +58,37 @@ export default function StaffPage() {
   });
 
   const activeCount = staffMembers.filter((s) => s.status === 'active').length;
+
+  // Upload photo mutation for popup change-photo
+  const uploadPhotoMut = useMutation({
+    mutationFn: ({ staffId, file }: { staffId: number; file: File }) =>
+      currentUser?.role === 'admin'
+        ? staffAPI.uploadProfilePicture(staffId, file)
+        : staffAPI.uploadMyProfilePicture(file),
+    onSuccess: (res) => {
+      toast.success('Photo updated!');
+      queryClient.invalidateQueries({ queryKey: ['staff'] });
+      // If it's the current user, update the auth store so Topbar/Sidebar reflect immediately
+      if (popupStaff && popupStaff.id === currentUser?.id) {
+        updateProfile({ profile_picture: res.data.profile_picture });
+      }
+      setPopupStaff(null);
+    },
+    onError: () => toast.error('Failed to upload photo'),
+  });
+
+  const handlePopupFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && popupStaff) {
+      uploadPhotoMut.mutate({ staffId: popupStaff.id, file });
+    }
+    e.target.value = '';
+  };
+
+  const handleAvatarClick = (e: React.MouseEvent, s: StaffMember) => {
+    e.stopPropagation(); // Don't navigate to detail page
+    setPopupStaff(s);
+  };
 
   return (
     <div className="space-y-8 relative z-10 font-medium pb-10">
@@ -131,9 +169,9 @@ export default function StaffPage() {
             <span className="material-symbols-outlined">engineering</span>
           </div>
           <div>
-            <p className="text-[10px] text-tertiary/50 uppercase tracking-widest font-label-caps font-bold">Tech Crew</p>
-            <p className="text-2xl font-bold text-blue-400 font-data-lg mt-0.5">
-              {staffMembers.filter((s) => s.role === 'technician').length}
+            <p className="text-[10px] text-tertiary/50 uppercase tracking-widest font-label-caps font-bold">Sales Crew</p>
+            <p className="text-2xl font-bold text-purple-400 font-data-lg mt-0.5">
+              {staffMembers.filter((s) => s.role === 'salesman').length}
             </p>
           </div>
         </div>
@@ -156,7 +194,7 @@ export default function StaffPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5">
-            {(['all', 'admin', 'technician', 'receptionist', 'manager', 'staff'] as const).map((r) => (
+            {(['all', 'admin', 'manager', 'salesman', 'staff'] as const).map((r) => (
               <button
                 key={r}
                 onClick={() => setRoleFilter(r)}
@@ -191,13 +229,26 @@ export default function StaffPage() {
                 >
                   <div className="flex justify-between items-start">
                     <div
-                      className={`w-12 h-12 rounded-xl bg-gradient-to-br ${grad} border border-white/10 flex items-center justify-center text-sm font-bold text-white shadow-inner`}
+                      className="cursor-pointer"
+                      onClick={(e) => handleAvatarClick(e, s)}
                     >
-                      {s.full_name
-                        .split(' ')
-                        .map((w) => w[0])
-                        .join('')
-                        .slice(0, 2)}
+                      {s.profile_picture ? (
+                        <img
+                          src={API_BASE + s.profile_picture}
+                          alt={s.full_name}
+                          className="w-12 h-12 rounded-xl object-cover border border-white/10 shadow-inner hover:border-performance-red/40 transition-all"
+                        />
+                      ) : (
+                        <div
+                          className={`w-12 h-12 rounded-xl bg-gradient-to-br ${grad} border border-white/10 flex items-center justify-center text-sm font-bold text-white shadow-inner hover:border-performance-red/40 transition-all`}
+                        >
+                          {s.full_name
+                            .split(' ')
+                            .map((w) => w[0])
+                            .join('')
+                            .slice(0, 2)}
+                        </div>
+                      )}
                     </div>
                     <div className={`flex items-center gap-1.5 text-[9px] font-label-caps font-bold uppercase ${statusCfg.text}`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${statusCfg.dot}`} />
@@ -260,13 +311,26 @@ export default function StaffPage() {
                         <td className="py-4 px-6">
                           <div className="flex items-center gap-3">
                             <div
-                              className={`w-9 h-9 rounded-lg bg-gradient-to-br ${grad} border border-white/10 flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0`}
+                              className="cursor-pointer"
+                              onClick={(e) => handleAvatarClick(e, s)}
                             >
-                              {s.full_name
-                                .split(' ')
-                                .map((w) => w[0])
-                                .join('')
-                                .slice(0, 2)}
+                              {s.profile_picture ? (
+                                <img
+                                  src={API_BASE + s.profile_picture}
+                                  alt={s.full_name}
+                                  className="w-9 h-9 rounded-lg object-cover border border-white/10 flex-shrink-0 hover:border-performance-red/40 transition-all"
+                                />
+                              ) : (
+                                <div
+                                  className={`w-9 h-9 rounded-lg bg-gradient-to-br ${grad} border border-white/10 flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 hover:border-performance-red/40 transition-all`}
+                                >
+                                  {s.full_name
+                                    .split(' ')
+                                    .map((w) => w[0])
+                                    .join('')
+                                    .slice(0, 2)}
+                                </div>
+                              )}
                             </div>
                             <div>
                               <p className="text-sm font-extrabold text-white group-hover:text-performance-red transition-colors font-body-lg">
@@ -307,6 +371,72 @@ export default function StaffPage() {
           </div>
         )}
       </div>
+
+      {/* ── Photo Preview Popup Modal ────────────────────── */}
+      {popupStaff && (
+        <>
+          <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm" onClick={() => setPopupStaff(null)} />
+          <div className="fixed z-[110] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] bg-[#0c0c0c]/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.9)] overflow-hidden">
+            {/* Close button */}
+            <button
+              onClick={() => setPopupStaff(null)}
+              className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-black/60 border border-white/10 flex items-center justify-center text-tertiary hover:text-white hover:bg-white/10 transition-all"
+            >
+              <span className="material-symbols-outlined text-[18px]">close</span>
+            </button>
+
+            {/* Photo */}
+            <div className="w-full aspect-square bg-black/40 flex items-center justify-center">
+              {popupStaff.profile_picture ? (
+                <img
+                  src={API_BASE + popupStaff.profile_picture}
+                  alt={popupStaff.full_name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-performance-red/40 to-[#690000] border border-white/10 flex items-center justify-center text-4xl font-extrabold text-white">
+                  {popupStaff.full_name
+                    .split(' ')
+                    .map((w) => w[0])
+                    .join('')
+                    .slice(0, 2)}
+                </div>
+              )}
+            </div>
+
+            {/* Info + Action */}
+            <div className="px-5 py-4 space-y-3">
+              <div>
+                <p className="text-white font-extrabold text-base">{popupStaff.full_name}</p>
+                <p className="text-tertiary/60 text-[10px] font-label-caps uppercase tracking-wider mt-0.5">
+                  {popupStaff.role} · {popupStaff.staff_code}
+                </p>
+              </div>
+
+              {/* Change Photo — visible to admin for anyone, or to the user for their own profile */}
+              {(currentUser?.role === 'admin' || currentUser?.id === popupStaff.id) && (
+                <>
+                  <input
+                    type="file"
+                    ref={popupFileRef}
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handlePopupFileChange}
+                  />
+                  <button
+                    onClick={() => popupFileRef.current?.click()}
+                    disabled={uploadPhotoMut.isPending}
+                    className="w-full py-2.5 rounded-xl bg-performance-red/10 border border-performance-red/20 hover:bg-performance-red/20 text-performance-red text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">photo_camera</span>
+                    {uploadPhotoMut.isPending ? 'Uploading...' : popupStaff.profile_picture ? 'Change Photo' : 'Upload Photo'}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

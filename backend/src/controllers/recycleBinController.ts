@@ -99,7 +99,41 @@ export const restoreItem = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    await pool.query(`UPDATE ${cfg.table} SET deleted_at = NULL WHERE id = ?`, [id]);
+    if (type === 'staff') {
+      const [staffRow] = await pool.query<RowDataPacket[]>(
+        `SELECT id, phone, email, staff_code FROM staff WHERE id = ?`, [id]
+      );
+      if (staffRow.length > 0) {
+        const origPhone = staffRow[0].phone.replace(new RegExp(`_del_${id}$`), '');
+        // Check if phone is in use by an active staff
+        const [activeDup] = await pool.query<RowDataPacket[]>(
+          `SELECT id FROM staff WHERE phone = ? AND deleted_at IS NULL AND id != ?`, [origPhone, id]
+        );
+        if (activeDup.length > 0) {
+          res.status(409).json({
+            success: false,
+            error: { code: ERROR_CODES.CONFLICT, message: 'Cannot restore: phone number is currently assigned to another active staff member.' },
+          });
+          return;
+        }
+
+        const origEmail = staffRow[0].email ? staffRow[0].email.replace(new RegExp(`_del_${id}$`), '') : null;
+        const origCode = staffRow[0].staff_code.replace(new RegExp(`_del_${id}$`), '');
+
+        await pool.query(
+          `UPDATE staff 
+           SET deleted_at = NULL, 
+               status = 'active', 
+               phone = ?, 
+               email = ?, 
+               staff_code = ? 
+           WHERE id = ?`,
+          [origPhone, origEmail, origCode, id]
+        );
+      }
+    } else {
+      await pool.query(`UPDATE ${cfg.table} SET deleted_at = NULL WHERE id = ?`, [id]);
+    }
 
     res.json({ success: true, data: { message: `${cfg.label} restored successfully.` } });
   } catch (error) {

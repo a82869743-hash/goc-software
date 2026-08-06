@@ -30,6 +30,9 @@ import KioskAttendancePage from './pages/KioskAttendancePage';
 import WarrantiesPage from './pages/WarrantiesPage';
 import PublicWarrantyCheck from './pages/PublicWarrantyCheck';
 import RecycleBinPage from './pages/RecycleBinPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import TermsConditionsPage from './pages/TermsConditionsPage';
+import DataDeletionPage from './pages/DataDeletionPage';
 
 
 
@@ -108,6 +111,11 @@ function App() {
 
       <Route path="/track/:token" element={<PublicTrackingPage />} />
       <Route path="/warranty-check" element={<PublicWarrantyCheck />} />
+
+      {/* Public Legal & Meta Pages */}
+      <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+      <Route path="/terms" element={<TermsConditionsPage />} />
+      <Route path="/data-deletion" element={<DataDeletionPage />} />
 
       <Route
         path="/kiosk-attendance"

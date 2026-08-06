@@ -38,7 +38,7 @@ export const getJobCards = async (req: Request, res: Response): Promise<void> =>
         j.vehicle_id,
         j.job_type,
         j.status,
-        j.date_in,
+        COALESCE(j.date_in, j.created_at) as date_in,
         j.expected_out,
         j.date_out,
         j.total_amount,
@@ -95,6 +95,7 @@ export const getJobCardById = async (req: Request, res: Response): Promise<void>
   try {
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT j.*, 
+              COALESCE(j.date_in, j.created_at) as date_in,
               c.full_name as customer_name, c.phone as customer_phone, c.email as customer_email,
               c.alt_phone as customer_alt_phone, c.dob as customer_dob, c.address as customer_address,
               c.city as customer_city, c.notes as customer_notes,
@@ -141,15 +142,20 @@ export const createJobCard = async (req: Request, res: Response): Promise<void> 
     const staffId = (req as any).staff?.id;
     const public_token = uuidv4();
 
+    const discType = d.discount_type || 'fixed';
+    const discVal = Number(d.discount_value || 0);
+    const discAmt = Number(d.discount_amount || 0);
+
     const [result] = await connection.query<ResultSetHeader>(
-      `INSERT INTO job_cards (job_code, booking_id, customer_id, vehicle_id, job_type,
+      `INSERT INTO job_cards (job_code, booking_id, customer_id, vehicle_id, job_type, date_in,
         expected_out, assigned_staff, internal_notes, created_by, status, public_token, insurance_company, insurance_expiry, gst_applicable,
-        advance_booking_id, advance_amount, amount_paid, balance_due)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'in_progress', ?, ?, ?, 1, ?, ?, ?, ?)`,
-      [code, d.booking_id || null, d.customer_id, d.vehicle_id, d.job_type || 'walkin',
+        advance_booking_id, advance_amount, amount_paid, balance_due, discount_type, discount_value, discount_amount)
+       VALUES (?, ?, ?, ?, COALESCE(?, NOW()), ?, ?, ?, ?, 'in_progress', ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)`,
+      [code, d.booking_id || null, d.customer_id, d.vehicle_id, d.job_type || 'walkin', d.date_in || null,
        d.expected_out || null, d.assigned_staff ? JSON.stringify(d.assigned_staff) : null,
        d.internal_notes || null, staffId, public_token, d.insurance_company || null, d.insurance_expiry || null,
-       d.advance_booking_id || null, d.advance_amount || 0.00, d.advance_amount || 0.00, -(d.advance_amount || 0.00)]
+       d.advance_booking_id || null, d.advance_amount || 0.00, d.advance_amount || 0.00, -(d.advance_amount || 0.00),
+       discType, discVal, discAmt]
     );
 
     const jobCardId = result.insertId;
@@ -784,6 +790,17 @@ export const completeJob = async (req: Request, res: Response): Promise<void> =>
     );
 
     const subtotal = services.reduce((s: number, sv: RowDataPacket) => s + Number(sv.line_total), 0);
+
+    // Discount calculation
+    let discAmount = 0;
+    if (jc.discount_type === 'percentage') {
+      discAmount = Math.round((subtotal * (Number(jc.discount_value || 0) / 100)) * 100) / 100;
+    } else {
+      discAmount = Number(jc.discount_amount || jc.discount_value || 0);
+    }
+    discAmount = Math.min(subtotal, Math.max(0, discAmount));
+    const afterDiscountSubtotal = Math.max(0, subtotal - discAmount);
+
     const isInvoice = completion_type === 'invoice';
     const useGST = gst_applicable; // GST applied if checked
 
@@ -793,16 +810,20 @@ export const completeJob = async (req: Request, res: Response): Promise<void> =>
 
     if (useGST) {
       if (isInvoice) {
-        // GST-inclusive: back-calculate tax from line_total
+        // GST-inclusive: back-calculate tax on after-discount subtotal
         for (const sv of services) {
           const taxPct = Number(sv.tax_pct !== undefined ? sv.tax_pct : 18.00);
-          gst_amount += Number(sv.line_total) - (Number(sv.line_total) / (1 + taxPct / 100));
+          const svRatio = subtotal > 0 ? (Number(sv.line_total) / subtotal) : 0;
+          const svAfterDisc = afterDiscountSubtotal * svRatio;
+          gst_amount += svAfterDisc - (svAfterDisc / (1 + taxPct / 100));
         }
       } else {
-        // GST-exclusive: calculate tax on top of line_total
+        // GST-exclusive: calculate tax on top of after-discount subtotal
         for (const sv of services) {
           const taxPct = Number(sv.tax_pct !== undefined ? sv.tax_pct : 18.00);
-          gst_amount += Number(sv.line_total) * (taxPct / 100);
+          const svRatio = subtotal > 0 ? (Number(sv.line_total) / subtotal) : 0;
+          const svAfterDisc = afterDiscountSubtotal * svRatio;
+          gst_amount += svAfterDisc * (taxPct / 100);
         }
       }
       gst_amount = Math.round(gst_amount * 100) / 100;
@@ -810,9 +831,9 @@ export const completeJob = async (req: Request, res: Response): Promise<void> =>
       sgstAmount = Math.round((gst_amount / 2) * 100) / 100;
       gst_amount = cgstAmount + sgstAmount;
     }
-    // Total amount is subtotal for inclusive invoice, subtotal + GST for exclusive estimate
-    let total_amount = isInvoice ? subtotal : (subtotal + gst_amount);
-    const taxable_amount = isInvoice ? (subtotal - gst_amount) : subtotal;
+    // Total amount is afterDiscountSubtotal for inclusive invoice, afterDiscountSubtotal + GST for exclusive estimate
+    let total_amount = isInvoice ? afterDiscountSubtotal : (afterDiscountSubtotal + gst_amount);
+    const taxable_amount = isInvoice ? (afterDiscountSubtotal - gst_amount) : afterDiscountSubtotal;
 
     // Apply 2.5% card charges if payment is made by card
     let card_charges = 0;
@@ -853,10 +874,10 @@ export const completeJob = async (req: Request, res: Response): Promise<void> =>
         `INSERT INTO invoices (invoice_code, job_card_id, customer_id, invoice_type, invoice_date, due_date,
           subtotal, discount_amount, taxable_amount, cgst_rate, cgst_amount, sgst_rate, sgst_amount, igst_rate, igst_amount, apply_gst,
           total_amount, amount_paid, balance_due, card_charges, customer_gstin, status, notes, created_by)
-         VALUES (?, ?, ?, ?, CURDATE(), NULL, ?, 0, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, CURDATE(), NULL, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`,
         [
           docNumber, jobId, jc.customer_id, invType,
-          subtotal, taxable_amount,
+          subtotal, discAmount, taxable_amount,
           cgstRate, cgstAmount, sgstRate, sgstAmount,
           useGST ? 1 : 0, total_amount, Number(jc.amount_paid || 0), total_amount - Number(jc.amount_paid || 0),
           card_charges, isInvoice ? 'paid' : 'draft', notes || null, staffId

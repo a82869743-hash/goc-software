@@ -1,5 +1,6 @@
 import multer from 'multer';
 import path from 'path';
+import fs from 'fs';
 import { Request } from 'express';
 import dotenv from 'dotenv';
 
@@ -8,11 +9,24 @@ dotenv.config({ path: '../.env' });
 const UPLOAD_PATH = process.env.UPLOAD_PATH || './uploads';
 const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || '5242880', 10); // 5MB default
 
+// Ensure all upload subdirectories exist at startup
+['photos', 'pdfs', 'general'].forEach((sub) => {
+  const dir = path.join(UPLOAD_PATH, sub);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+});
+
 // Storage configuration for different file types
 const createStorage = (subfolder: string) => {
   return multer.diskStorage({
     destination: (_req: Request, _file: Express.Multer.File, cb) => {
-      cb(null, path.join(UPLOAD_PATH, subfolder));
+      const dest = path.join(UPLOAD_PATH, subfolder);
+      // Belt-and-suspenders: ensure dir exists at write-time too
+      if (!fs.existsSync(dest)) {
+        fs.mkdirSync(dest, { recursive: true });
+      }
+      cb(null, dest);
     },
     filename: (_req: Request, file: Express.Multer.File, cb) => {
       const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
